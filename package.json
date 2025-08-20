@@ -7,9 +7,9 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "require": "./dist/index.js",
-      "import": "./dist/index.mjs",
-      "types": "./dist/index.d.ts"
+      "import": "./dist/index.mjs"
     }
   },
   "files": [
@@ -39,6 +39,7 @@
     "ai": "^5.0.18",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
+    "highlight.js": "^11.11.1",
     "lucide-react": "^0.263.1",
     "react-markdown": "^10.1.0",
     "rehype-highlight": "^7.0.2",

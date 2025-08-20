@@ -11,7 +11,7 @@ export interface MarkdownMessageProps {
 
 export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
   return (
-    <div className={cn("prose prose-sm max-w-none", className)}>
+    <div className={cn("prose prose-sm max-w-full break-words overflow-wrap-anywhere min-w-0", className)}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
@@ -25,7 +25,7 @@ export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
             // Inline code
             if (!className) {
               return (
-                <code className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded text-xs font-mono">
+                <code className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded text-xs font-mono break-all">
                   {children}
                 </code>
               )
@@ -34,7 +34,7 @@ export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
             return <code className={className}>{children}</code>
           },
           pre: ({ children }) => (
-            <pre className="bg-black/10 dark:bg-white/10 p-3 rounded-md overflow-x-auto text-xs font-mono my-2">
+            <pre className="bg-black/10 dark:bg-white/10 p-3 rounded-md overflow-x-auto text-xs font-mono my-2 min-w-0">
               {children}
             </pre>
           ),
@@ -50,14 +50,16 @@ export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
           h5: ({ children }) => <h5 className="text-sm font-semibold mb-1 mt-2 first:mt-0">{children}</h5>,
           h6: ({ children }) => <h6 className="text-sm font-semibold mb-1 mt-2 first:mt-0">{children}</h6>,
           a: ({ children, href }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">
+            <a href={href} target="_blank" rel="noopener noreferrer" className="underline hover:no-underline break-words">
               {children}
             </a>
           ),
           table: ({ children }) => (
-            <table className="border-collapse border border-border my-2 text-xs w-full">
-              {children}
-            </table>
+            <div className="overflow-x-auto my-2 w-full">
+              <table className="border-collapse border border-border text-xs w-full">
+                {children}
+              </table>
+            </div>
           ),
           th: ({ children }) => (
             <th className="border border-border px-2 py-1 bg-muted font-semibold text-left">

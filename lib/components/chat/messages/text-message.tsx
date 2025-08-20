@@ -13,7 +13,7 @@ export interface TextMessageProps {
 export function TextMessage({ text, isUser, isSystem, className }: TextMessageProps) {
   return (
     <div className={cn(
-      "rounded-lg px-3 py-2 text-sm",
+      "rounded-lg px-3 py-2 text-sm break-words overflow-wrap-anywhere max-w-full min-w-0",
       isUser && "bg-primary text-primary-foreground",
       !isUser && !isSystem && "bg-muted",
       isSystem && "bg-accent text-accent-foreground",

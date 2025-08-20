@@ -1,8 +1,8 @@
-import React, { useRef, useEffect } from "react"
+import React from "react"
 import { cn } from "@lib/utils"
-import { ScrollArea } from "@lib/components/ui/scroll-area"
 import type { UIMessage } from "ai"
-import { ChatMessage } from "@lib/components/chat/chat-message"
+import { ChatHeader } from "@lib/components/chat/chat-header"
+import { ChatMessages } from "@lib/components/chat/chat-messages"
 import { ChatInput } from "@lib/components/chat/chat-input"
 
 export interface ChatContainerProps {
@@ -14,9 +14,24 @@ export interface ChatContainerProps {
   isLoading?: boolean
   placeholder?: string
   className?: string
+  
+  // Header props
+  title?: string
+  subtitle?: string
+  avatar?: string
+  status?: "online" | "offline" | "away" | "busy"
+  badge?: string
+  headerActions?: React.ReactNode
+  
+  // Component class overrides
+  headerClassName?: string
+  messagesClassName?: string
   messageClassName?: string
   inputClassName?: string
+  
+  // Messages props
   autoScroll?: boolean
+  emptyState?: React.ReactNode
 }
 
 export function ChatContainer({
@@ -28,72 +43,57 @@ export function ChatContainer({
   isLoading = false,
   placeholder,
   className,
+  
+  // Header props
+  title,
+  subtitle,
+  avatar,
+  status,
+  badge,
+  headerActions,
+  
+  // Component class overrides
+  headerClassName,
+  messagesClassName,
   messageClassName,
   inputClassName,
-  autoScroll = true
+  
+  // Messages props
+  autoScroll = true,
+  emptyState
 }: ChatContainerProps) {
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  // Auto-scroll to bottom when new messages are added
-  useEffect(() => {
-    if (autoScroll && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
-    }
-  }, [messages, autoScroll])
-
   return (
-    <div className={cn("flex flex-col h-full", className)}>
-      {/* Messages area */}
-      <ScrollArea ref={scrollAreaRef} className="flex-1">
-        <div className="space-y-0">
-          {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-center p-8">
-              <div className="text-muted-foreground">
-                <p className="text-lg mb-2">No messages yet</p>
-                <p className="text-sm">Start a conversation below</p>
-              </div>
-            </div>
-          ) : (
-            messages.map((message, index) => (
-              <ChatMessage
-                key={message.id || index}
-                message={message}
-                className={messageClassName}
-              />
-            ))
-          )}
-          
-          {isLoading && (
-            <div className="flex gap-3 p-4">
-              <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
-              <div className="flex flex-col gap-2 max-w-[80%]">
-                <div className="h-4 w-16 bg-muted animate-pulse rounded" />
-                <div className="rounded-lg px-3 py-2 bg-muted">
-                  <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.1s]" />
-                    <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:0.2s]" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
-
-      {/* Input area */}
-      <ChatInput
-        value={input}
-        onChange={onInputChange}
-        onSubmit={onSubmit}
-        onAttach={onAttach}
-        placeholder={placeholder}
-        disabled={isLoading}
-        className={inputClassName}
+    <div className={cn("flex flex-col h-full bg-background overflow-hidden min-w-0", className)}>
+      <ChatHeader
+        title={title}
+        subtitle={subtitle}
+        avatar={avatar}
+        status={status}
+        badge={badge}
+        actions={headerActions}
+        className={headerClassName}
       />
+      
+      <ChatMessages
+        messages={messages}
+        isLoading={isLoading}
+        autoScroll={autoScroll}
+        className={messagesClassName}
+        messageClassName={messageClassName}
+        emptyState={emptyState}
+      />
+      
+      <div className="bg-background p-6">
+        <ChatInput
+          value={input}
+          onChange={onInputChange}
+          onSubmit={onSubmit}
+          onAttach={onAttach}
+          placeholder={placeholder}
+          disabled={isLoading}
+          className={inputClassName}
+        />
+      </div>
     </div>
   )
 }

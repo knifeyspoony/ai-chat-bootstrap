@@ -13,66 +13,36 @@ import {
   ToolMessage
 } from "@lib/components/chat/messages"
 
-export interface ChatMessageProps {
+export interface AssistantMessageProps {
   message: UIMessage
   avatar?: string
   name?: string
   className?: string
 }
 
-export function ChatMessage({ 
-  message, 
-  avatar, 
-  name,
-  className 
-}: ChatMessageProps) {
-  const isUser = message.role === "user"
-  const isSystem = message.role === "system"
-  
+export function AssistantMessage({ message, avatar, name, className }: AssistantMessageProps) {
   return (
-    <div className={cn(
-      "flex gap-3 p-4",
-      isUser && "flex-row-reverse",
-      isSystem && "justify-center",
-      className
-    )}>
-      {!isSystem && (
-        <Avatar className="h-8 w-8 shrink-0">
-          <AvatarImage src={avatar} alt={name || message.role} />
-          <AvatarFallback>
-            {name ? name[0].toUpperCase() : message.role === "user" ? "U" : "AI"}
-          </AvatarFallback>
-        </Avatar>
-      )}
+    <div className={cn("flex gap-3 px-6 py-4 w-full min-w-0", className)}>
+      <Avatar className="h-8 w-8 shrink-0">
+        <AvatarImage src={avatar} alt={name || "Assistant"} />
+        <AvatarFallback>
+          {name ? name[0].toUpperCase() : "AI"}
+        </AvatarFallback>
+      </Avatar>
       
-      <div className={cn(
-        "flex flex-col gap-2 max-w-[80%]",
-        isUser && "items-end",
-        isSystem && "items-center max-w-full"
-      )}>
-        {!isSystem && (
-          <div className={cn(
-            "flex items-center gap-2 text-xs text-muted-foreground",
-            isUser && "flex-row-reverse"
-          )}>
-            <span>{name || (message.role === "user" ? "You" : "Assistant")}</span>
-            {(message as any).createdAt && (
-              <span>{new Date((message as any).createdAt).toLocaleTimeString()}</span>
-            )}
-          </div>
-        )}
+      <div className="flex flex-col gap-2 min-w-0 flex-1">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{name || "Assistant"}</span>
+          {(message as any).createdAt && (
+            <span>{new Date((message as any).createdAt).toLocaleTimeString()}</span>
+          )}
+        </div>
         
-        <div className={cn(
-          "flex flex-col gap-2",
-          isUser && "items-end"
-        )}>
+        <div className="flex flex-col gap-2 min-w-0">
           {(message as any).content?.map((part: any, index: number) => (
-            <MessagePart 
-              key={index} 
-              part={part} 
-              isUser={isUser} 
-              isSystem={isSystem}
-            />
+            <div key={index} className="min-w-0">
+              <MessagePart part={part} isUser={false} />
+            </div>
           ))}
         </div>
       </div>
@@ -80,18 +50,10 @@ export function ChatMessage({
   )
 }
 
-function MessagePart({ 
-  part, 
-  isUser, 
-  isSystem 
-}: { 
-  part: any, 
-  isUser: boolean, 
-  isSystem: boolean 
-}) {
+function MessagePart({ part, isUser }: { part: any, isUser: boolean }) {
   switch (part.type) {
     case 'text':
-      return <TextMessage text={part.text} isUser={isUser} isSystem={isSystem} />
+      return <TextMessage text={part.text} isUser={isUser} isSystem={false} />
       
     case 'reasoning':
       return <ReasoningMessage reasoning={part.reasoning} />
@@ -118,12 +80,12 @@ function MessagePart({
         <Card className="p-3 bg-purple-50 border-purple-200 dark:bg-purple-950 dark:border-purple-800">
           <div className="flex items-center gap-2">
             <FileIcon className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-medium break-words">
                 {part.title}
               </span>
               {part.filename && (
-                <span className="text-xs text-purple-700 dark:text-purple-300">
+                <span className="text-xs text-purple-700 dark:text-purple-300 break-words">
                   {part.filename}
                 </span>
               )}
@@ -168,7 +130,7 @@ function MessagePart({
                 Data: {dataType}
               </Badge>
             </div>
-            <pre className="text-xs bg-indigo-100 dark:bg-indigo-900 p-2 rounded overflow-x-auto">
+            <pre className="text-xs bg-indigo-100 dark:bg-indigo-900 p-2 rounded overflow-x-auto break-all whitespace-pre-wrap min-w-0">
               {JSON.stringify(part.data || part, null, 2)}
             </pre>
           </Card>
@@ -181,7 +143,7 @@ function MessagePart({
           <Badge variant="outline" className="text-xs mb-2">
             Unknown: {part.type}
           </Badge>
-          <pre className="text-xs text-gray-700 dark:text-gray-300 overflow-x-auto">
+          <pre className="text-xs text-gray-700 dark:text-gray-300 overflow-x-auto break-all whitespace-pre-wrap min-w-0">
             {JSON.stringify(part, null, 2)}
           </pre>
         </Card>

@@ -10,8 +10,10 @@ export interface ChatContainerProps {
   input: string
   onInputChange: (value: string) => void
   onSubmit: () => void
+  onStop?: () => void
   onAttach?: () => void
   isLoading?: boolean
+  isStreaming?: boolean
   placeholder?: string
   className?: string
   
@@ -39,8 +41,10 @@ export function ChatContainer({
   input,
   onInputChange,
   onSubmit,
+  onStop,
   onAttach,
   isLoading = false,
+  isStreaming = false,
   placeholder,
   className,
   
@@ -88,9 +92,11 @@ export function ChatContainer({
           value={input}
           onChange={onInputChange}
           onSubmit={onSubmit}
+          onStop={onStop}
           onAttach={onAttach}
           placeholder={placeholder}
           disabled={isLoading}
+          isStreaming={isStreaming}
           className={inputClassName}
         />
       </div>

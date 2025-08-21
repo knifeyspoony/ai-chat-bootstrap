@@ -4,7 +4,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@lib/components/ui/avatar"
 import { Badge } from "@lib/components/ui/badge"
 import { Card } from "@lib/components/ui/card"
 import type { UIMessage } from "ai"
-import { FileIcon } from "lucide-react"
+import { FileIcon, AlertCircleIcon } from "lucide-react"
 import { 
   TextMessage, 
   ReasoningMessage, 
@@ -19,9 +19,14 @@ export interface AssistantMessageProps {
   name?: string
   className?: string
   streaming?: boolean
+  interrupted?: boolean
 }
 
-function AssistantMessageComponent({ message, avatar, name, className, streaming }: AssistantMessageProps) {
+function AssistantMessageComponent({ message, avatar, name, className, streaming, interrupted }: AssistantMessageProps) {
+  // Detect if message was likely interrupted (has content but not streaming and seems incomplete)
+  const wasInterrupted = interrupted || (!streaming && message.parts?.some(part => 
+    part.type === 'text' && part.text && !part.text.trim().endsWith('.') && !part.text.trim().endsWith('!') && !part.text.trim().endsWith('?')
+  ))
   return (
     <div className={cn("flex gap-3 px-6 py-4 w-full min-w-0", className)}>
       <Avatar className="h-8 w-8 shrink-0">
@@ -45,6 +50,13 @@ function AssistantMessageComponent({ message, avatar, name, className, streaming
               <MessagePart part={part} isUser={false} streaming={!!streaming} />
             </div>
           ))}
+          
+          {wasInterrupted && !streaming && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+              <AlertCircleIcon className="h-3 w-3" />
+              <span>Response was interrupted</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

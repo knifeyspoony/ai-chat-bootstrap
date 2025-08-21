@@ -288,8 +288,10 @@ export function ChatPopout({
             input={input}
             onInputChange={setInput}
             onSubmit={handleSubmit}
+            onStop={chat.stop}
             onAttach={onAttach}
             isLoading={chat.isLoading}
+            isStreaming={chat.status === 'streaming' || chat.status === 'submitted'}
             placeholder={placeholder}
             title={title}
             subtitle={subtitle}
@@ -406,8 +408,10 @@ export function ChatPopout({
             input={input}
             onInputChange={setInput}
             onSubmit={handleSubmit}
+            onStop={chat.stop}
             onAttach={onAttach}
             isLoading={chat.isLoading}
+            isStreaming={chat.status === 'streaming' || chat.status === 'submitted'}
             placeholder={placeholder}
             title={title}
             subtitle={subtitle}

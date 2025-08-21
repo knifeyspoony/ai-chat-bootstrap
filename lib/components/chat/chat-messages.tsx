@@ -208,7 +208,22 @@ export function ChatMessages({
           {messages.length === 0 ? (
             emptyState || defaultEmptyState
           ) : (
-            messages.map((message, index) => {
+            messages.filter((message) => {
+              // Filter out empty assistant messages (likely from cancelled requests)
+              if (message.role === "assistant") {
+                const hasContent = message.parts?.some(part => 
+                  part.type === 'text' && part.text?.trim() ||
+                  part.type === 'reasoning' && part.text?.trim() ||
+                  part.type?.startsWith('tool-') ||
+                  part.type?.startsWith('data-') ||
+                  part.type === 'file' ||
+                  part.type === 'source-url' ||
+                  part.type === 'source-document'
+                )
+                return hasContent
+              }
+              return true
+            }).map((message, index) => {
               const isUser = message.role === "user"
               const isSystem = message.role === "system"
               const isLast = index === messages.length - 1

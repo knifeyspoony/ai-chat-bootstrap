@@ -38,13 +38,13 @@ export function ChatHeader({
 
   return (
     <div className={cn(
-      "flex items-center justify-between p-4 border-b bg-background/50 backdrop-blur-sm",
+      "flex items-center justify-between px-4 py-2 border-b bg-background/50 backdrop-blur-sm",
       className
     )}>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         {avatar && (
-          <div className="relative">
-            <Avatar className="h-8 w-8">
+          <div className="relative flex-shrink-0">
+            <Avatar className="h-6 w-6">
               <AvatarImage src={avatar} alt={title || "Chat"} />
               <AvatarFallback>
                 {title ? title[0].toUpperCase() : "AI"}
@@ -52,32 +52,30 @@ export function ChatHeader({
             </Avatar>
             {status && (
               <div className={cn(
-                "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
+                "absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-background",
                 getStatusColor(status)
               )} />
             )}
           </div>
         )}
         
-        <div className="flex flex-col">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {title && (
-            <div className="flex items-center gap-2">
-              <h3 className="font-medium text-sm">{title}</h3>
-              {badge && (
-                <Badge variant="secondary" className="text-xs">
-                  {badge}
-                </Badge>
-              )}
-            </div>
+            <h3 className="font-medium text-sm truncate">{title}</h3>
+          )}
+          {badge && (
+            <Badge variant="secondary" className="text-xs flex-shrink-0">
+              {badge}
+            </Badge>
           )}
           {subtitle && (
-            <p className="text-xs text-muted-foreground">{subtitle}</p>
+            <span className="text-xs text-muted-foreground truncate">• {subtitle}</span>
           )}
         </div>
       </div>
       
       {actions && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 flex-shrink-0">
           {actions}
         </div>
       )}

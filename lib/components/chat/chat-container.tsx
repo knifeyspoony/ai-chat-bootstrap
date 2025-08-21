@@ -78,12 +78,12 @@ export function ChatContainer({
         messages={messages}
         isLoading={isLoading}
         autoScroll={autoScroll}
-        className={messagesClassName}
+        className={cn("border-b", messagesClassName)}
         messageClassName={messageClassName}
         emptyState={emptyState}
       />
       
-      <div className="bg-background p-6">
+      <div className="bg-background p-4">
         <ChatInput
           value={input}
           onChange={onInputChange}

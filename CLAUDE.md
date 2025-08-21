@@ -69,6 +69,61 @@ pnpm run storybook
 
 ## AI SDK Integration
 
+### Type Safety Guidelines (CRITICAL)
+**NEVER assume types or interfaces - ALWAYS verify from actual source code first:**
+
+#### 1. Check Actual Type Definitions Before Making Changes
+```bash
+# Find any interface/type in node_modules
+find node_modules -name "*.d.ts" -exec grep -l "InterfaceName" {} \;
+# Read the exact definition
+grep -A 20 "interface InterfaceName" node_modules/.pnpm/package@version/node_modules/package/dist/index.d.ts
+
+# For React component props
+grep -A 15 "interface.*Props" node_modules/@types/react/index.d.ts
+
+# For library-specific types
+grep -rn "type SomeType" node_modules/library-name/
+```
+
+#### 2. Verify Existing Usage Patterns in Codebase
+```bash
+# See how types are actually used in this project
+grep -r "TypeName" lib/ src/ --include="*.ts" --include="*.tsx"
+grep -r ": TypeName" lib/ src/ -A 5 -B 2
+
+# Check existing implementations
+grep -r "interface.*Props" lib/ src/ -A 10
+```
+
+#### 3. Run TypeScript Compiler for Exact Errors (Not Assumptions)
+```bash
+pnpm run lint  # Get real TypeScript errors
+npx tsc --noEmit  # Type check without building
+```
+
+#### 4. Read Component/Library Source Code Directly
+```bash
+# Read actual component files to understand expected props
+cat node_modules/library/dist/Component.d.ts
+# Check package.json for exact versions being used
+cat package.json | grep "library-name"
+```
+
+#### 5. AI SDK v5.0.18 Example - UIMessage Structure
+```typescript
+// ACTUAL structure from node_modules (verified):
+interface UIMessage {
+  id: string;
+  role: 'system' | 'user' | 'assistant';
+  parts: Array<UIMessagePart>;  // NOT 'content'!
+  metadata?: unknown;           // Optional
+  // NO 'status' field exists in v5.0.18!
+}
+```
+
+**Key Rule: If you don't have the actual source code open, don't guess the types!**
+
 ### Documentation Reference
 - **Main Docs**: https://ai-sdk.dev/docs/reference
 - **UIMessage Format**: Used for chat message structure
@@ -112,7 +167,6 @@ pnpm run lint         # ESLint check
 
 ## Future TODOs
 - [ ] Implement comprehensive test suite
-- [ ] Add more message type components
 - [ ] Improve TypeScript types for AI SDK integration
 - [ ] Add animation/transition support
 - [ ] Consider headless component variants

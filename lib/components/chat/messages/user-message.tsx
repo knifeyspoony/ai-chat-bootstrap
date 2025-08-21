@@ -36,7 +36,7 @@ export function UserMessage({ message, avatar, name, className }: UserMessagePro
         </div>
         
         <div className="flex flex-col gap-2 items-end min-w-0">
-          {(message as any).content?.map((part: any, index: number) => (
+          {message.parts?.map((part: any, index: number) => (
             <div key={index} className="min-w-0">
               <MessagePart part={part} isUser={true} />
             </div>

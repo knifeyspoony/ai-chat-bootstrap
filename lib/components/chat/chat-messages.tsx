@@ -3,8 +3,8 @@ import { cn } from "@lib/utils"
 import { Badge } from "@lib/components/ui/badge"
 import { ScrollArea } from "@lib/components/ui/scroll-area"
 import type { UIMessage } from "ai"
-import { UserMessage } from "@lib/components/chat/user-message"
-import { AssistantMessage } from "@lib/components/chat/assistant-message"
+import { UserMessage } from "@lib/components/chat/messages/user-message"
+import { AssistantMessage } from "@lib/components/chat/messages/assistant-message"
 
 export interface ChatMessagesProps {
   messages: UIMessage[]
@@ -52,10 +52,12 @@ export function ChatMessages({
             const isSystem = message.role === "system"
             
             if (isSystem) {
+              const firstPart = message.parts?.[0]
+              const systemText = firstPart && 'text' in firstPart ? firstPart.text : "System message"
               return (
                 <div key={message.id || index} className={cn("flex justify-center px-6 py-4 w-full", messageClassName)}>
                   <Badge variant="outline" className="text-xs">
-                    {(message as any).content?.[0]?.text || "System message"}
+                    {systemText}
                   </Badge>
                 </div>
               )

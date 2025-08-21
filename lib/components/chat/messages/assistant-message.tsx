@@ -39,7 +39,7 @@ export function AssistantMessage({ message, avatar, name, className }: Assistant
         </div>
         
         <div className="flex flex-col gap-2 min-w-0">
-          {(message as any).content?.map((part: any, index: number) => (
+          {message.parts?.map((part: any, index: number) => (
             <div key={index} className="min-w-0">
               <MessagePart part={part} isUser={false} />
             </div>

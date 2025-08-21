@@ -37,7 +37,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     return (
       <div className={cn(
-        "flex items-end gap-2 p-4 border-t bg-background",
+        "flex items-end gap-2 p-4 bg-background",
         className
       )}>
         {onAttach && (

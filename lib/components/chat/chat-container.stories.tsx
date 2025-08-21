@@ -1,13 +1,19 @@
-import type { Meta, StoryObj } from '@storybook/react'
-import { ChatContainer } from './chat-container'
+import type { Meta, StoryObj } from '@storybook/nextjs'
+import { ChatContainer, type ChatContainerProps } from './chat-container'
 import { useState } from 'react'
 import { Button } from '@lib/components/ui/button'
 import { MoreHorizontalIcon, PhoneIcon, VideoIcon } from 'lucide-react'
 import type { UIMessage } from 'ai'
 
+// Props for ChatContainerWrapper - excludes state management props that are handled internally
+type ChatContainerWrapperProps = Omit<ChatContainerProps, 'input' | 'onInputChange' | 'onSubmit'> & {
+  // Override messages to be optional with default
+  messages?: UIMessage[]
+}
+
 const meta = {
   title: 'Chat/ChatContainer',
-  component: ChatContainer,
+  component: ChatContainerWrapper,
   parameters: {
     layout: 'fullscreen',
     viewport: {
@@ -19,11 +25,9 @@ const meta = {
   },
   tags: ['autodocs'],
   argTypes: {
-    onSubmit: { action: 'message submitted' },
     onAttach: { action: 'attach clicked' },
-    onInputChange: { action: 'input changed' },
   },
-} satisfies Meta<typeof ChatContainer>
+} satisfies Meta<typeof ChatContainerWrapper>
 
 export default meta
 type Story = StoryObj<typeof meta>
@@ -32,43 +36,39 @@ const sampleMessages: UIMessage[] = [
   {
     id: 'msg-1',
     role: 'user',
-    content: [{ type: 'text', text: 'Hello! How can you help me today?' }],
-    createdAt: new Date(Date.now() - 5 * 60 * 1000),
+    parts: [{ type: 'text', text: 'Hello! How can you help me today?' }]
   },
   {
     id: 'msg-2',
     role: 'assistant',
-    content: [
+    parts: [
       { type: 'text', text: 'Hello! I\'m here to help you with various tasks. I can:' },
       { type: 'text', text: '• Answer questions\n• Help with coding\n• Provide explanations\n• Assist with writing\n• And much more!' }
-    ],
-    createdAt: new Date(Date.now() - 4 * 60 * 1000),
+    ]
   },
   {
     id: 'msg-3',
     role: 'user',
-    content: [{ type: 'text', text: 'Can you explain how AI works?' }],
-    createdAt: new Date(Date.now() - 3 * 60 * 1000),
+    parts: [{ type: 'text', text: 'Can you explain how AI works?' }]
   },
   {
     id: 'msg-4',
     role: 'assistant',
-    content: [
+    parts: [
       { 
         type: 'reasoning', 
-        reasoning: 'The user is asking about AI fundamentals. I should provide a clear, accessible explanation.' 
+        text: 'The user is asking about AI fundamentals. I should provide a clear, accessible explanation.' 
       },
       { 
         type: 'text', 
         text: 'AI works by processing large amounts of data to identify patterns and make predictions or decisions. Here\'s a simplified breakdown:\n\n1. **Data Collection**: AI systems are trained on vast datasets\n2. **Pattern Recognition**: They learn to identify patterns in this data\n3. **Model Training**: Through machine learning, they adjust their internal parameters\n4. **Inference**: When given new input, they use learned patterns to generate responses' 
       }
-    ],
-    createdAt: new Date(Date.now() - 2 * 60 * 1000),
+    ]
   },
 ]
 
 // Wrapper component to handle state
-function ChatContainerWrapper(props: any) {
+function ChatContainerWrapper(props: ChatContainerWrapperProps) {
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<UIMessage[]>(props.messages || [])
   const [isLoading, setIsLoading] = useState(props.isLoading || false)
@@ -79,8 +79,7 @@ function ChatContainerWrapper(props: any) {
     const newMessage: UIMessage = {
       id: `msg-${Date.now()}`,
       role: 'user',
-      content: [{ type: 'text', text: input }],
-      createdAt: new Date(),
+      parts: [{ type: 'text', text: input }]
     }
     
     setMessages(prev => [...prev, newMessage])
@@ -92,8 +91,7 @@ function ChatContainerWrapper(props: any) {
       const assistantMessage: UIMessage = {
         id: `msg-${Date.now() + 1}`,
         role: 'assistant',
-        content: [{ type: 'text', text: `You said: "${input}". This is a demo response.` }],
-        createdAt: new Date(),
+        parts: [{ type: 'text', text: `You said: "${input}". This is a demo response.` }]
       }
       setMessages(prev => [...prev, assistantMessage])
       setIsLoading(false)
@@ -170,8 +168,7 @@ export const InteractiveDemo: Story = {
       {
         id: 'welcome',
         role: 'assistant',
-        content: [{ type: 'text', text: 'Welcome! Try typing a message below to see the interactive chat in action.' }],
-        createdAt: new Date(),
+        parts: [{ type: 'text', text: 'Welcome! Try typing a message below to see the interactive chat in action.' }]
       }
     ],
     title: 'Chat Demo',
@@ -189,27 +186,18 @@ export const ComplexMessages: Story = {
       {
         id: 'complex-1',
         role: 'user',
-        content: [
+        parts: [
           { type: 'text', text: 'Can you help me with this file?' },
-          { type: 'file', filename: 'data.csv', mimeType: 'text/csv', url: '#' }
-        ],
-        createdAt: new Date(Date.now() - 3 * 60 * 1000),
+          { type: 'file', filename: 'data.csv', mediaType: 'text/csv', url: '#' }
+        ]
       },
       {
         id: 'complex-2',
         role: 'assistant',
-        content: [
-          { type: 'reasoning', reasoning: 'User has uploaded a CSV file. I should help them analyze it.' },
-          { type: 'text', text: 'I can help you analyze your CSV file! Based on the filename, it looks like it contains data.' },
-          { 
-            type: 'tool-analyze', 
-            toolName: 'csv_analyzer',
-            args: { file: 'data.csv' },
-            result: 'The CSV contains 1000 rows and 5 columns: id, name, age, city, score'
-          },
-          { type: 'text', text: 'Here\'s what I found in your file. Would you like me to help with any specific analysis?' }
-        ],
-        createdAt: new Date(Date.now() - 2 * 60 * 1000),
+        parts: [
+          { type: 'reasoning', text: 'User has uploaded a CSV file. I should help them analyze it.' },
+          { type: 'text', text: 'I can help you analyze your CSV file! Based on the filename, it looks like it contains data. After analyzing the file, I found it contains 1000 rows and 5 columns: id, name, age, city, score. Would you like me to help with any specific analysis?' }
+        ]
       }
     ],
   },
@@ -234,8 +222,7 @@ export const SupportChat: Story = {
       {
         id: 'support-1',
         role: 'assistant',
-        content: [{ type: 'text', text: 'Hi! How can I help you today?' }],
-        createdAt: new Date(Date.now() - 2 * 60 * 1000),
+        parts: [{ type: 'text', text: 'Hi! How can I help you today?' }]
       }
     ],
     title: 'Support Team',
@@ -265,13 +252,12 @@ export const ScrollingDemo: Story = {
     messages: Array.from({ length: 20 }, (_, i) => ({
       id: `msg-${i}`,
       role: i % 2 === 0 ? 'user' : 'assistant',
-      content: [{ 
+      parts: [{ 
         type: 'text', 
         text: i % 2 === 0 
           ? `This is user message ${i + 1}. Let me ask you about something important.`
           : `This is assistant response ${i + 1}. Here's a helpful answer to your question with some additional context and information.`
-      }],
-      createdAt: new Date(Date.now() - (20 - i) * 60 * 1000),
+      }]
     })) as UIMessage[],
     title: 'Scrolling Demo',
     subtitle: 'Many messages to test scrolling',
@@ -288,16 +274,15 @@ export const LongMessagesTest: Story = {
       {
         id: 'long-1',
         role: 'user',
-        content: [{ 
+        parts: [{ 
           type: 'text', 
           text: 'This is a very very very long message that should wrap properly without causing horizontal scrolling in the chat interface. It contains a lot of text to test the wrapping behavior and make sure everything displays correctly within the chat bubble without breaking the layout or causing any horizontal overflow issues that would make the chat unusable.'
-        }],
-        createdAt: new Date(Date.now() - 5 * 60 * 1000),
+        }]
       },
       {
         id: 'long-2',
         role: 'assistant',
-        content: [{ 
+        parts: [{ 
           type: 'text', 
           text: `Here's a comprehensive response with **markdown formatting** and various elements:
 
@@ -326,17 +311,15 @@ function veryLongFunctionNameThatMightCauseHorizontalScrolling(parameterWithVery
 > This is a blockquote with very long text that should wrap properly within the available space without causing any layout issues or horizontal scrolling problems in the chat interface.
 
 The message continues with more text to ensure everything wraps correctly and maintains proper formatting.`
-        }],
-        createdAt: new Date(Date.now() - 3 * 60 * 1000),
+        }]
       },
       {
         id: 'long-3',
         role: 'user',
-        content: [{ 
+        parts: [{ 
           type: 'text', 
           text: 'URLsLikeThisOneWithoutSpacesCouldPotentiallyBreaklayout: https://example.com/very/long/path/that/goes/on/and/on/without/any/breaks/or/spaces/which/might/cause/horizontal/overflow/issues/in/the/chat/interface'
-        }],
-        createdAt: new Date(Date.now() - 1 * 60 * 1000),
+        }]
       }
     ] as UIMessage[],
     title: 'Text Wrapping Test',

@@ -37,7 +37,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     return (
       <div className={cn(
-        "flex items-end gap-2 p-4 bg-background",
+        "flex items-end gap-2 bg-background",
         className
       )}>
         {onAttach && (
@@ -62,7 +62,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             placeholder={placeholder}
             disabled={disabled}
             className={cn(
-              "min-h-[44px] resize-none pr-12",
+              "min-h-[44px] resize-none pr-12 leading-tight py-3",
               `max-h-[${maxRows * 1.5}rem]`
             )}
             rows={1}
@@ -73,7 +73,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             size="sm"
             onClick={onSubmit}
             disabled={disabled || !value.trim()}
-            className="absolute right-2 bottom-2 h-8 w-8 p-0"
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
           >
             <SendIcon className="h-4 w-4" />
           </Button>

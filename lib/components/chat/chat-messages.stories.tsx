@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { ChatMessages } from './chat-messages'
-import type { UIMessage } from 'ai'
+import type { UIMessage, UIMessagePart } from 'ai'
 
 const meta = {
   title: 'Chat/ChatMessages',
@@ -35,11 +35,10 @@ const meta = {
 export default meta
 type Story = StoryObj<typeof meta>
 
-const createMessage = (role: 'user' | 'assistant' | 'system', content: any[]): UIMessage => ({
+const createMessage = (role: 'user' | 'assistant' | 'system', parts: UIMessagePart<any, any>[]): UIMessage => ({
   id: `msg-${Math.random()}`,
   role,
-  content,
-  createdAt: new Date(),
+  parts,
 })
 
 const sampleMessages: UIMessage[] = [

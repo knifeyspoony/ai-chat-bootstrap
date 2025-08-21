@@ -4,3 +4,4 @@ export { ReasoningMessage } from '@lib/components/chat/messages/reasoning-messag
 export { FileMessage } from '@lib/components/chat/messages/file-message'
 export { SourceUrlMessage } from '@lib/components/chat/messages/source-url-message'
 export { ToolMessage } from '@lib/components/chat/messages/tool-message'
+export { CodeBlockMessage } from '@lib/components/chat/messages/code-block-message'

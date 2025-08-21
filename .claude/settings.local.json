@@ -8,7 +8,8 @@
       "Bash(pnpm run lint:*)",
       "Bash(npx tsc:*)",
       "Bash(grep:*)",
-      "Bash(pnpm run build-storybook:*)"
+      "Bash(pnpm run build-storybook:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

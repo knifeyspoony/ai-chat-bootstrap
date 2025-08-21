@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { cn } from '@lib/utils'
+import { CodeBlockMessage } from './code-block-message'
 
 export interface MarkdownMessageProps {
   content: string
@@ -25,19 +26,41 @@ export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
             // Inline code
             if (!className) {
               return (
-                <code className="bg-black/10 dark:bg-white/10 px-1 py-0.5 rounded text-xs font-mono break-all">
+                <code className="bg-neutral-200 dark:bg-neutral-700 border border-border px-1 py-0.5 rounded text-xs font-mono break-all">
                   {children}
                 </code>
               )
             }
-            // Code blocks are handled by pre
+            
+            // Extract language from className for code blocks
+            const languageMatch = className.match(/language-(\w+)/)
+            if (languageMatch) {
+              const language = languageMatch[1]
+              // This is a code block - render it with CodeBlockMessage
+              return (
+                <CodeBlockMessage language={language}>
+                  <code className={className}>{children}</code>
+                </CodeBlockMessage>
+              )
+            }
+            
+            // Fallback for code with className but no language
             return <code className={className}>{children}</code>
           },
-          pre: ({ children }) => (
-            <pre className="bg-black/10 dark:bg-white/10 p-3 rounded-md overflow-x-auto text-xs font-mono my-2 min-w-0">
-              {children}
-            </pre>
-          ),
+          pre: ({ children }) => {
+            // Check if children already contain a CodeBlockMessage (from code component)
+            const hasCodeBlockMessage = React.Children.toArray(children).some(
+              (child) => React.isValidElement(child) && (child.type as any)?.displayName === 'CodeBlockMessage'
+            )
+            
+            if (hasCodeBlockMessage) {
+              // CodeBlockMessage already rendered by code component, just return children
+              return <>{children}</>
+            }
+            
+            // Fallback for pre blocks without language (shouldn't happen with our setup)
+            return <CodeBlockMessage>{children}</CodeBlockMessage>
+          },
           blockquote: ({ children }) => (
             <blockquote className="border-l-4 border-border pl-4 my-2 italic">
               {children}

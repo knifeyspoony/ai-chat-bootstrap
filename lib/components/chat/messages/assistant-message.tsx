@@ -130,7 +130,7 @@ function MessagePart({ part, isUser }: { part: any, isUser: boolean }) {
                 Data: {dataType}
               </Badge>
             </div>
-            <pre className="text-xs bg-indigo-100 dark:bg-indigo-900 p-2 rounded overflow-x-auto break-all whitespace-pre-wrap min-w-0">
+            <pre className="text-xs bg-neutral-200 dark:bg-neutral-700 border border-border p-2 rounded overflow-x-auto break-all whitespace-pre-wrap min-w-0">
               {JSON.stringify(part.data || part, null, 2)}
             </pre>
           </Card>
@@ -143,7 +143,7 @@ function MessagePart({ part, isUser }: { part: any, isUser: boolean }) {
           <Badge variant="outline" className="text-xs mb-2">
             Unknown: {part.type}
           </Badge>
-          <pre className="text-xs text-gray-700 dark:text-gray-300 overflow-x-auto break-all whitespace-pre-wrap min-w-0">
+          <pre className="text-xs bg-neutral-100 dark:bg-neutral-800 p-2 rounded overflow-x-auto break-all whitespace-pre-wrap min-w-0">
             {JSON.stringify(part, null, 2)}
           </pre>
         </Card>

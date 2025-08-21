@@ -10,9 +10,9 @@ export interface SourceUrlMessageProps {
 
 export function SourceUrlMessage({ title, url, className }: SourceUrlMessageProps) {
   return (
-    <Card className="p-3 bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
+    <Card className="p-3 bg-secondary border-secondary">
       <div className="flex items-center gap-2">
-        <LinkIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
+        <LinkIcon className="h-4 w-4 text-secondary-foreground" />
         <div className="flex flex-col">
           <span className="text-sm font-medium">
             {title || 'Source'}
@@ -21,7 +21,7 @@ export function SourceUrlMessage({ title, url, className }: SourceUrlMessageProp
             href={url} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="text-xs text-green-700 hover:underline dark:text-green-300"
+            className="text-xs text-primary hover:text-primary/80 hover:underline"
           >
             {url}
           </a>

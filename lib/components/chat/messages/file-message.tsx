@@ -11,9 +11,9 @@ export interface FileMessageProps {
 
 export function FileMessage({ filename, mimeType, url, className }: FileMessageProps) {
   return (
-    <Card className="p-3 bg-gray-50 border-gray-200 dark:bg-gray-900 dark:border-gray-700">
+    <Card className="p-3 bg-muted border-muted">
       <div className="flex items-center gap-2">
-        <FileIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+        <FileIcon className="h-4 w-4 text-muted-foreground" />
         <div className="flex flex-col">
           <span className="text-sm font-medium">
             {filename || 'File'}
@@ -30,7 +30,7 @@ export function FileMessage({ filename, mimeType, url, className }: FileMessageP
           href={url} 
           target="_blank" 
           rel="noopener noreferrer"
-          className="text-xs text-blue-600 hover:underline mt-1 block dark:text-blue-400"
+          className="text-xs text-primary hover:text-primary/80 hover:underline mt-1 block"
         >
           View file
         </a>

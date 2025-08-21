@@ -43,6 +43,44 @@ lib/
 
 ## Development Guidelines
 
+### Zustand Hook Patterns (CRITICAL - Prevents Re-render Loops)
+
+**NEVER include Zustand action functions in useEffect dependencies!**
+
+❌ **Wrong - Causes infinite re-renders:**
+```typescript
+const setContext = useAIContextStore(state => state.setContext)
+const clearContext = useAIContextStore(state => state.clearContext)
+
+useEffect(() => {
+  setContext(key, value)
+  return () => clearContext(key)
+}, [key, value, setContext, clearContext]) // ❌ setContext/clearContext are unstable refs
+```
+
+✅ **Correct - Stable dependencies only:**
+```typescript
+const setContext = useAIContextStore(state => state.setContext)
+const clearContext = useAIContextStore(state => state.clearContext)
+
+useEffect(() => {
+  setContext(key, value)  
+  return () => clearContext(key)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [key, value]) // ✅ Only include actual data that should trigger re-runs
+```
+
+**Why this happens:**
+- Zustand selectors create **new function references** on every render
+- `useAIContextStore(state => state.setContext)` returns a different function each time
+- This triggers useEffect on every render, causing infinite loops
+- Zustand actions are stable by design - the underlying functions don't change
+
+**Apply this pattern to all hooks:**
+- `useAIContext`: `[key, value]` only
+- `useAIFrontendTool`: `[tool]` only
+- `useAIFocus`: `[focusItem]` only
+
 ### Package Management
 ```bash
 # Always use pnpm
@@ -110,19 +148,118 @@ cat node_modules/library/dist/Component.d.ts
 cat package.json | grep "library-name"
 ```
 
-#### 5. AI SDK v5.0.18 Example - UIMessage Structure
+#### 5. AI SDK v5.0.18 UIMessage Structure (VERIFIED from node_modules)
 ```typescript
-// ACTUAL structure from node_modules (verified):
-interface UIMessage {
+// ACTUAL structure from AI SDK v5.0.18 (verified from node_modules/ai/dist/index.d.ts):
+interface UIMessage<METADATA = unknown, DATA_PARTS extends UIDataTypes = UIDataTypes, TOOLS extends UITools = UITools> {
+  /**
+   * A unique identifier for the message.
+   */
   id: string;
+  
+  /**
+   * The role of the message.
+   */
   role: 'system' | 'user' | 'assistant';
-  parts: Array<UIMessagePart>;  // NOT 'content'!
-  metadata?: unknown;           // Optional
-  // NO 'status' field exists in v5.0.18!
+  
+  /**
+   * The metadata of the message.
+   */
+  metadata?: METADATA;
+  
+  /**
+   * The parts of the message. Use this for rendering the message in the UI.
+   * 
+   * System messages should be avoided (set the system prompt on the server instead).
+   * They can have text parts.
+   * 
+   * User messages can have text parts and file parts.
+   * 
+   * Assistant messages can have text, reasoning, tool invocation, and file parts.
+   */
+  parts: Array<UIMessagePart<DATA_PARTS, TOOLS>>;
 }
+
+// UIMessagePart Union Type:
+type UIMessagePart<DATA_TYPES extends UIDataTypes, TOOLS extends UITools> = 
+  | TextUIPart 
+  | ReasoningUIPart 
+  | ToolUIPart<TOOLS> 
+  | DynamicToolUIPart 
+  | SourceUrlUIPart 
+  | SourceDocumentUIPart 
+  | FileUIPart 
+  | DataUIPart<DATA_TYPES> 
+  | StepStartUIPart;
+
+// Individual Part Types:
+type TextUIPart = {
+  type: 'text';
+  text: string;
+  state?: 'streaming' | 'done';
+  providerMetadata?: ProviderMetadata;
+};
+
+type ReasoningUIPart = {
+  type: 'reasoning';
+  text: string;
+  state?: 'streaming' | 'done';
+  providerMetadata?: ProviderMetadata;
+};
+
+type FileUIPart = {
+  type: 'file';
+  mediaType: string;
+  filename?: string;
+  url: string;  // URL or Data URL
+};
+
+type SourceUrlUIPart = {
+  type: 'source-url';
+  sourceId: string;
+  url: string;
+  title?: string;
+  providerMetadata?: ProviderMetadata;
+};
+
+type SourceDocumentUIPart = {
+  type: 'source-document';
+  sourceId: string;
+  mediaType: string;
+  title: string;
+  filename?: string;
+  providerMetadata?: ProviderMetadata;
+};
+
+type StepStartUIPart = {
+  type: 'step-start';
+};
+
+type DataUIPart<DATA_TYPES extends UIDataTypes> = ValueOf<{
+  [NAME in keyof DATA_TYPES & string]: {
+    type: `data-${NAME}`;
+    id?: string;
+    data: DATA_TYPES[NAME];
+  };
+}>;
+
+type ToolUIPart<TOOLS extends UITools = UITools> = ValueOf<{
+  [NAME in keyof TOOLS & string]: {
+    type: `tool-${NAME}`;
+    toolCallId: string;
+    // ... different states for input-streaming, input-available, complete, error
+  };
+}>;
 ```
 
-**Key Rule: If you don't have the actual source code open, don't guess the types!**
+**Key Rules:**
+- ✅ UIMessage HAS a `parts` property (Array<UIMessagePart>)
+- ✅ Each part has a `type` field indicating its content type
+- ✅ Text content is in `part.text` for TextUIPart
+- ✅ Assistant messages render by mapping over `message.parts`
+- ✅ The existing component structure is correct for this format
+
+**CRITICAL:** Always verify types from actual source code, never assume!
 
 ### Documentation Reference
 - **Main Docs**: https://ai-sdk.dev/docs/reference

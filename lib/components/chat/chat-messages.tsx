@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback, forwardRef } from "react"
+import React, { useRef, useEffect, useLayoutEffect, useState, useCallback, forwardRef } from "react"
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
 import { cn } from "@lib/utils"
 import { Badge } from "@lib/components/ui/badge"
@@ -48,28 +48,62 @@ export function ChatMessages({
 }: ChatMessagesProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
   const [showTopFade, setShowTopFade] = useState(false)
   const [showBottomFade, setShowBottomFade] = useState(false)
+  // Throttle scroll fade updates to one per frame and avoid redundant state writes
+  const scrollRafRef = useRef<number | null>(null)
+  const prevFadeRef = useRef({ top: false, bottom: false })
+  const pinnedRef = useRef(true)
+  const prevHeightRef = useRef(0)
+  const prevIsLoadingRef = useRef(isLoading)
 
-  // Handle scroll to update fade visibility
+  // Handle scroll to update fade visibility (rAF-coalesced + change-detected)
   const handleScroll = useCallback(() => {
     const viewport = viewportRef.current
     if (!viewport) return
 
-    const { scrollTop, scrollHeight, clientHeight } = viewport
-    const isAtTop = scrollTop <= 5
-    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 5
+    if (scrollRafRef.current != null) return
+    scrollRafRef.current = requestAnimationFrame(() => {
+      const { scrollTop, scrollHeight, clientHeight } = viewport
+      const isAtTop = scrollTop <= 5
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 5
+      const nearBottomForPin = scrollTop + clientHeight >= scrollHeight - 160
+      pinnedRef.current = nearBottomForPin
 
-    setShowTopFade(!isAtTop)
-    setShowBottomFade(!isAtBottom)
+      const nextTop = !isAtTop
+      const nextBottom = !isAtBottom
+
+      if (prevFadeRef.current.top !== nextTop) {
+        setShowTopFade(nextTop)
+        prevFadeRef.current.top = nextTop
+      }
+      if (prevFadeRef.current.bottom !== nextBottom) {
+        setShowBottomFade(nextBottom)
+        prevFadeRef.current.bottom = nextBottom
+      }
+      scrollRafRef.current = null
+    })
   }, [])
 
   // Auto-scroll to bottom when new messages are added
+  // Autoscroll only when user is near bottom; avoid smooth behavior while streaming
   useEffect(() => {
-    if (autoScroll && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
-    }
-  }, [messages, autoScroll])
+    if (!autoScroll) return
+    const viewport = viewportRef.current
+    const end = messagesEndRef.current
+    if (!viewport || !end) return
+
+    const { scrollTop, scrollHeight, clientHeight } = viewport
+    const nearBottom = scrollHeight - (scrollTop + clientHeight) <= 160
+    if (!nearBottom) return
+
+    const behavior: ScrollBehavior = isLoading ? 'auto' : 'smooth'
+    const raf = requestAnimationFrame(() => {
+      end.scrollIntoView({ behavior, block: 'end' })
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [messages, autoScroll, isLoading])
 
   // Set up scroll listener and initial fade state
   useEffect(() => {
@@ -79,10 +113,69 @@ export function ChatMessages({
     handleScroll() // Check initial state
     viewport.addEventListener('scroll', handleScroll)
     
-    return () => viewport.removeEventListener('scroll', handleScroll)
-  }, [handleScroll, messages])
+    return () => {
+      viewport.removeEventListener('scroll', handleScroll)
+      if (scrollRafRef.current != null) {
+        cancelAnimationFrame(scrollRafRef.current)
+        scrollRafRef.current = null
+      }
+    }
+  }, [handleScroll])
+  
+  // Observe content size changes and keep pinned to bottom when user hasn't scrolled up
+  useEffect(() => {
+    if (!autoScroll) return
+    const viewport = viewportRef.current
+    const content = contentRef.current
+    const end = messagesEndRef.current
+    if (!viewport || !content || !end) return
 
+    const ro = new ResizeObserver(() => {
+      if (!pinnedRef.current) return
+      end.scrollIntoView({ behavior: 'auto', block: 'end' })
+    })
 
+    ro.observe(content)
+    return () => ro.disconnect()
+  }, [autoScroll])
+
+  // When streaming starts, force pin to bottom once
+  useEffect(() => {
+    if (!autoScroll) {
+      prevIsLoadingRef.current = isLoading
+      return
+    }
+    const viewport = viewportRef.current
+    const end = messagesEndRef.current
+    if (!viewport || !end) {
+      prevIsLoadingRef.current = isLoading
+      return
+    }
+    if (!prevIsLoadingRef.current && isLoading) {
+      pinnedRef.current = true
+      prevIsLoadingRef.current = isLoading
+      const raf = requestAnimationFrame(() => {
+        end.scrollIntoView({ behavior: 'auto', block: 'end' })
+      })
+      return () => cancelAnimationFrame(raf)
+    }
+    prevIsLoadingRef.current = isLoading
+  }, [isLoading, autoScroll])
+
+  // After DOM updates, if content height grew and we're pinned, keep bottom in view
+  useLayoutEffect(() => {
+    if (!autoScroll) return
+    const viewport = viewportRef.current
+    const end = messagesEndRef.current
+    if (!viewport || !end) return
+
+    const currentHeight = viewport.scrollHeight
+    if (currentHeight > prevHeightRef.current && pinnedRef.current) {
+      end.scrollIntoView({ behavior: 'auto', block: 'end' })
+    }
+    prevHeightRef.current = currentHeight
+  }, [messages, isLoading, autoScroll])
+  
   const defaultEmptyState = (
     <div className="flex items-center justify-center h-full text-center p-8">
       <div className="text-muted-foreground">
@@ -111,19 +204,21 @@ export function ChatMessages({
       />
       
       <ScrollAreaWithRef ref={viewportRef} className="h-full">
-        <div className="flex flex-col w-full min-w-0">
+        <div ref={contentRef} className="flex flex-col w-full min-w-0">
           {messages.length === 0 ? (
             emptyState || defaultEmptyState
           ) : (
             messages.map((message, index) => {
               const isUser = message.role === "user"
               const isSystem = message.role === "system"
+              const isLast = index === messages.length - 1
+              const isStreamingLast = isLoading && isLast && message.role === "assistant"
               
               if (isSystem) {
                 const firstPart = message.parts?.[0]
                 const systemText = firstPart && 'text' in firstPart ? firstPart.text : "System message"
                 return (
-                  <div key={message.id || index} className={cn("flex justify-center px-6 py-4 w-full", messageClassName)}>
+                  <div key={message.id ?? index} className={cn("flex justify-center px-6 py-4 w-full", messageClassName)}>
                     <Badge variant="outline" className="text-xs">
                       {systemText}
                     </Badge>
@@ -133,19 +228,20 @@ export function ChatMessages({
               
               if (isUser) {
                 return (
-                  <UserMessage 
-                    key={message.id || index}
-                    message={message} 
-                    className={messageClassName} 
+                  <UserMessage
+                    key={message.id ?? index}
+                    message={message}
+                    className={messageClassName}
                   />
                 )
               }
               
               return (
-                <AssistantMessage 
-                  key={message.id || index}
-                  message={message} 
-                  className={messageClassName} 
+                <AssistantMessage
+                  key={message.id ?? index}
+                  message={message}
+                  className={messageClassName}
+                  streaming={isStreamingLast}
                 />
               )
             })

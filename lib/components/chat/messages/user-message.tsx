@@ -17,7 +17,7 @@ export interface UserMessageProps {
   className?: string
 }
 
-export function UserMessage({ message, avatar, name, className }: UserMessageProps) {
+function UserMessageComponent({ message, avatar, name, className }: UserMessageProps) {
   return (
     <div className={cn("flex gap-3 px-6 py-4 w-full flex-row-reverse min-w-0", className)}>
       <Avatar className="h-8 w-8 shrink-0">
@@ -46,6 +46,8 @@ export function UserMessage({ message, avatar, name, className }: UserMessagePro
     </div>
   )
 }
+
+export const UserMessage = React.memo(UserMessageComponent)
 
 function MessagePart({ part, isUser }: { part: any, isUser: boolean }) {
   switch (part.type) {

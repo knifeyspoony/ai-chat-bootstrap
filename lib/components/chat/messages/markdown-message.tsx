@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useDeferredValue, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -8,14 +8,23 @@ import { CodeBlockMessage } from './code-block-message'
 export interface MarkdownMessageProps {
   content: string
   className?: string
+  streaming?: boolean
 }
 
-export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
+export function MarkdownMessage({ content, className, streaming = false }: MarkdownMessageProps) {
+  // During streaming, defer updates to lower priority to reduce jank
+  const deferredContent = useDeferredValue(content)
+  const effectiveContent = streaming ? deferredContent : content
+
+  // Keep plugin arrays stable; disable heavy highlighting while streaming
+  const remarkPlugins = useMemo(() => [remarkGfm], [])
+  const rehypePlugins = useMemo(() => (streaming ? [] : [rehypeHighlight]), [streaming])
+
   return (
     <div className={cn("prose prose-sm max-w-full break-words overflow-wrap-anywhere min-w-0", className)}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins as any}
         components={{
           // Override default components for better styling
           p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
@@ -96,7 +105,7 @@ export function MarkdownMessage({ content, className }: MarkdownMessageProps) {
           ),
         }}
       >
-        {content}
+        {effectiveContent}
       </ReactMarkdown>
     </div>
   )

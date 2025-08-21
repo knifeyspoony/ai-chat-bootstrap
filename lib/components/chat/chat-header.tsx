@@ -24,11 +24,11 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case "online": return "bg-green-500"
-      case "away": return "bg-yellow-500"
-      case "busy": return "bg-red-500"
-      case "offline": return "bg-gray-400"
-      default: return "bg-gray-400"
+      case "online": return "bg-primary"
+      case "away": return "bg-secondary"
+      case "busy": return "bg-destructive"
+      case "offline": return "bg-muted-foreground"
+      default: return "bg-muted-foreground"
     }
   }
 
@@ -38,7 +38,7 @@ export function ChatHeader({
 
   return (
     <div className={cn(
-      "flex items-center justify-between px-4 py-2 border-b bg-background/50 backdrop-blur-sm",
+      "flex items-center justify-between px-4 py-2 bg-background/80 backdrop-blur-sm border-b border-border/90",
       className
     )}>
       <div className="flex items-center gap-2 min-w-0 flex-1">

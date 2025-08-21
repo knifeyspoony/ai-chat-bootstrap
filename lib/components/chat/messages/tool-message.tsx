@@ -1,5 +1,5 @@
 import React from 'react'
-import { Card } from '@lib/components/ui/card'
+import { cn } from '@lib/utils'
 import { Badge } from '@lib/components/ui/badge'
 import { WrenchIcon } from 'lucide-react'
 
@@ -11,27 +11,52 @@ export interface ToolMessageProps {
 }
 
 export function ToolMessage({ toolName, args, result, className }: ToolMessageProps) {
+  const [open, setOpen] = React.useState(false)
+  const detailsId = React.useId()
+
   return (
-    <Card className="p-3 bg-orange-50 border-orange-200 dark:bg-orange-950 dark:border-orange-800">
-      <div className="flex items-center gap-2 mb-2">
-        <WrenchIcon className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-        <Badge variant="outline" className="text-xs text-orange-700 bg-orange-100 dark:text-orange-300 dark:bg-orange-900">
-          Tool: {toolName}
-        </Badge>
-      </div>
-      {args && (
-        <pre className="text-xs bg-orange-100 dark:bg-orange-900 p-2 rounded overflow-x-auto">
-          {JSON.stringify(args, null, 2)}
-        </pre>
-      )}
-      {result && (
-        <div className="mt-2 p-2 bg-white dark:bg-gray-800 rounded border border-orange-200 dark:border-orange-700">
-          <p className="text-xs text-orange-800 dark:text-orange-200 font-medium mb-1">Result:</p>
-          <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-            {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
-          </pre>
+    <div className={cn("min-w-0", className)}>
+      <Badge asChild variant="outline" className="cursor-pointer select-none rounded-full">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={detailsId}
+          onClick={() => setOpen((v) => !v)}
+          className="inline-flex items-center gap-1"
+        >
+          <WrenchIcon className="h-3 w-3" />
+          <span className="truncate">Tool: {toolName}</span>
+        </button>
+      </Badge>
+
+      {open && (
+        <div
+          id={detailsId}
+          role="region"
+          aria-label={`Tool ${toolName} details`}
+          className="mt-2 rounded border border-border bg-muted/40 p-2"
+        >
+          {args && (
+            <div className="mb-2">
+              <p className="text-[10px] uppercase text-muted-foreground mb-1">Args</p>
+              <pre className="text-xs bg-background/60 border border-border p-2 rounded overflow-x-auto break-all whitespace-pre-wrap">
+                {JSON.stringify(args, null, 2)}
+              </pre>
+            </div>
+          )}
+          {result && (
+            <div>
+              <p className="text-[10px] uppercase text-muted-foreground mb-1">Result</p>
+              <pre className="text-xs bg-background/60 border border-border p-2 rounded overflow-x-auto whitespace-pre-wrap">
+                {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
+              </pre>
+            </div>
+          )}
+          {!args && !result && (
+            <p className="text-xs text-muted-foreground">No details</p>
+          )}
         </div>
       )}
-    </Card>
+    </div>
   )
 }

@@ -19,29 +19,28 @@ export interface UserMessageProps {
 
 function UserMessageComponent({ message, avatar, name, className }: UserMessageProps) {
   return (
-    <div className={cn("flex gap-3 px-6 py-4 w-full flex-row-reverse min-w-0", className)}>
-      <Avatar className="h-8 w-8 shrink-0">
-        <AvatarImage src={avatar} alt={name || "User"} />
-        <AvatarFallback>
-          {name ? name[0].toUpperCase() : "U"}
-        </AvatarFallback>
-      </Avatar>
-      
-      <div className="flex flex-col gap-2 items-end min-w-0 flex-1">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-row-reverse">
-          <span>{name || "You"}</span>
+    <div className={cn("flex flex-col px-6 py-4 w-full min-w-0", className)}>
+      <div className="flex items-center gap-2 justify-end mb-2">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {(message as any).createdAt && (
             <span>{new Date((message as any).createdAt).toLocaleTimeString()}</span>
           )}
+          <span>{name || "You"}</span>
         </div>
-        
-        <div className="flex flex-col gap-2 items-end min-w-0">
-          {message.parts?.map((part: any, index: number) => (
-            <div key={index} className="min-w-0">
-              <MessagePart part={part} isUser={true} />
-            </div>
-          ))}
-        </div>
+        <Avatar className="h-8 w-8 shrink-0">
+          <AvatarImage src={avatar} alt={name || "User"} />
+          <AvatarFallback>
+            {name ? name[0].toUpperCase() : "U"}
+          </AvatarFallback>
+        </Avatar>
+      </div>
+      
+      <div className="flex flex-col gap-2 items-end min-w-0 mr-10">
+        {message.parts?.map((part: any, index: number) => (
+          <div key={index} className="min-w-0">
+            <MessagePart part={part} isUser={true} />
+          </div>
+        ))}
       </div>
     </div>
   )

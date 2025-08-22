@@ -8,7 +8,7 @@ This is a React component library for building AI chat interfaces using the Verc
 - **React Version**: React 19.1.0
 - **UI Framework**: shadcn/ui with Tailwind CSS
 - **AI Framework**: Vercel AI SDK v5.x
-- **Development Tools**: Storybook, TypeScript, Next.js 15.5.0
+- **Development Tools**: TypeScript, Next.js 15.5.0
 - **Testing**: Vitest (configured but tests not implemented yet)
 
 ## Project Structure & Conventions

@@ -28,36 +28,35 @@ function AssistantMessageComponent({ message, avatar, name, className, streaming
     part.type === 'text' && part.text && !part.text.trim().endsWith('.') && !part.text.trim().endsWith('!') && !part.text.trim().endsWith('?')
   ))
   return (
-    <div className={cn("flex gap-3 px-6 py-4 w-full min-w-0", className)}>
-      <Avatar className="h-8 w-8 shrink-0">
-        <AvatarImage src={avatar} alt={name || "Assistant"} />
-        <AvatarFallback>
-          {name ? name[0].toUpperCase() : "AI"}
-        </AvatarFallback>
-      </Avatar>
-      
-      <div className="flex flex-col gap-2 min-w-0 flex-1">
+    <div className={cn("flex flex-col px-6 py-4 w-full min-w-0", className)}>
+      <div className="flex items-center gap-2 mb-2">
+        <Avatar className="h-8 w-8 shrink-0">
+          <AvatarImage src={avatar} alt={name || "Assistant"} />
+          <AvatarFallback>
+            {name ? name[0].toUpperCase() : "AI"}
+          </AvatarFallback>
+        </Avatar>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{name || "Assistant"}</span>
           {(message as any).createdAt && (
             <span>{new Date((message as any).createdAt).toLocaleTimeString()}</span>
           )}
         </div>
+      </div>
+      
+      <div className="flex flex-col gap-2 min-w-0 ml-10">
+        {message.parts?.map((part: any, index: number) => (
+          <div key={index} className="min-w-0">
+            <MessagePart part={part} isUser={false} streaming={!!streaming} />
+          </div>
+        ))}
         
-        <div className="flex flex-col gap-2 min-w-0">
-          {message.parts?.map((part: any, index: number) => (
-            <div key={index} className="min-w-0">
-              <MessagePart part={part} isUser={false} streaming={!!streaming} />
-            </div>
-          ))}
-          
-          {wasInterrupted && !streaming && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-              <AlertCircleIcon className="h-3 w-3" />
-              <span>Response was interrupted</span>
-            </div>
-          )}
-        </div>
+        {wasInterrupted && !streaming && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+            <AlertCircleIcon className="h-3 w-3" />
+            <span>Response was interrupted</span>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -1,63 +1,100 @@
-import React, { forwardRef } from "react"
+import React from "react"
 import { cn } from "@lib/utils"
-import { Button } from "@lib/components/ui/button"
-import { Textarea } from "@lib/components/ui/textarea"
 import { Badge } from "@lib/components/ui/badge"
+import { Alert, AlertDescription } from "@lib/components/ui/alert"
 import { useAIFocus } from "@lib/hooks"
-import { SendIcon, PlusIcon, XIcon, SquareIcon } from "lucide-react"
+import { useChatStore } from "@lib/stores/chat"
+import { PlusIcon, XIcon, RotateCcwIcon, SparklesIcon } from "lucide-react"
+import { 
+  PromptInput,
+  PromptInputTextarea,
+  PromptInputToolbar,
+  PromptInputTools,
+  PromptInputButton,
+  PromptInputSubmit
+} from "@lib/components/ai-elements/prompt-input"
+import { Button } from "@lib/components/ui/button"
+import { 
+  DropdownMenu,
+  DropdownMenuContent, 
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger 
+} from "@lib/components/ui/dropdown-menu"
+import type { ChatStatus } from "ai"
+import type { Suggestion } from "@lib/types/suggestions"
 
 export interface ChatInputProps {
   value: string
   onChange: (value: string) => void
-  onSubmit: () => void
-  onStop?: () => void
+  onSubmit: (e: React.FormEvent) => void
+  // onStop is handled by status now
   onAttach?: () => void
+  onRetry?: () => void
   placeholder?: string
   disabled?: boolean
-  isStreaming?: boolean
+  status?: ChatStatus
   maxRows?: number
   className?: string
+  
+  // Suggestions props
+  enableSuggestions?: boolean
+  suggestions?: Suggestion[]
+  suggestionsCount?: number
+  onSuggestionClick?: (suggestion: Suggestion) => void
 }
 
-export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
-  ({ 
-    value, 
-    onChange, 
-    onSubmit,
-    onStop, 
-    onAttach, 
-    placeholder = "Type your message...",
-    disabled = false,
-    isStreaming = false,
-    maxRows = 4,
-    className 
-  }, ref) => {
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault()
-        if (isStreaming && onStop) {
-          onStop()
-        } else if (value.trim() && !disabled) {
-          onSubmit()
-        }
-      }
-    }
-
-    const handleButtonClick = () => {
-      if (isStreaming && onStop) {
-        onStop()
-      } else if (!disabled && value.trim()) {
-        onSubmit()
-      }
-    }
-
+export const ChatInput = ({
+  value,
+  onChange,
+  onSubmit,
+  onAttach,
+  onRetry,
+  placeholder = "Type your message...",
+  disabled = false,
+  status,
+  maxRows = 4,
+  className,
+  
+  // Suggestions props
+  enableSuggestions = false,
+  suggestions = [],
+  suggestionsCount = 3,
+  onSuggestionClick
+}: ChatInputProps) => {
     const { allFocusItems, clearFocus } = useAIFocus()
+    const error = useChatStore(state => state.error)
+    const setError = useChatStore(state => state.setError)
 
     return (
-      <div className={cn(
-        "flex flex-col gap-2 bg-background",
-        className
-      )}>
+      <div className={cn("flex flex-col gap-2", className)}>
+        {/* Error Display */}
+        {error && (
+          <Alert variant="destructive" className="mx-1">
+            <AlertDescription className="flex items-center justify-between">
+              <span className="flex-1">{error}</span>
+              <div className="flex items-center gap-1">
+                {onRetry && (
+                  <PromptInputButton
+                    onClick={onRetry}
+                    className="h-6 w-6 p-0 hover:bg-background/20"
+                    title="Retry last message"
+                  >
+                    <RotateCcwIcon className="h-3 w-3" />
+                  </PromptInputButton>
+                )}
+                <PromptInputButton
+                  onClick={() => setError(null)}
+                  className="h-6 w-6 p-0 hover:bg-background/20"
+                  title="Dismiss error"
+                >
+                  <XIcon className="h-3 w-3" />
+                </PromptInputButton>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+        
         {/* Focus Item Chips */}
         {allFocusItems.length > 0 && (
           <div className="flex flex-wrap gap-1.5 px-1">
@@ -70,69 +107,96 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   className="group flex items-center gap-1 pr-1 text-xs"
                 >
                   <span className="truncate max-w-32">{displayText}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
+                  <PromptInputButton
                     onClick={() => clearFocus(item.id)}
                     className="h-4 w-4 p-0 hover:bg-background/80 opacity-60 group-hover:opacity-100 transition-opacity"
                   >
                     <XIcon className="h-3 w-3" />
-                  </Button>
+                  </PromptInputButton>
                 </Badge>
               )
             })}
           </div>
         )}
 
-        {/* Input Row */}
-        <div className="flex items-end gap-2">
-          {onAttach && (
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={onAttach}
-              disabled={disabled}
-              className="shrink-0"
-            >
-              <PlusIcon className="h-4 w-4" />
-            </Button>
-          )}
-          
-          <div className="flex-1 relative">
-          <Textarea
-            ref={ref}
+        <PromptInput onSubmit={onSubmit} className="w-full">
+          <PromptInputTextarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled}
-            className={cn(
-              "min-h-[44px] resize-none pr-12 leading-tight py-3",
-              `max-h-[${maxRows * 1.5}rem]`
-            )}
-            rows={1}
+            maxHeight={maxRows * 24}
           />
-          
-          <Button
-            type="submit"
-            size="sm"
-            onClick={handleButtonClick}
-            disabled={(disabled && !isStreaming) || (!isStreaming && !value.trim())}
-            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
-          >
-            {isStreaming ? (
-              <SquareIcon className="h-4 w-4" />
-            ) : (
-              <SendIcon className="h-4 w-4" />
-            )}
-          </Button>
-          </div>
-        </div>
+          <PromptInputToolbar>
+            <PromptInputTools>
+              {onAttach && (
+                <PromptInputButton
+                  onClick={onAttach}
+                  disabled={disabled}
+                >
+                  <PlusIcon className="h-4 w-4" />
+                </PromptInputButton>
+              )}
+            </PromptInputTools>
+            
+            {/* Right side buttons group - Suggestions + Send */}
+            <div className="flex gap-1">
+              {/* AI Suggestions Button */}
+              {enableSuggestions && (
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <PromptInputButton
+                      type="button"
+                      disabled={!suggestions || suggestions.length === 0}
+                      className={cn(
+                        suggestions && suggestions.length > 0 && "text-primary hover:text-primary"
+                      )}
+                    >
+                      <SparklesIcon className="h-4 w-4" />
+                    </PromptInputButton>
+                  </DropdownMenuTrigger>
+                  {suggestions && suggestions.length > 0 && (
+                    <DropdownMenuContent 
+                      align="end" 
+                      side="top" 
+                      className="w-80"
+                      sideOffset={8}
+                    >
+                      <DropdownMenuLabel>AI Suggestions</DropdownMenuLabel>
+                      {suggestions
+                        .slice(0, Math.min(Math.max(suggestionsCount, 1), 10))
+                        .map((suggestion, index) => (
+                          <DropdownMenuItem
+                            key={index}
+                            onClick={() => onSuggestionClick?.(suggestion)}
+                            className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
+                          >
+                            <div className="flex flex-col gap-1 py-1">
+                              <span className="font-medium leading-tight">
+                                {suggestion.shortSuggestion}
+                              </span>
+                              {suggestion.shortSuggestion !== suggestion.longSuggestion && (
+                                <span className="text-xs text-muted-foreground leading-tight">
+                                  {suggestion.longSuggestion}
+                                </span>
+                              )}
+                            </div>
+                          </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                  )}
+                </DropdownMenu>
+              )}
+              
+              <PromptInputSubmit
+                status={status}
+                disabled={disabled || !value.trim()}
+              />
+            </div>
+          </PromptInputToolbar>
+        </PromptInput>
       </div>
     )
   }
-)
 
 ChatInput.displayName = "ChatInput"

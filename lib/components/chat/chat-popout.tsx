@@ -9,7 +9,7 @@ import type { UIMessage } from "ai"
 export interface ChatPopoutProps extends Omit<ChatContainerProps, 'className' | 'input' | 'onInputChange' | 'onSubmit' | 'messages' | 'isLoading'> {
   // Chat configuration props (replaces direct chat state)
   systemPrompt?: string
-  onToolCall?: (toolCall: any) => void
+  onToolCall?: (toolCall: unknown) => void
   api?: string
   
   // Custom onSubmit that receives the input value (optional - can be handled internally)
@@ -53,15 +53,16 @@ export function ChatPopout({
   title,
   subtitle,
   avatar,
-  status,
+  headerStatus,
   badge,
   headerActions,
   headerClassName,
   messagesClassName,
   messageClassName,
   inputClassName,
-  autoScroll,
   emptyState,
+  enableSuggestions,
+  suggestionsPrompt,
   
   // Popout props
   isOpen: controlledIsOpen,
@@ -86,11 +87,28 @@ export function ChatPopout({
   // Internal input state - prevents parent re-renders on keystroke
   const [input, setInput] = useState('')
   
+  // Ref to store suggestions fetch function
+  const triggerSuggestionsRef = useRef<(() => void) | null>(null)
+  
+  // Ref to prevent double calls to suggestions
+  const lastSuggestionCallTime = useRef<number>(0)
+
   // Internal chat state - prevents parent re-renders on message updates
   const chat = useAIChat({
     systemPrompt,
     api,
-    onToolCall
+    onToolCall,
+    onFinish: () => {
+      // Trigger suggestions refresh when assistant finishes - with debouncing
+      if (enableSuggestions && triggerSuggestionsRef.current) {
+        const now = Date.now()
+        // Prevent double calls within 100ms
+        if (now - lastSuggestionCallTime.current > 100) {
+          lastSuggestionCallTime.current = now
+          triggerSuggestionsRef.current()
+        }
+      }
+    }
   })
 
   // rAF-coalesced, windowed view of messages to reduce render pressure during streaming
@@ -127,7 +145,8 @@ export function ChatPopout({
   const effectiveIsOpen = isOpen
   
   // Wrapper for onSubmit that handles message sending internally
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault()
     if (!input.trim()) return
     
     // Send message using internal chat hook
@@ -288,15 +307,14 @@ export function ChatPopout({
             input={input}
             onInputChange={setInput}
             onSubmit={handleSubmit}
-            onStop={chat.stop}
             onAttach={onAttach}
             isLoading={chat.isLoading}
-            isStreaming={chat.status === 'streaming' || chat.status === 'submitted'}
+            status={chat.status}
             placeholder={placeholder}
             title={title}
             subtitle={subtitle}
             avatar={avatar}
-            status={status}
+            headerStatus={headerStatus}
             badge={badge}
             headerActions={
               <>
@@ -315,8 +333,15 @@ export function ChatPopout({
             messagesClassName={messagesClassName}
             messageClassName={messageClassName}
             inputClassName={inputClassName}
-            autoScroll={autoScroll}
             emptyState={emptyState}
+            enableSuggestions={enableSuggestions}
+            suggestionsPrompt={suggestionsPrompt}
+            onAssistantFinish={(triggerFetch) => {
+              triggerSuggestionsRef.current = triggerFetch
+            }}
+            onSendMessage={(message) => {
+              chat.sendMessageWithContext(message)
+            }}
             className="h-full"
           />
         </div>
@@ -408,15 +433,14 @@ export function ChatPopout({
             input={input}
             onInputChange={setInput}
             onSubmit={handleSubmit}
-            onStop={chat.stop}
             onAttach={onAttach}
             isLoading={chat.isLoading}
-            isStreaming={chat.status === 'streaming' || chat.status === 'submitted'}
+            status={chat.status}
             placeholder={placeholder}
             title={title}
             subtitle={subtitle}
             avatar={avatar}
-            status={status}
+            headerStatus={headerStatus}
             badge={badge}
             headerActions={
               <>
@@ -435,8 +459,15 @@ export function ChatPopout({
             messagesClassName={messagesClassName}
             messageClassName={messageClassName}
             inputClassName={inputClassName}
-            autoScroll={autoScroll}
             emptyState={emptyState}
+            enableSuggestions={enableSuggestions}
+            suggestionsPrompt={suggestionsPrompt}
+            onAssistantFinish={(triggerFetch) => {
+              triggerSuggestionsRef.current = triggerFetch
+            }}
+            onSendMessage={(message) => {
+              chat.sendMessageWithContext(message)
+            }}
             className="h-full"
           />
         </div>

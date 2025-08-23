@@ -12,3 +12,4 @@ export * from "@lib/stores"
 
 // Re-export key types for convenience
 export type { UIMessage } from 'ai'
+export type { Suggestion, SuggestionsRequest, SuggestionsResponse } from '@lib/types/suggestions'

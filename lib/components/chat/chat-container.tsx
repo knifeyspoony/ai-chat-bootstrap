@@ -1,19 +1,19 @@
 import React from "react"
 import { cn } from "@lib/utils"
-import type { UIMessage } from "ai"
+import type { UIMessage, ChatStatus } from "ai"
 import { ChatHeader } from "@lib/components/chat/chat-header"
 import { ChatMessages } from "@lib/components/chat/chat-messages"
 import { ChatInput } from "@lib/components/chat/chat-input"
+import { useSuggestions } from "@lib/hooks/use-suggestions"
 
 export interface ChatContainerProps {
   messages: UIMessage[]
   input: string
   onInputChange: (value: string) => void
-  onSubmit: () => void
-  onStop?: () => void
+  onSubmit: (e: React.FormEvent) => void
   onAttach?: () => void
   isLoading?: boolean
-  isStreaming?: boolean
+  status?: ChatStatus
   placeholder?: string
   className?: string
   
@@ -21,7 +21,7 @@ export interface ChatContainerProps {
   title?: string
   subtitle?: string
   avatar?: string
-  status?: "online" | "offline" | "away" | "busy"
+  headerStatus?: "online" | "offline" | "away" | "busy"
   badge?: string
   headerActions?: React.ReactNode
   
@@ -32,8 +32,14 @@ export interface ChatContainerProps {
   inputClassName?: string
   
   // Messages props
-  autoScroll?: boolean
   emptyState?: React.ReactNode
+  
+  // Suggestions props  
+  enableSuggestions?: boolean
+  suggestionsPrompt?: string
+  suggestionsCount?: number
+  onAssistantFinish?: (triggerFetch: () => void) => void
+  onSendMessage?: (message: string) => void
 }
 
 export function ChatContainer({
@@ -41,10 +47,9 @@ export function ChatContainer({
   input,
   onInputChange,
   onSubmit,
-  onStop,
   onAttach,
   isLoading = false,
-  isStreaming = false,
+  status,
   placeholder,
   className,
   
@@ -52,7 +57,7 @@ export function ChatContainer({
   title,
   subtitle,
   avatar,
-  status,
+  headerStatus,
   badge,
   headerActions,
   
@@ -63,16 +68,43 @@ export function ChatContainer({
   inputClassName,
   
   // Messages props
-  autoScroll = true,
-  emptyState
+  emptyState,
+  
+  // Suggestions props
+  enableSuggestions = false,
+  suggestionsPrompt,
+  suggestionsCount = 3,
+  onAssistantFinish,
+  onSendMessage
 }: ChatContainerProps) {
+  // Handle suggestions
+  const { suggestions, handleSuggestionClick, onAssistantFinish: triggerSuggestionsFetch } = useSuggestions({
+    enabled: enableSuggestions,
+    prompt: suggestionsPrompt,
+    messages,
+    onSuggestionClick: (suggestion) => {
+      // Directly send the long suggestion as a message
+      if (onSendMessage) {
+        onSendMessage(suggestion.longSuggestion)
+      }
+    }
+  })
+
+  // Register suggestions fetch function with parent
+  React.useEffect(() => {
+    if (onAssistantFinish && enableSuggestions) {
+      onAssistantFinish(triggerSuggestionsFetch)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onAssistantFinish, enableSuggestions]) // Remove triggerSuggestionsFetch to prevent re-registration
+
   return (
     <div className={cn("flex flex-col h-full bg-background overflow-hidden min-w-0", className)}>
       <ChatHeader
         title={title}
         subtitle={subtitle}
         avatar={avatar}
-        status={status}
+        status={headerStatus}
         badge={badge}
         actions={headerActions}
         className={headerClassName}
@@ -81,8 +113,7 @@ export function ChatContainer({
       <ChatMessages
         messages={messages}
         isLoading={isLoading}
-        autoScroll={autoScroll}
-        className={cn("relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-border/30 after:to-transparent", messagesClassName)}
+        className={messagesClassName}
         messageClassName={messageClassName}
         emptyState={emptyState}
       />
@@ -92,12 +123,16 @@ export function ChatContainer({
           value={input}
           onChange={onInputChange}
           onSubmit={onSubmit}
-          onStop={onStop}
           onAttach={onAttach}
           placeholder={placeholder}
           disabled={isLoading}
-          isStreaming={isStreaming}
+          status={status}
           className={inputClassName}
+          // Suggestions props
+          enableSuggestions={enableSuggestions}
+          suggestions={suggestions}
+          suggestionsCount={suggestionsCount}
+          onSuggestionClick={handleSuggestionClick}
         />
       </div>
     </div>

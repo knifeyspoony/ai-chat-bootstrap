@@ -514,6 +514,9 @@ export default function DemoPage() {
         defaultWidth={450}
         minWidth={400}
         maxWidth={600}
+        enableSuggestions={true}
+        suggestionsCount={4}
+        suggestionsPrompt="Generate contextual suggestions based on the focused widgets, tools available, and current conversation. Suggest specific actions the user can take with the counter, calculator, database settings, user profile, or other interactive elements."
       />
     </div>
   )

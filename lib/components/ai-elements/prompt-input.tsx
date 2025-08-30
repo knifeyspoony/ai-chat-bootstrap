@@ -163,14 +163,10 @@ export const PromptInputSubmit = ({
 
   return (
     <Button
-      className={cn(
-        'gap-1.5 rounded-lg',
-        status === 'error' && 'bg-destructive hover:bg-destructive/90 text-destructive-foreground',
-        className
-      )}
+      className={cn('gap-1.5 rounded-lg', className)}
       size={size}
       type="submit"
-      variant={status === 'error' ? 'destructive' : variant}
+      variant={variant}
       {...props}
     >
       {children ?? Icon}

@@ -14,7 +14,7 @@ This is a React component library for building AI chat interfaces using the Verc
 ## Project Structure & Conventions
 
 ### Import Paths (DO NOT use relative imports)
-- **Library components**: `@lib/components/...` (points to `./lib/components/`)
+- **Library components**: `@lib/components/...` (points to `./@lib/components/`)
 - **Library utils**: `@lib/utils` (points to `./lib/utils`)
 - **Source files**: `@/...` (points to `./src/`)
 
@@ -34,7 +34,7 @@ lib/
 ```
 
 ### Component Architecture
-- **Message Types**: Organized in `lib/components/chat/messages/` subfolder
+- **Message Types**: Organized in `@lib/components/chat/messages/` subfolder
   - `TextMessage` with markdown rendering
   - `ReasoningMessage`, `FileMessage`, `SourceUrlMessage`, `ToolMessage`
   - `MarkdownMessage` for rich text formatting

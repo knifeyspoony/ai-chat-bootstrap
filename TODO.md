@@ -20,7 +20,7 @@ The AI SDK v5 has breaking changes from v4. Current issues:
 
 **Files to fix:**
 - `src/app/demo/page.tsx` - Update to use correct interface
-- `lib/components/chat/chat-popout.tsx` - Adapt to new AI SDK patterns
+- `@lib/components/chat/chat-popout.tsx` - Adapt to new AI SDK patterns
 - `src/app/api/chat/route.ts` - Fix route to work with new transport system
 
 **Research needed:**

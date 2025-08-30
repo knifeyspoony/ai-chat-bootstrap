@@ -50,7 +50,7 @@ const getStatusBadge = (status: ToolUIPart['state']) => {
   } as const;
 
   return (
-    <Badge className="rounded-full text-xs" variant="secondary">
+    <Badge className="gap-1.5 rounded-full text-xs" variant="secondary">
       {icons[status]}
       {labels[status]}
     </Badge>
@@ -72,8 +72,7 @@ export const ToolHeader = ({
   >
     <div className="flex items-center gap-2">
       <WrenchIcon className="size-4 text-muted-foreground" />
-      {/* Remove the tool- part from the type */}
-      <span className="font-medium text-sm">{type.replace('tool-', '')}</span>
+      <span className="font-medium text-sm">{type}</span>
       {getStatusBadge(state)}
     </div>
     <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />

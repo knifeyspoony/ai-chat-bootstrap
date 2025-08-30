@@ -1,7 +1,7 @@
 import React from "react"
 import { cn } from "@lib/utils"
 import { Badge } from "@lib/components/ui/badge"
-import type { UIMessage } from "ai"
+import { getToolName, type UIMessage } from "ai"
 import { 
   Conversation, 
   ConversationContent, 
@@ -14,7 +14,7 @@ import {
 } from "@lib/components/ai-elements/message"
 import { Response } from "@lib/components/ai-elements/response"
 import { Reasoning } from "@lib/components/ai-elements/reasoning"
-import { Source } from "@lib/components/ai-elements/source"
+import { Source } from "@lib/components/ai-elements/sources"
 import { 
   Tool, 
   ToolHeader, 
@@ -170,6 +170,7 @@ function MessagePart({ part, streaming = false }: { part: any, streaming?: boole
       // Handle tool-* and data-* parts
       if (part.type?.startsWith('tool-')) {
         const toolPart = part as any // Type assertion for tool parts
+        const toolName = getToolName(toolPart);
         return (
           <Tool>
             <ToolHeader 

@@ -14,8 +14,9 @@ export function useAIChat(options: {
   systemPrompt?: string
   onToolCall?: (toolCall: any) => void
   onFinish?: () => void
+  initialMessages?: any[]
 } = {}) {
-  const { api = '/api/chat', systemPrompt, onToolCall, onFinish } = options
+  const { api = '/api/chat', systemPrompt, onToolCall, onFinish, initialMessages } = options
   
   // Get raw store data with stable selectors - these return the same reference when unchanged
   const contextMap = useAIContextStore(useShallow(state => state.context))
@@ -78,6 +79,7 @@ export function useAIChat(options: {
   const chatHook = useChat({
     transport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    messages: initialMessages,
     onToolCall: async ({ toolCall }) => {
       try {
         // Execute frontend tool if available

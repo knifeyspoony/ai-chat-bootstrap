@@ -11,6 +11,7 @@ export interface ChatPopoutProps extends Omit<ChatContainerProps, 'className' | 
   systemPrompt?: string
   onToolCall?: (toolCall: unknown) => void
   api?: string
+  initialMessages?: UIMessage[]
   
   // Custom onSubmit that receives the input value (optional - can be handled internally)
   onSubmit?: (input: string) => void
@@ -47,6 +48,7 @@ export function ChatPopout({
   systemPrompt,
   onToolCall,
   api,
+  initialMessages,
   onSubmit,
   onAttach,
   placeholder,
@@ -98,6 +100,7 @@ export function ChatPopout({
     systemPrompt,
     api,
     onToolCall,
+    initialMessages,
     onFinish: () => {
       // Trigger suggestions refresh when assistant finishes - with debouncing
       if (enableSuggestions && triggerSuggestionsRef.current) {

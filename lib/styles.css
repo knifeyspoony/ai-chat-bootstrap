@@ -124,3 +124,29 @@ pre code {
   min-width: 100% !important;
 }
 
+/* Fix Streamdown code block copy button hover behavior */
+/* Only show copy button when hovering the specific code block, not parent containers */
+pre .group button,
+.group.relative button {
+  opacity: 0 !important;
+  transition: opacity 0.2s ease-in-out !important;
+}
+
+pre .group:hover button,
+.group.relative:hover button {
+  opacity: 1 !important;
+}
+
+/* Ensure copy button doesn't show from parent group hover */
+.group pre .group button {
+  opacity: 0 !important;
+}
+
+.group:hover pre .group button {
+  opacity: 0 !important;
+}
+
+.group pre .group:hover button {
+  opacity: 1 !important;
+}
+

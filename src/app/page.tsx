@@ -1,103 +1,682 @@
-import Image from "next/image";
+'use client'
+
+import React, { useState, useMemo } from 'react'
+import { Button } from '@lib/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@lib/components/ui/card'
+import { Badge } from '@lib/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@lib/components/ui/select'
+import { Switch } from '@lib/components/ui/switch'
+import { ScrollArea } from '@lib/components/ui/scroll-area'
+import { ChatPopout } from '@lib/components/chat/chat-popout'
+import { useAIContext, useAIFrontendTool, useAIFocus } from '@lib/hooks'
+import { cn } from '@lib/utils'
+import { useAIToolsStore } from '@lib/stores'
+import { z } from 'zod'
+import { 
+  PlusIcon,
+  MinusIcon,
+  CalculatorIcon,
+  EyeIcon,
+  Database as DatabaseIcon,
+  User as UserIcon,
+  CheckCircle2,
+  Circle,
+  Focus,
+  Zap,
+  Sparkles
+} from 'lucide-react'
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  // Demo state
+  const [counter, setCounter] = useState(0)
+  const [calculation, setCalculation] = useState<string | null>(null)
+  const [selectedSystemPrompt, setSelectedSystemPrompt] = useState<string>('default')
+  const [chatMode, setChatMode] = useState<'overlay' | 'inline'>('overlay')
+  
+  // Focus selection - track which context items are currently relevant
+  const { setFocus, clearFocus, getFocus, focusedIds } = useAIFocus()
+  const toolsCount = useAIToolsStore(state => state.tools.size)
+  
+  // Create sample messages to demonstrate all message types
+  const sampleMessages = useMemo(() => [
+    // User message with text
+    {
+      id: 'msg-1',
+      role: 'user' as const,
+      parts: [
+        {
+          type: 'text' as const,
+          text: 'Hello! Can you help me understand what this demo showcases?'
+        }
+      ]
+    },
+    // Assistant response with text
+    {
+      id: 'msg-2', 
+      role: 'assistant' as const,
+      parts: [
+        {
+          type: 'text' as const,
+          text: 'Welcome to the AI SDK Chat Demo! 🎉\n\nThis demo showcases:\n- **Real-time context sharing** - Click widgets to focus them\n- **Tool integration** - AI can interact with the counter, calculator, and other widgets\n- **Dynamic focus management** - The AI knows about focused elements\n- **Multiple message types** - Text, reasoning, files, sources, and tool calls\n\nTry clicking on some widgets below and then ask me about them!'
+        }
+      ]
+    },
+    // User message requesting calculation
+    {
+      id: 'msg-3',
+      role: 'user' as const,
+      parts: [
+        {
+          type: 'text' as const,
+          text: 'Can you calculate 25 * 4 for me?'
+        }
+      ]
+    },
+    // Assistant response with tool usage
+    {
+      id: 'msg-4',
+      role: 'assistant' as const,
+      parts: [
+        {
+          type: 'tool-calculate' as const,
+          toolCallId: 'call_demo_1',
+          state: 'complete' as const,
+          input: {
+            operation: 'multiply',
+            a: 25,
+            b: 4
+          },
+          output: {
+            operation: 'multiply',
+            a: 25,
+            b: 4,
+            result: 100,
+            message: '25 multiply 4 = 100'
+          }
+        },
+        {
+          type: 'text' as const,
+          text: 'I\'ve calculated that for you! 25 × 4 = **100**. You can see the result displayed in the calculator widget above.'
+        }
+      ]
+    },
+    // User asking about reasoning
+    {
+      id: 'msg-5',
+      role: 'user' as const,
+      parts: [
+        {
+          type: 'text' as const,
+          text: 'How do you decide which tool to use?'
+        }
+      ]
+    },
+    // Assistant with reasoning and text
+    {
+      id: 'msg-6',
+      role: 'assistant' as const,
+      parts: [
+        {
+          type: 'reasoning' as const,
+          text: 'Let me think about this. The user is asking about my decision-making process for tool selection. I should explain:\n1. I analyze the user\'s request to identify what action they want\n2. I check what tools are available and their descriptions\n3. I match the request to the most appropriate tool\n4. For calculations, I use the calculate tool\n5. For counter operations, I use increment/decrement tools\n6. For system changes, I use the change_system_prompt tool',
+          state: 'done' as const
+        },
+        {
+          type: 'text' as const,
+          text: 'Great question! My tool selection process involves several steps:\n\n1. **Request Analysis**: I parse your message to understand what you need\n2. **Available Tools**: I check what tools are registered and their capabilities\n3. **Best Match**: I select the tool whose description best matches your request\n4. **Context Awareness**: I consider focused widgets and current app state\n\nFor example:\n- Math questions → `calculate` tool\n- "Increment counter" → `increment_counter` tool\n- "Change AI personality" → `change_system_prompt` tool\n\nThe reasoning you see above shows my thought process for this response!'
+        }
+      ]
+    },
+    // User asking about file support
+    {
+      id: 'msg-7',
+      role: 'user' as const,
+      parts: [
+        {
+          type: 'text' as const,
+          text: 'Can you share some documentation about this library?'
+        }
+      ]
+    },
+    // Assistant with source and file references
+    {
+      id: 'msg-8',
+      role: 'assistant' as const,
+      parts: [
+        {
+          type: 'source-url' as const,
+          sourceId: 'doc-1',
+          url: 'https://ai-sdk.dev/docs/reference',
+          title: 'AI SDK Documentation'
+        },
+        {
+          type: 'source-document' as const,
+          sourceId: 'doc-2',
+          mediaType: 'text/markdown',
+          title: 'README.md',
+          filename: 'README.md'
+        },
+        {
+          type: 'file' as const,
+          mediaType: 'application/json',
+          filename: 'package.json',
+          url: 'data:application/json;base64,ewogICJuYW1lIjogImFpLXNkay1jaGF0IiwKICAidmVyc2lvbiI6ICIwLjEuMCIsCiAgImRlc2NyaXB0aW9uIjogIlJlYWN0IGNvbXBvbmVudCBsaWJyYXJ5IGZvciBBSSBjaGF0IGludGVyZmFjZXMiCn0='
+        },
+        {
+          type: 'text' as const,
+          text: 'I\'ve referenced some key documentation sources:\n\n📚 **External Documentation**: The official AI SDK docs provide comprehensive API reference\n📄 **Project README**: Contains setup instructions and usage examples  \n📦 **Package Info**: Shows the library metadata and dependencies\n\nThis demo showcases how the chat interface can display different content types including external URLs, document references, and file attachments. The AI can reference multiple sources in a single response!'
+        }
+      ]
+    },
+    // User message with step-based interaction
+    {
+      id: 'msg-9',
+      role: 'user' as const,
+      parts: [
+        {
+          type: 'text' as const,
+          text: 'Walk me through setting up this library step by step'
+        }
+      ]
+    },
+    // Assistant with step indicators
+    {
+      id: 'msg-10',
+      role: 'assistant' as const,
+      parts: [
+        {
+          type: 'step-start' as const
+        },
+        {
+          type: 'text' as const,
+          text: '## Setting up AI SDK Chat Library\n\nHere\'s a complete step-by-step guide:\n\n### Step 1: Installation\n```bash\npnpm add ai-sdk-chat @ai-sdk/react ai\n```\n\n### Step 2: Import Styles\n```tsx\nimport \'ai-sdk-chat/lib/styles.css\'\n```\n\n### Step 3: Basic Usage\n```tsx\nimport { ChatPopout } from \'ai-sdk-chat\'\n\nfunction App() {\n  return (\n    <ChatPopout \n      title="AI Assistant"\n      placeholder="Ask me anything..."\n      api="/api/chat"\n    />\n  )\n}\n```\n\n### Step 4: Add Context & Tools\n```tsx\nimport { useAIContext, useAIFrontendTool } from \'ai-sdk-chat\'\n\nfunction MyComponent() {\n  const [counter, setCounter] = useState(0)\n  \n  useAIContext(\'counter\', counter)\n  \n  useAIFrontendTool({\n    name: \'increment\',\n    description: \'Increment counter\',\n    execute: async () => {\n      setCounter(c => c + 1)\n      return { newValue: counter + 1 }\n    }\n  })\n  \n  return <div>Counter: {counter}</div>\n}\n```\n\nThat\'s it! The AI can now interact with your app state and execute tools. Try the examples above to see it in action! 🚀'
+        }
+      ]
+    }
+  ], [])
+  
+  // Share state with AI
+  useAIContext('counter', counter)
+  useAIContext('calculation', calculation)
+  useAIContext('selectedSystemPrompt', selectedSystemPrompt)
+  // Memoize pageInfo to prevent recreating object on every render
+  const pageInfo = useMemo(() => ({
+    title: 'AI SDK Chat Demo',
+    description: 'Interactive demo showcasing AI-app integration',
+    timestamp: new Date().toISOString()
+  }), []) // Empty deps - only create once on mount
+  
+  useAIContext('pageInfo', pageInfo)
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Demo domain objects to use as focus items
+  const userProfile = useMemo(() => ({
+    userId: 'user-042',
+    name: 'Ada Lovelace',
+    email: 'ada@example.com',
+    role: 'admin',
+    plan: 'Pro',
+    preferences: { theme: 'dark', notifications: true }
+  }), [])
+
+  const dbSettings = useMemo(() => ({
+    dbId: 'db-primary',
+    engine: 'postgres',
+    host: 'db.example.com',
+    port: 5432,
+    database: 'app_db',
+    ssl: true,
+    pool: { min: 1, max: 10 },
+    replicas: ['replica-1', 'replica-2']
+  }), [])
+  
+  // System prompt options
+  const systemPrompts = {
+    default: undefined,
+    helpful: "You are a friendly and enthusiastic AI assistant. Be encouraging and positive in your responses while helping users explore this demo.",
+    technical: "You are a technical AI assistant focused on demonstrating the integration between AI and React applications. Explain technical concepts clearly and suggest advanced usage patterns.",
+    creative: "You are a creative AI assistant. When users interact with the demo, suggest interesting and creative ways to use the tools and features. Be imaginative and inspiring."
+  }
+  
+  // Focus item handler
+  const handleFocusToggle = (itemId: string) => {
+    const isCurrentlyFocused = getFocus(itemId)
+    
+    if (isCurrentlyFocused) {
+      clearFocus(itemId)
+    } else {
+      // Add item to focus with relevant data
+      let focusData: any = { id: itemId }
+      
+      if (itemId === 'counter-widget') {
+        focusData = {
+          id: itemId,
+          type: 'counter',
+          currentValue: counter,
+          capabilities: ['increment', 'decrement']
+        }
+      } else if (itemId === 'calculator-widget') {
+        focusData = {
+          id: itemId,
+          type: 'calculator', 
+          result: calculation,
+          capabilities: ['calculate', 'clear']
+        }
+      } else if (itemId === 'settings-widget') {
+        focusData = {
+          id: itemId,
+          type: 'settings',
+          systemPrompt: selectedSystemPrompt
+        }
+      } else if (itemId === 'db-settings') {
+        // Dump full database settings object
+        focusData = {
+          ...dbSettings,
+          type: 'database'
+        }
+      } else if (itemId === 'user-profile') {
+        // Dump full user profile object
+        focusData = {
+          ...userProfile,
+          type: 'user'
+        }
+      }
+      
+      setFocus(itemId, focusData)
+    }
+  }
+  
+  // Register frontend tools
+  useAIFrontendTool({
+    name: 'increment_counter',
+    description: 'Increment the demo counter',
+    parameters: z.object({
+      amount: z.number().default(1).describe('Amount to increment by')
+    }),
+    execute: async ({ amount }) => {
+      let newValue: number = 0
+      setCounter(prev => {
+        newValue = prev + amount
+        return newValue
+      })
+      return { newValue, amount }
+    }
+  })
+  
+  useAIFrontendTool({
+    name: 'decrement_counter', 
+    description: 'Decrement the demo counter',
+    parameters: z.object({
+      amount: z.number().default(1).describe('Amount to decrement by')
+    }),
+    execute: async ({ amount }) => {
+      let newValue: number = 0
+      setCounter(prev => {
+        newValue = prev - amount
+        return newValue
+      })
+      return { newValue, amount }
+    }
+  })
+  
+  useAIFrontendTool({
+    name: 'calculate',
+    description: 'Perform basic arithmetic calculations and display the result',
+    parameters: z.object({
+      operation: z.enum(['add', 'subtract', 'multiply', 'divide']).describe('The arithmetic operation'),
+      a: z.number().describe('First number'),
+      b: z.number().describe('Second number')
+    }),
+    execute: async ({ operation, a, b }) => {
+      let result: number = 0
+      switch (operation) {
+        case 'add':
+          result = a + b
+          break
+        case 'subtract':
+          result = a - b
+          break
+        case 'multiply':
+          result = a * b
+          break
+        case 'divide':
+          if (b === 0) throw new Error('Division by zero')
+          result = a / b
+          break
+      }
+      
+      const resultString = `${a} ${operation} ${b} = ${result}`
+      setCalculation(resultString)
+      return {
+        operation,
+        a,
+        b,
+        result,
+        message: resultString
+      }
+    }
+  })
+  
+  useAIFrontendTool({
+    name: 'change_system_prompt',
+    description: 'Change the AI assistant personality and behavior',
+    parameters: z.object({
+      promptType: z.enum(['default', 'helpful', 'technical', 'creative']).describe('The type of AI personality to use')
+    }),
+    execute: async ({ promptType }) => {
+      setSelectedSystemPrompt(promptType)
+      return {
+        promptType,
+        message: `AI personality changed to: ${promptType}`,
+        description: promptType === 'default' ? 'Using default system prompt' : systemPrompts[promptType as keyof typeof systemPrompts]
+      }
+    }
+  })
+  
+  
+  // focusedIds is now reactive from useAIFocus hook
+  
+  // Chat integration (now handled internally by ChatPopout)
+  // No more chat state in DemoPage - prevents re-renders on message updates!
+
+  // FocusableCard component
+  const FocusableCard = ({ 
+    id, 
+    title, 
+    description, 
+    icon: Icon, 
+    children, 
+    color = 'blue',
+    focusRef 
+  }: {
+    id: string
+    title: string
+    description: string
+    icon: any
+    children: React.ReactNode
+    color?: string
+    focusRef?: any
+  }) => {
+    const focused = !!getFocus(id)
+    const colorClasses = {
+      primary: focused ? 'ring-2 ring-primary shadow-lg bg-primary/10' : 'hover:bg-primary/5',
+      secondary: focused ? 'ring-2 ring-secondary shadow-lg bg-secondary/50' : 'hover:bg-secondary/20',
+      accent: focused ? 'ring-2 ring-accent shadow-lg bg-accent/50' : 'hover:bg-accent/20',
+      muted: focused ? 'ring-2 ring-muted-foreground shadow-lg bg-muted' : 'hover:bg-muted/50',
+    }
+
+    return (
+      <Card 
+        className={`transition-all duration-300 cursor-pointer border-2 ${colorClasses[color as keyof typeof colorClasses]} ${focused ? 'border-primary' : 'border-border hover:border-muted-foreground/50'}`}
+        onClick={() => handleFocusToggle(id)}
+      >
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Icon className="h-5 w-5" />
+              {title}
+            </div>
+            {focused ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
+          </CardTitle>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent ref={focusRef}>
+          {children}
+        </CardContent>
+      </Card>
+    )
+  }
+  
+  const pageContent = (
+    <>
+      {/* Hero Section */}
+      <div className="text-center mb-16">
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <Sparkles className="h-8 w-8 text-primary" />
+          <h1 className="text-5xl font-bold text-foreground">
+            AI SDK Chat Demo
+          </h1>
+          <Zap className="h-8 w-8 text-primary" />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+        <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+          Experience seamless AI-app integration with real-time context sharing, intelligent tool execution, and dynamic focus management. 
+          <br />
+          <span className="font-medium">Click elements below to focus them, then chat with AI!</span>
+        </p>
+      </div>
+
+      {/* Controls Section */}
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-12 p-6 bg-card rounded-2xl border">
+        <div className="flex items-center gap-3">
+          <span className="font-medium">AI Personality:</span>
+          <Select value={selectedSystemPrompt} onValueChange={setSelectedSystemPrompt}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Default</SelectItem>
+              <SelectItem value="helpful">Helpful</SelectItem>
+              <SelectItem value="technical">Technical</SelectItem>
+              <SelectItem value="creative">Creative</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <span className="font-medium">Chat Mode:</span>
+          <div className="flex items-center gap-2">
+            <span className={cn("text-sm", chatMode === 'overlay' ? "text-primary font-medium" : "text-muted-foreground")}>
+              Overlay
+            </span>
+            <Switch 
+              checked={chatMode === 'inline'} 
+              onCheckedChange={(checked) => setChatMode(checked ? 'inline' : 'overlay')}
+            />
+            <span className={cn("text-sm", chatMode === 'inline' ? "text-primary font-medium" : "text-muted-foreground")}>
+              Inline
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      {/* Interactive Elements Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        {/* Counter Widget */}
+        <FocusableCard
+          id="counter-widget"
+          title="Counter"
+          description="Interactive number counter"
+          icon={CalculatorIcon}
+          color="primary"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          <div className="space-y-4">
+            <div className="text-center">
+              <div className="text-4xl font-bold text-primary mb-2">{counter}</div>
+              <Badge variant="secondary" className="text-xs">Current Value</Badge>
+            </div>
+            <div className="flex gap-2 justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setCounter(c => c - 1)
+                }}
+              >
+                <MinusIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setCounter(c => c + 1)
+                }}
+              >
+                <PlusIcon className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </FocusableCard>
+        {/* Calculator Widget */}
+        <FocusableCard
+          id="calculator-widget"
+          title="Calculator"
+          description="Math operations display"
+          icon={CalculatorIcon}
+          color="secondary"
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          <div className="space-y-4">
+            <div className="text-center min-h-[80px] flex items-center justify-center">
+              {calculation ? (
+                <div>
+                  <div className="text-2xl font-bold text-primary mb-2">{calculation}</div>
+                  <Badge variant="secondary" className="text-xs">Latest Result</Badge>
+                </div>
+              ) : (
+                <div className="text-muted-foreground text-center">
+                  <CalculatorIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Ask AI to calculate</p>
+                </div>
+              )}
+            </div>
+            {calculation && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setCalculation(null)
+                }}
+                className="w-full"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+        </FocusableCard>
+
+        {/* Settings Widget */}
+        <FocusableCard
+          id="settings-widget"
+          title="Settings"
+          description="App configuration"
+          icon={EyeIcon}
+          color="accent"
         >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          <div className="space-y-3">
+            <div className="text-sm space-y-2">
+              <div>
+                <span className="font-medium">AI Mode:</span>
+                <Badge variant="outline" className="ml-2 capitalize">{selectedSystemPrompt}</Badge>
+              </div>
+              <div>
+                <span className="font-medium">Focus:</span>
+                <Badge variant="outline" className="ml-2">
+                  {focusedIds.length} focused
+                </Badge>
+              </div>
+              <div>
+                <span className="font-medium">Tools:</span>
+                <Badge variant="outline" className="ml-2">
+                  {toolsCount} registered
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </FocusableCard>
+
+        {/* Database Settings */}
+        <FocusableCard
+          id="db-settings"
+          title="Database Settings"
+          description="Primary database configuration"
+          icon={DatabaseIcon}
+          color="muted"
+        >
+          <div className="space-y-3">
+            <div className="text-xs space-y-1 font-mono bg-muted p-3 rounded-lg">
+              <div>engine: <span className="text-primary">{dbSettings.engine}</span></div>
+              <div>host: <span className="text-primary">{dbSettings.host}</span></div>
+              <div>port: <span className="text-primary">{dbSettings.port}</span></div>
+              <div>database: <span className="text-primary">{dbSettings.database}</span></div>
+              <div>ssl: <span className="text-primary">{String(dbSettings.ssl)}</span></div>
+            </div>
+          </div>
+        </FocusableCard>
+
+        {/* User Profile */}
+        <FocusableCard
+          id="user-profile"
+          title="User Profile"
+          description="Current signed-in user"
+          icon={UserIcon}
+          color="accent"
+        >
+          <div className="space-y-3">
+            <div className="text-xs space-y-1 font-mono bg-muted p-3 rounded-lg">
+              <div>name: <span className="text-primary">{userProfile.name}</span></div>
+              <div>email: <span className="text-primary">{userProfile.email}</span></div>
+              <div>role: <span className="text-primary">{userProfile.role}</span></div>
+              <div>plan: <span className="text-primary">{userProfile.plan}</span></div>
+            </div>
+          </div>
+        </FocusableCard>
+
+        {/* Context Panel */}
+        <FocusableCard
+          id="context-panel"
+          title="Live Context"
+          description="Real-time app state"
+          icon={Focus}
+          color="muted"
+        >
+          <div className="space-y-3">
+            <div className="text-xs space-y-1 font-mono bg-muted p-3 rounded-lg">
+              <div>counter: <span className="text-primary">{counter}</span></div>
+              <div>calculation: <span className="text-primary">{calculation || 'null'}</span></div>
+              <div>focused: <span className="text-primary">[{focusedIds.join(', ')}]</span></div>
+              <div>ai_mode: <span className="text-primary">"{selectedSystemPrompt}"</span></div>
+            </div>
+            <Badge variant="outline" className="w-full justify-center text-xs">
+              <span className="w-2 h-2 bg-primary rounded-full mr-2"></span>
+              Live Sync
+            </Badge>
+          </div>
+        </FocusableCard>
+      </div>
+    </>
+  )
+
+  return (
+    <div className={cn("min-h-screen bg-background", chatMode === 'inline' ? "flex h-screen" : "")}>
+      {chatMode === 'inline' ? (
+        <ScrollArea className="flex-1">
+          <div className="px-4 py-12">
+            {pageContent}
+          </div>
+        </ScrollArea>
+      ) : (
+        <div className="container mx-auto px-4 py-12 max-w-7xl">
+          {pageContent}
+        </div>
+      )}
+      
+      {/* Chat Interface */}
+      <ChatPopout
+        systemPrompt={systemPrompts[selectedSystemPrompt as keyof typeof systemPrompts]}
+        initialMessages={sampleMessages}
+        title="AI Assistant"
+        subtitle={`${selectedSystemPrompt} mode • ${focusedIds.length} focused • ${chatMode}`}
+        placeholder="Try: 'Show user profile', 'What are the database settings?', or 'Calculate 25 * 4'..."
+        position="right"
+        mode={chatMode}
+        defaultWidth={450}
+        minWidth={400}
+        maxWidth={600}
+        enableSuggestions={true}
+        suggestionsCount={4}
+        suggestionsPrompt="Generate contextual suggestions based on the focused widgets, tools available, and current conversation. Suggest specific actions the user can take with the counter, calculator, database settings, user profile, or other interactive elements."
+      />
     </div>
-  );
+  )
 }

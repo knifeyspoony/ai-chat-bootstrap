@@ -11,7 +11,16 @@ A React component library for building AI chat interfaces using Vercel AI SDK wi
 - **AI Suggestions**: Intelligent suggestions and recommendations
 - **Chat Commands**: Built-in command system for chat interactions
 
-## Installation
+## Development
+
+```bash
+pnpm install
+pnpm run dev          # Next.js dev server
+pnpm run build:lib    # Build for npm
+pnpm run lint         # Type checking
+```
+
+## Installation (not yet available)
 
 ```bash
 pnpm add ai-sdk-chat
@@ -163,16 +172,6 @@ interface UIMessage {
 - shadcn/ui + Tailwind CSS
 - TypeScript
 - Next.js 15.5.0
-
-## Development
-
-```bash
-pnpm install
-pnpm run dev          # Next.js dev server
-pnpm run storybook    # Component development
-pnpm run build:lib    # Build for npm
-pnpm run lint         # Type checking
-```
 
 ## License
 

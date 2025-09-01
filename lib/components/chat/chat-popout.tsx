@@ -85,7 +85,7 @@ export function ChatPopout({
   buttonIcon,
   showToggleButton = true
 }: ChatPopoutProps) {
-  const [internalIsOpen, setInternalIsOpen] = useState(false)
+  const [internalIsOpen, setInternalIsOpen] = useState(true)
   const [width, setWidth] = useState(defaultWidth)
   const [isDragging, setIsDragging] = useState(false)
   
@@ -332,6 +332,10 @@ export function ChatPopout({
             suggestionsCount={suggestionsCount}
             enableCommands={enableCommands}
             onCommandExecute={onCommandExecute}
+            onAICommandExecute={(message, toolName, systemPrompt) => {
+              chat.sendAICommandMessage(message, toolName, systemPrompt)
+              setInput('') // Clear input after sending AI command
+            }}
             onAssistantFinish={(triggerFetch) => {
               triggerSuggestionsRef.current = triggerFetch
             }}
@@ -461,6 +465,10 @@ export function ChatPopout({
             suggestionsCount={suggestionsCount}
             enableCommands={enableCommands}
             onCommandExecute={onCommandExecute}
+            onAICommandExecute={(message, toolName, systemPrompt) => {
+              chat.sendAICommandMessage(message, toolName, systemPrompt)
+              setInput('') // Clear input after sending AI command
+            }}
             onAssistantFinish={(triggerFetch) => {
               triggerSuggestionsRef.current = triggerFetch
             }}

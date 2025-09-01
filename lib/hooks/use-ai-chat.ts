@@ -131,6 +131,39 @@ export function useAIChat(options: {
     chatHook.sendMessage({ text: content })
   }
 
+  // Send AI command message with specific tool filtering
+  const sendAICommandMessage = (content: string, toolName: string, commandSystemPrompt?: string) => {
+    setError(null)
+    
+    // Create a custom transport for this specific message with tool filtering
+    const commandTransport = new DefaultChatTransport({
+      api,
+      prepareSendMessagesRequest: (options) => {
+        const currentContext = useAIContextStore.getState().serialize()
+        const currentFocusItems = useAIFocusStore.getState().getAllFocusItems()
+        
+        // Filter tools to only include the specified tool
+        const allTools = useAIToolsStore.getState().serializeToolsForBackend()
+        const filteredTools = allTools.filter(tool => tool.name === toolName)
+        
+        return {
+          ...options,
+          body: {
+            ...options.body,
+            messages: options.messages,
+            context: currentContext,
+            tools: filteredTools, // Only include the specified tool
+            focus: currentFocusItems,
+            systemPrompt: commandSystemPrompt || systemPrompt // Use command-specific or default system prompt
+          }
+        }
+      }
+    })
+
+    // Send message with the filtered transport
+    chatHook.sendMessage({ text: content }, { transport: commandTransport })
+  }
+
   // Retry last message with error recovery
   const retryLastMessage = () => {
     const lastMessage = chatHook.messages[chatHook.messages.length - 1]
@@ -151,6 +184,7 @@ export function useAIChat(options: {
   return {
     ...chatHook,
     sendMessageWithContext,
+    sendAICommandMessage,
     retryLastMessage,
     clearError,
     isLoading: chatHook.status === 'streaming' || chatHook.status === 'submitted',

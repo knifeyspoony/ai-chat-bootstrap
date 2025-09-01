@@ -1,38 +1,39 @@
 import { useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { useAIChatCommandsStore, type AIChatCommand } from '@lib/stores/commands'
+import { useAIChatCommandsStore, type UIChatCommand } from '@lib/stores/commands'
 
 /**
- * Register AI chat commands that send targeted messages to the LLM.
- * These commands are executed by the AI using specific frontend tools.
+ * Register UI chat commands that execute directly on the client.
+ * These commands bypass the LLM and execute immediately when typed.
  * 
- * @param command - The AI chat command configuration (type is automatically set to 'ai')
+ * @param command - The UI chat command configuration (type is automatically set to 'ui')
  * 
  * @example
  * ```tsx
  * function MyCommands() {
- *   useAIChatCommand({
- *     name: 'summarize',
- *     description: 'Summarize a URL using AI',
- *     toolName: 'url_summarizer',
- *     parameters: z.object({
- *       url: z.string().describe('URL to summarize')
- *     }),
- *     systemPrompt: 'You are a concise summarizer. Extract key points and main ideas.'
+ *   useUIChatCommand({
+ *     name: 'clear',
+ *     description: 'Clear the chat history',
+ *     parameters: z.object({}),
+ *     execute: async () => {
+ *       await clearChatHistory()
+ *     }
  *   })
  *   
- *   useAIChatCommand({
- *     name: 'search',
- *     description: 'Search and analyze content',
- *     toolName: 'web_search',
+ *   useUIChatCommand({
+ *     name: 'theme',
+ *     description: 'Change the theme',
  *     parameters: z.object({
- *       query: z.string().describe('Search query')
- *     })
+ *       mode: z.enum(['light', 'dark']).describe('Theme mode')
+ *     }),
+ *     execute: async ({ mode }) => {
+ *       setTheme(mode)
+ *     }
  *   })
  * }
  * ```
  */
-export function useAIChatCommand(command: Omit<AIChatCommand, 'type'>) {
+export function useUIChatCommand(command: Omit<UIChatCommand, 'type'>) {
   // SINGLE Zustand call to minimize hook count
   const { registerCommand, unregisterCommand } = useAIChatCommandsStore(useShallow(state => ({
     registerCommand: state.registerCommand,
@@ -41,17 +42,15 @@ export function useAIChatCommand(command: Omit<AIChatCommand, 'type'>) {
   
   // Use single ref for all command data to minimize hook count  
   const commandDataRef = useRef<{
-    command: AIChatCommand
+    command: UIChatCommand
     signature: string
   }>({
-    command: { ...command, type: 'ai' },
+    command: { ...command, type: 'ui' },
     signature: JSON.stringify({
       name: command.name,
       description: command.description,
       parameters: command.parameters,
-      type: 'ai',
-      toolName: command.toolName,
-      systemPrompt: command.systemPrompt
+      type: 'ui'
     })
   })
   
@@ -60,22 +59,24 @@ export function useAIChatCommand(command: Omit<AIChatCommand, 'type'>) {
     name: command.name,
     description: command.description,
     parameters: command.parameters,
-    type: 'ai',
-    toolName: command.toolName,
-    systemPrompt: command.systemPrompt
+    type: 'ui'
   })
   
   const hasSignatureChanged = commandDataRef.current.signature !== currentSignature
-  commandDataRef.current.command = { ...command, type: 'ai' }
+  commandDataRef.current.command = { ...command, type: 'ui' }
   
   useEffect(() => {
-    const stableCommand: AIChatCommand = {
-      type: 'ai',
+    // Create a wrapper that always calls the latest execute function
+    const stableExecute = async (params: unknown) => {
+      return commandDataRef.current.command.execute(params)
+    }
+    
+    const stableCommand: UIChatCommand = {
+      type: 'ui',
       name: command.name,
       description: command.description,
       parameters: command.parameters,
-      toolName: command.toolName,
-      systemPrompt: command.systemPrompt
+      execute: stableExecute
     }
     
     registerCommand(stableCommand)

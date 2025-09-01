@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { ChatInput, type ChatInputProps } from "./chat-input"
-import { useAIChatCommandsStore, type ChatCommand } from "@lib/stores/commands"
+import { useAIChatCommandsStore, type ChatCommand, type UIChatCommand, type AIChatCommand } from "@lib/stores/commands"
 import { hasRequiredParameters, generatePlaceholder, parseArgsToParams, getCurrentParameterIndex, hasAllRequiredParams } from "@lib/utils/command-utils"
 import { CommandDropdown } from "@lib/components/ui/chat-command"
 import { CommandParameterInfo } from "@lib/components/ui/command-parameter-info"
@@ -10,6 +10,7 @@ export interface ChatInputWithCommandsProps extends ChatInputProps {
   // Commands props
   enableCommands?: boolean
   onCommandExecute?: (commandName: string, args?: string) => void
+  onAICommandExecute?: (message: string, toolName: string, systemPrompt?: string) => void
 }
 
 export const ChatInputWithCommands = ({
@@ -18,6 +19,7 @@ export const ChatInputWithCommands = ({
   onSubmit,
   enableCommands = false,
   onCommandExecute,
+  onAICommandExecute,
   ...props
 }: ChatInputWithCommandsProps) => {
   const setError = useChatStore(state => state.setError)
@@ -146,8 +148,14 @@ export const ChatInputWithCommands = ({
     try {
       if (!hasRequiredParameters(cmd.parameters)) {
         // Execute immediately - no args needed
-        await executeCommand(cmd.name, {})
-        onCommandExecute?.(cmd.name, undefined)
+        if (cmd.type === 'ui') {
+          await executeCommand(cmd.name, {})
+          onCommandExecute?.(cmd.name, undefined)
+        } else if (cmd.type === 'ai') {
+          // Send AI command message with no parameters
+          const message = `Execute ${cmd.name} command`
+          onAICommandExecute?.(message, cmd.toolName, cmd.systemPrompt)
+        }
         onChange('')
         setShowCommands(false)
         
@@ -203,8 +211,16 @@ export const ChatInputWithCommands = ({
         
         try {
           const params = parseArgsToParams(argsString, command.parameters)
-          await executeCommand(cmdName, params)
-          onCommandExecute?.(cmdName, argsString || undefined)
+          
+          if (command.type === 'ui') {
+            await executeCommand(cmdName, params)
+            onCommandExecute?.(cmdName, argsString || undefined)
+          } else if (command.type === 'ai') {
+            // Build AI command message with parameters
+            const message = argsString ? `${cmdName} ${argsString}` : cmdName
+            onAICommandExecute?.(message, command.toolName, command.systemPrompt)
+          }
+          
           onChange('')
           setShowParameterInfo(false)
           setSelectedCommand(null)

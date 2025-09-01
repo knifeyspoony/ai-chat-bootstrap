@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@lib/components/ui/switch'
 import { ScrollArea } from '@lib/components/ui/scroll-area'
 import { ChatPopout } from '@lib/components/chat/chat-popout'
-import { useAIContext, useAIFrontendTool, useAIFocus, useAIChatCommand } from '@lib/hooks'
+import { useAIContext, useAIFrontendTool, useAIFocus, useUIChatCommand, useAIChatCommand } from '@lib/hooks'
 import { cn } from '@lib/utils'
 import { useAIToolsStore } from '@lib/stores'
 import { z } from 'zod'
@@ -31,7 +31,7 @@ export default function Home() {
   const [counter, setCounter] = useState(0)
   const [calculation, setCalculation] = useState<string | null>(null)
   const [selectedSystemPrompt, setSelectedSystemPrompt] = useState<string>('default')
-  const [chatMode, setChatMode] = useState<'overlay' | 'inline'>('overlay')
+  const [chatMode, setChatMode] = useState<'overlay' | 'inline'>('inline')
   
   // Focus selection - track which context items are currently relevant
   const { setFocus, clearFocus, getFocus, focusedIds, clearAllFocus } = useAIFocus()
@@ -372,8 +372,8 @@ export default function Home() {
     }
   })
   
-  // Register chat commands
-  useAIChatCommand({
+  // Register UI commands (client-side only)
+  useUIChatCommand({
     name: 'reset',
     description: 'Reset all demo widgets to initial state',
     parameters: z.object({}),
@@ -385,7 +385,7 @@ export default function Home() {
     }
   })
   
-  useAIChatCommand({
+  useUIChatCommand({
     name: 'counter',
     description: 'Set counter to a specific value',
     parameters: z.object({
@@ -396,7 +396,7 @@ export default function Home() {
     }
   })
   
-  useAIChatCommand({
+  useUIChatCommand({
     name: 'personality',
     description: 'Change AI personality',
     parameters: z.object({
@@ -407,7 +407,7 @@ export default function Home() {
     }
   })
   
-  useAIChatCommand({
+  useUIChatCommand({
     name: 'focus',
     description: 'Focus specific widgets',
     parameters: z.object({
@@ -424,7 +424,7 @@ export default function Home() {
     }
   })
   
-  useAIChatCommand({
+  useUIChatCommand({
     name: 'clear',
     description: 'Clear calculator result',
     parameters: z.object({}),
@@ -433,7 +433,7 @@ export default function Home() {
     }
   })
   
-  useAIChatCommand({
+  useUIChatCommand({
     name: 'mode',
     description: 'Switch chat mode',
     parameters: z.object({
@@ -444,7 +444,7 @@ export default function Home() {
     }
   })
 
-  useAIChatCommand({
+  useUIChatCommand({
     name: 'demo',
     description: 'Demo command with multiple parameters for testing',
     parameters: z.object({
@@ -459,6 +459,27 @@ export default function Home() {
       const message = `Hello ${name}!`.repeat(count)
       console.log(message)
     }
+  })
+
+  // Add AI commands that use specific tools
+  useAIChatCommand({
+    name: 'calculate',
+    description: 'Ask AI to perform a calculation',
+    toolName: 'calculate',
+    parameters: z.object({
+      expression: z.string().describe('Math expression (e.g., "25 * 4")')
+    }),
+    systemPrompt: 'You are a helpful calculator. Parse the user\'s math expression and use the calculate tool to compute the result. Be precise and clear in your response.'
+  })
+
+  useAIChatCommand({
+    name: 'increment',
+    description: 'Ask AI to increment the counter',
+    toolName: 'increment_counter',
+    parameters: z.object({
+      amount: z.number().default(1).describe('Amount to increment by')
+    }),
+    systemPrompt: 'You are helping manage a counter widget. Use the increment_counter tool to increase the counter value as requested.'
   })
   
   // focusedIds is now reactive from useAIFocus hook
@@ -755,7 +776,7 @@ export default function Home() {
         initialMessages={sampleMessages}
         title="AI Assistant"
         subtitle={`${selectedSystemPrompt} mode • ${focusedIds.length} focused • ${chatMode}`}
-        placeholder="Try: 'Show user profile', 'Calculate 25 * 4', or type '/' for commands..."
+        placeholder="Try: 'Show user profile', 'Calculate 25 * 4', or type '/' for UI/AI commands..."
         position="right"
         mode={chatMode}
         defaultWidth={450}

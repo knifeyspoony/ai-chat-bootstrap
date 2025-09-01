@@ -44,6 +44,7 @@ export interface ChatContainerProps {
   // Commands props
   enableCommands?: boolean
   onCommandExecute?: (commandName: string, args?: string) => void
+  onAICommandExecute?: (message: string, toolName: string, systemPrompt?: string) => void
 }
 
 export function ChatContainer({
@@ -83,7 +84,8 @@ export function ChatContainer({
   
   // Commands props
   enableCommands = false,
-  onCommandExecute
+  onCommandExecute,
+  onAICommandExecute
 }: ChatContainerProps) {
   // Handle suggestions
   const { suggestions, handleSuggestionClick, onAssistantFinish: triggerSuggestionsFetch } = useSuggestions({
@@ -144,6 +146,7 @@ export function ChatContainer({
           // Commands props
           enableCommands={enableCommands}
           onCommandExecute={onCommandExecute}
+          onAICommandExecute={onAICommandExecute}
         />
       </div>
     </div>

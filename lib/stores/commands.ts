@@ -1,12 +1,24 @@
 import { create } from 'zustand'
 import { z } from 'zod'
 
-export interface ChatCommand {
+export interface BaseChatCommand {
   name: string
   description: string
   parameters: z.ZodSchema
+}
+
+export interface UIChatCommand extends BaseChatCommand {
+  type: 'ui'
   execute: (params: unknown) => void | Promise<void>
 }
+
+export interface AIChatCommand extends BaseChatCommand {
+  type: 'ai'
+  toolName: string
+  systemPrompt?: string
+}
+
+export type ChatCommand = UIChatCommand | AIChatCommand
 
 export interface AIChatCommandsStore {
   commands: Map<string, ChatCommand>
@@ -49,6 +61,10 @@ export const useAIChatCommandsStore = create<AIChatCommandsStore>((set, get) => 
       throw new Error(`Command "${name}" not found`)
     }
     
+    if (command.type === 'ai') {
+      throw new Error(`Cannot execute AI command "${name}" directly. Use sendAICommand instead.`)
+    }
+    
     try {
       // Validate parameters using the command's schema
       const validatedParams = command.parameters.parse(params)
@@ -61,9 +77,11 @@ export const useAIChatCommandsStore = create<AIChatCommandsStore>((set, get) => 
   
   getMatchingCommands: (input: string) => {
     const query = input.toLowerCase()
-    return Array.from(get().commands.values()).filter(command =>
-      command.name.toLowerCase().includes(query) ||
-      command.description.toLowerCase().includes(query)
-    )
+    return Array.from(get().commands.values())
+      .filter(command =>
+        command.name.toLowerCase().includes(query) ||
+        command.description.toLowerCase().includes(query)
+      )
+      .sort((a, b) => a.name.localeCompare(b.name))
   }
 }))

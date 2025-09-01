@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useRef } from "react"
-import { Terminal } from "lucide-react"
+import { Terminal, Sparkles } from "lucide-react"
 import { cn } from "@lib/utils"
 import { type ChatCommand } from "@lib/stores/commands"
 
@@ -73,7 +73,11 @@ export const CommandDropdown = React.forwardRef<
             onClick={() => onSelect(command, index)}
             onMouseEnter={() => onSelectedIndexChange(index)}
           >
-            <Terminal className="h-4 w-4 text-primary shrink-0" />
+            {command.type === 'ai' ? (
+              <Sparkles className="h-4 w-4 text-primary shrink-0" />
+            ) : (
+              <Terminal className="h-4 w-4 text-primary shrink-0" />
+            )}
             <div className="flex flex-col min-w-0 flex-1">
               <span className="font-medium truncate">/{command.name}</span>
               <span className="text-xs text-muted-foreground truncate">

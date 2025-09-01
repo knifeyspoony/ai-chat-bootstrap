@@ -1,203 +1,178 @@
 # AI SDK Chat
 
-A high-performance React 19 AI chat SDK with deep application integration capabilities. Built with shadcn/ui components and optimized for zero unnecessary renders.
+A React component library for building AI chat interfaces using Vercel AI SDK with enhanced UX features.
 
 ## Features
 
-- 🚀 **Zero Unnecessary Renders** - Surgical state updates with stable references
-- 🎨 **Fully Reskinnable** - Complete theming control with sensible defaults
-- 🔧 **Deep Integration** - Share component state, register tools, manage focus
-- 📦 **Framework Isolated** - Clean boundaries prevent state pollution
-- 🔒 **Type-Safe** - Full TypeScript support with runtime validation
-- ⚡ **React 19 Optimized** - Leverages latest React features for performance
+- **AI SDK Elements Integration**: Pre-built UI components from ai-sdk.dev/elements/
+- **Automatic Context Sharing**: Hooks for seamless chat context management  
+- **Frontend Tools**: Interactive UX components for enhanced user experience
+- **Focus Items**: UI element highlighting for contextual AI assistance
+- **AI Suggestions**: Intelligent suggestions and recommendations
+- **Chat Commands**: Built-in command system for chat interactions
 
 ## Installation
 
 ```bash
-npm install ai-sdk-chat
-# or
-yarn add ai-sdk-chat
-# or
 pnpm add ai-sdk-chat
+```
+
+Import the required CSS:
+
+```tsx
+import 'ai-sdk-chat/lib/styles.css'
 ```
 
 ## Quick Start
 
 ```tsx
-import { AISDKChatProvider, AISDKChat } from 'ai-sdk-chat'
+import { ChatContainer, ChatInput } from 'ai-sdk-chat'
+import { useChat } from 'ai/react'
 
-function App() {
+export default function App() {
+  const { messages, input, handleInputChange, handleSubmit } = useChat()
+
   return (
-    <AISDKChatProvider apiKey={process.env.OPENAI_API_KEY}>
-      <YourApp />
-      <AISDKChat />
-    </AISDKChatProvider>
+    <ChatContainer>
+      {messages.map(message => (
+        <div key={message.id}>
+          {/* Messages render automatically based on UIMessage parts */}
+        </div>
+      ))}
+      <ChatInput 
+        input={input}
+        handleInputChange={handleInputChange}
+        handleSubmit={handleSubmit}
+      />
+    </ChatContainer>
   )
 }
 ```
 
-## Core Hooks
+## Core Components
 
-### `useAIContext`
-Share application state with the AI chat context without causing re-renders.
+### Chat Components
+- `ChatContainer` - Main chat wrapper
+- `ChatInput` - Input with command support  
+- `ChatMessage` - Message renderer for UIMessage format
 
+### Message Types
+- `TextMessage` - Markdown text rendering
+- `ReasoningMessage` - AI reasoning display
+- `FileMessage` - File attachments
+- `SourceUrlMessage` - URL references
+- `ToolMessage` - Tool invocation results
+
+## Hooks
+
+### Context Management
 ```tsx
-function UserProfile() {
-  const user = useCurrentUser()
-  
-  // This won't re-render the chat interface
-  useAIContext('currentUser', user)
+import { useAIContext } from 'ai-sdk-chat'
+
+// Share app state automatically with chat
+useAIContext('counter', counter)
+useAIContext('userProfile', { 
+  name: user.name, 
+  role: user.role 
+})
+```
+
+### Frontend Tools
+```tsx
+import { useAIFrontendTool } from 'ai-sdk-chat'
+
+// Register tools that execute in the browser
+useAIFrontendTool({
+  name: 'increment_counter',
+  description: 'Increment the demo counter',
+  parameters: z.object({
+    amount: z.number().default(1).describe('Amount to increment by')
+  }),
+  execute: async ({ amount }) => {
+    setCounter(prev => prev + amount)
+    return { newValue: counter + amount }
+  }
+})
+```
+
+### Focus Items
+```tsx
+import { useAIFocus } from 'ai-sdk-chat'
+
+// Track selected UI items for contextual AI assistance
+const { setFocus, clearFocus, focusedIds } = useAIFocus()
+const [selectedNote, setSelectedNote] = useState(null)
+
+// When user selects an item, add it to focus
+useEffect(() => {
+  if (selectedNote) {
+    setFocus(selectedNote.id, {
+      id: selectedNote.id,
+      type: 'note', 
+      title: selectedNote.title,
+      content: selectedNote.content
+    })
+  } else {
+    clearFocus('note-123')
+  }
+}, [selectedNote, setFocus, clearFocus])
+
+// Now when user asks "What's the main point here?", 
+// the LLM gets the selected note's content as context with an indication
+// that the item is selected and so it may be highly relevant
+```
+
+### Chat Commands
+```tsx
+import { useAIChatCommand } from 'ai-sdk-chat'
+
+// Register slash commands for quick actions
+useAIChatCommand({
+  name: 'reset',
+  description: 'Reset all demo widgets to initial state',
+  parameters: z.object({}),
+  execute: async () => {
+    setCounter(0)
+    setCalculation(null)
+    clearAllFocus()
+  }
+})
+
+// User can now type "/reset" in chat to execute
+```
+
+## Message Format
+
+Uses AI SDK UIMessage format with support for multiple content types:
+
+```typescript
+interface UIMessage {
+  id: string
+  role: 'system' | 'user' | 'assistant'
+  parts: Array<{
+    type: 'text' | 'reasoning' | 'file' | 'source-url' | 'tool-*' | 'data-*'
+    // ... type-specific properties
+  }>
 }
 ```
 
-### `useAIFrontendTool`
-Register tools that execute in the browser with optional custom rendering.
+## Tech Stack
 
-```tsx
-function DataTools() {
-  useAIFrontendTool({
-    name: 'create_chart',
-    description: 'Creates data visualizations',
-    parameters: z.object({
-      data: z.array(z.any()),
-      type: z.enum(['bar', 'line', 'pie'])
-    }),
-    execute: async (params) => {
-      const chart = await createChart(params)
-      return { chartId: chart.id }
-    },
-    render: ({ result }) => <ChartDisplay id={result.chartId} />
-  })
-}
+- React 19.1.0
+- Vercel AI SDK v5.x
+- shadcn/ui + Tailwind CSS
+- TypeScript
+- Next.js 15.5.0
+
+## Development
+
+```bash
+pnpm install
+pnpm run dev          # Next.js dev server
+pnpm run storybook    # Component development
+pnpm run build:lib    # Build for npm
+pnpm run lint         # Type checking
 ```
-
-### `useAIBackendTool`
-Register server-side tools that don't affect frontend state. Provide an `execute` function to handle the tool logic.
-
-```tsx
-function DatabaseTools() {
-  useAIBackendTool({
-    name: 'query_database',
-    description: 'Query application database',
-    parameters: z.object({
-      query: z.string()
-    }),
-    execute: async (params) => {
-      const result = await fetch('/api/query', {
-        method: 'POST',
-        body: JSON.stringify(params)
-      })
-      return result.json()
-    }
-  })
-}
-```
-
-### `useAIFocus`
-Highlight UI elements for contextual AI assistance.
-
-```tsx
-function CodeEditor() {
-  const [selection, setSelection] = useState(null)
-  
-  useAIFocus({
-    id: 'code-selection',
-    active: !!selection,
-    context: selection,
-    preview: selection && <CodePreview code={selection} />
-  })
-}
-```
-
-## Advanced Configuration
-
-```tsx
-<AIProvider
-  apiKey={process.env.OPENAI_API_KEY}
-  model="gpt-4-turbo-preview"
-  theme={{
-    primary: '#0070f3',
-    background: '#ffffff',
-    text: '#000000',
-    fontFamily: 'Inter, system-ui, sans-serif',
-    borderRadius: '12px'
-  }}
-  position="bottom-right"
-  hotkey="cmd+k"
-  maxTokens={4096}
-  temperature={0.7}
-  systemMessage="You are a helpful assistant for a data analytics platform."
->
-  <App />
-</AIProvider>
-```
-
-## Performance
-
-The SDK is designed for optimal performance:
-
-- **Stable References**: Prevents unnecessary re-renders through careful reference management
-- **Batched Updates**: Multiple state changes are batched into single updates
-- **Selective Subscriptions**: Components only re-render when their specific data changes
-- **Lazy Serialization**: Context is only serialized when needed for AI messages
-- **Virtual Scrolling**: Large chat histories use virtualization
-
-## Styling
-
-### Using Default Theme
-
-```tsx
-import 'ai-sdk-chat/styles/default.css'
-```
-
-### Custom Theme
-
-```tsx
-const customTheme = {
-  primary: '#your-color',
-  background: '#your-bg',
-  text: '#your-text',
-  // ... see ThemeConfig type for all options
-}
-
-<AISDKChatProvider theme={customTheme}>
-  <App />
-</AISDKChatProvider>
-```
-
-### CSS Variables
-
-```css
-:root {
-  --ai-chat-primary: #0070f3;
-  --ai-chat-background: #ffffff;
-  --ai-chat-text: #000000;
-  --ai-chat-border: #e5e5e5;
-  --ai-chat-radius: 12px;
-}
-```
-
-## TypeScript
-
-Full TypeScript support with exported types:
-
-```tsx
-import type { 
-  AIContext,
-  FrontendTool,
-  BackendTool,
-  FocusItem,
-  ChatMessage,
-  ThemeConfig
-} from 'ai-sdk-chat'
-```
-
-## Browser Support
-
-- Chrome/Edge 90+
-- Firefox 88+
-- Safari 14+
-- React 19.0+
 
 ## License
 

@@ -1,19 +1,19 @@
 import { create } from 'zustand'
 import { z } from 'zod'
-import { asSchema, zodSchema } from '@ai-sdk/provider-utils'
+import { asSchema } from '@ai-sdk/provider-utils'
 
 export interface FrontendTool {
   name: string
   description: string
   parameters: z.ZodSchema
-  execute: (params: any) => Promise<any> | any
-  render?: (result: any) => React.ReactNode
+  execute: (params: unknown) => Promise<unknown> | unknown
+  render?: (result: unknown) => React.ReactNode
 }
 
 export interface SerializedTool {
   name: string
   description: string
-  inputSchema: any // JSON Schema format for backend
+  inputSchema: unknown // JSON Schema format for backend
 }
 
 export interface AIToolsStore {
@@ -22,7 +22,7 @@ export interface AIToolsStore {
   unregisterTool: (name: string) => void
   getTool: (name: string) => FrontendTool | undefined
   getAllTools: () => FrontendTool[]
-  executeTool: (name: string, params: any) => Promise<any>
+  executeTool: (name: string, params: unknown) => Promise<unknown>
   serializeToolsForBackend: () => SerializedTool[]
 }
 
@@ -51,7 +51,7 @@ export const useAIToolsStore = create<AIToolsStore>((set, get) => ({
     return Array.from(get().tools.values())
   },
   
-  executeTool: async (name: string, params: any) => {
+  executeTool: async (name: string, params: unknown) => {
     const tool = get().tools.get(name)
     if (!tool) {
       throw new Error(`Tool "${name}" not found`)

@@ -65,6 +65,9 @@ export function ChatPopout({
   emptyState,
   enableSuggestions,
   suggestionsPrompt,
+  suggestionsCount,
+  enableCommands,
+  onCommandExecute,
   
   // Popout props
   isOpen: controlledIsOpen,
@@ -158,7 +161,7 @@ export function ChatPopout({
     
     // Optionally notify parent
     onSubmit?.(input)
-  }, [input, chat.sendMessageWithContext, onSubmit])
+  }, [input, chat, onSubmit])
 
   // Handle resize drag
   const handleMove = useCallback((clientX: number) => {
@@ -228,19 +231,6 @@ export function ChatPopout({
     }
   }, [handleMouseMove, handleEnd, handleTouchMove])
 
-  // Close on escape key
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        setIsOpen(false)
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape)
-      return () => document.removeEventListener('keydown', handleEscape)
-    }
-  }, [isOpen, setIsOpen])
 
   const toggleOpen = () => {
     setIsOpen(!isOpen)
@@ -339,6 +329,9 @@ export function ChatPopout({
             emptyState={emptyState}
             enableSuggestions={enableSuggestions}
             suggestionsPrompt={suggestionsPrompt}
+            suggestionsCount={suggestionsCount}
+            enableCommands={enableCommands}
+            onCommandExecute={onCommandExecute}
             onAssistantFinish={(triggerFetch) => {
               triggerSuggestionsRef.current = triggerFetch
             }}
@@ -465,6 +458,9 @@ export function ChatPopout({
             emptyState={emptyState}
             enableSuggestions={enableSuggestions}
             suggestionsPrompt={suggestionsPrompt}
+            suggestionsCount={suggestionsCount}
+            enableCommands={enableCommands}
+            onCommandExecute={onCommandExecute}
             onAssistantFinish={(triggerFetch) => {
               triggerSuggestionsRef.current = triggerFetch
             }}

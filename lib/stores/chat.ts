@@ -16,9 +16,9 @@ export interface ChatState {
   clearMessages: () => void
   
   // Tool execution results
-  toolResults: Map<string, any>
-  setToolResult: (toolCallId: string, result: any) => void
-  getToolResult: (toolCallId: string) => any
+  toolResults: Map<string, unknown>
+  setToolResult: (toolCallId: string, result: unknown) => void
+  getToolResult: (toolCallId: string) => unknown
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -42,7 +42,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   
   clearMessages: () => set({ messages: [] }),
   
-  setToolResult: (toolCallId: string, result: any) => {
+  setToolResult: (toolCallId: string, result: unknown) => {
     get().toolResults.set(toolCallId, result)
   },
   

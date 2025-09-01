@@ -9,7 +9,7 @@ export interface Suggestion {
 
 export interface SuggestionsRequest {
   messages: UIMessage[]
-  context?: Record<string, any>
+  context?: Record<string, unknown>
   focus?: FocusItem[]
   prompt?: string  // Custom prompt for generating suggestions
 }

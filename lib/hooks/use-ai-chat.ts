@@ -12,9 +12,9 @@ import { useChatStore } from '@lib/stores/chat'
 export function useAIChat(options: {
   api?: string
   systemPrompt?: string
-  onToolCall?: (toolCall: any) => void
+  onToolCall?: (toolCall: unknown) => void
   onFinish?: () => void
-  initialMessages?: any[]
+  initialMessages?: unknown[]
 } = {}) {
   const { api = '/api/chat', systemPrompt, onToolCall, onFinish, initialMessages } = options
   
@@ -115,9 +115,9 @@ export function useAIChat(options: {
   ) {
     try {
       chatHook.addToolResult({
-        tool: toolCall.toolName as any,
+        tool: toolCall.toolName as string,
         toolCallId: toolCall.toolCallId,
-        output: output as any
+        output: output
       })
     } catch (e) {
       console.error('addToolResult error:', e)

@@ -40,11 +40,20 @@ export const PromptInputTextarea = ({
   onChange,
   className,
   placeholder = 'What would you like to know?',
-  minHeight = 48,
-  maxHeight = 164,
+  minHeight, // eslint-disable-line @typescript-eslint/no-unused-vars
+  maxHeight, // eslint-disable-line @typescript-eslint/no-unused-vars
+  onKeyDown,
   ...props
 }: PromptInputTextareaProps) => {
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
+    // Call parent's onKeyDown handler first (if provided)
+    onKeyDown?.(e);
+    
+    // If parent prevented default, don't proceed with internal handling
+    if (e.defaultPrevented) {
+      return;
+    }
+    
     if (e.key === 'Enter') {
       // Don't submit if IME composition is in progress
       if (e.nativeEvent.isComposing) {

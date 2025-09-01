@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 export interface FocusItem {
   id: string
-  [key: string]: any // Allow any serializable data
+  [key: string]: unknown // Allow any serializable data
 }
 
 export interface AIFocusStore {

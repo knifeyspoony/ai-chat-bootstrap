@@ -59,11 +59,11 @@ export function useAIFrontendTool(tool: FrontendTool) {
   
   useEffect(() => {
     // Create a wrapper that always calls the latest execute function
-    const stableExecute = async (params: any) => {
+    const stableExecute = async (params: unknown) => {
       return toolDataRef.current.tool.execute(params)
     }
     
-    const stableRender = toolDataRef.current.tool.render ? (props: any) => {
+    const stableRender = toolDataRef.current.tool.render ? (props: unknown) => {
       return toolDataRef.current.tool.render?.(props) || null
     } : undefined
     
@@ -81,5 +81,6 @@ export function useAIFrontendTool(tool: FrontendTool) {
     return () => {
       unregisterTool(tool.name)
     }
-  }, [tool.name, hasSignatureChanged, registerTool, unregisterTool, currentSignature])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool.name, hasSignatureChanged, currentSignature])
 }

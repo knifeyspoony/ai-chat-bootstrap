@@ -17,7 +17,7 @@ import { useAIContextStore } from '@lib/stores'
  * }
  * ```
  */
-export function useAIContext(key: string, value: any) {
+export function useAIContext(key: string, value: unknown) {
   const setContext = useAIContextStore(state => state.setContext)
   const clearContext = useAIContextStore(state => state.clearContext)
   

@@ -301,9 +301,3 @@ pnpm run lint         # ESLint check
 - Peer dependency warnings with React 19 (lucide-react expects ^18)
 - Type issues with AI SDK UIMessage interface (using type assertions as workaround)
 - No tests implemented yet for markdown rendering
-
-## Future TODOs
-- [ ] Implement comprehensive test suite
-- [ ] Improve TypeScript types for AI SDK integration
-- [ ] Add animation/transition support
-- [ ] Consider headless component variants

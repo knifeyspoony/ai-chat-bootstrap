@@ -1,17 +1,17 @@
 import { create } from 'zustand'
 
 export interface AIContextStore {
-  context: Map<string, any>
-  setContext: (key: string, value: any) => void
-  getContext: (key?: string) => any
+  context: Map<string, unknown>
+  setContext: (key: string, value: unknown) => void
+  getContext: (key?: string) => unknown
   clearContext: (key?: string) => void
-  serialize: () => Record<string, any>
+  serialize: () => Record<string, unknown>
 }
 
 export const useAIContextStore = create<AIContextStore>((set, get) => ({
-  context: new Map<string, any>(),
+  context: new Map<string, unknown>(),
   
-  setContext: (key: string, value: any) => {
+  setContext: (key: string, value: unknown) => {
     set(state => ({
       context: new Map(state.context).set(key, value)
     }))

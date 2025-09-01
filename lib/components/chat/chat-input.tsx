@@ -13,7 +13,6 @@ import {
   PromptInputButton,
   PromptInputSubmit
 } from "@lib/components/ai-elements/prompt-input"
-import { Button } from "@lib/components/ui/button"
 import { 
   DropdownMenu,
   DropdownMenuContent, 
@@ -36,6 +35,7 @@ export interface ChatInputProps {
   status?: ChatStatus
   maxRows?: number
   className?: string
+  onKeyDown?: (e: React.KeyboardEvent) => void
   
   // Suggestions props
   enableSuggestions?: boolean
@@ -55,6 +55,7 @@ export const ChatInput = ({
   status,
   maxRows = 4,
   className,
+  onKeyDown,
   
   // Suggestions props
   enableSuggestions = false,
@@ -126,6 +127,7 @@ export const ChatInput = ({
             placeholder={placeholder}
             disabled={disabled}
             maxHeight={maxRows * 24}
+            onKeyDown={onKeyDown}
           />
           <PromptInputToolbar>
             <PromptInputTools>

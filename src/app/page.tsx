@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@lib/components/ui/switch'
 import { ScrollArea } from '@lib/components/ui/scroll-area'
 import { ChatPopout } from '@lib/components/chat/chat-popout'
-import { useAIContext, useAIFrontendTool, useAIFocus } from '@lib/hooks'
+import { useAIContext, useAIFrontendTool, useAIFocus, useAIChatCommand } from '@lib/hooks'
 import { cn } from '@lib/utils'
 import { useAIToolsStore } from '@lib/stores'
 import { z } from 'zod'
@@ -34,7 +34,7 @@ export default function Home() {
   const [chatMode, setChatMode] = useState<'overlay' | 'inline'>('overlay')
   
   // Focus selection - track which context items are currently relevant
-  const { setFocus, clearFocus, getFocus, focusedIds } = useAIFocus()
+  const { setFocus, clearFocus, getFocus, focusedIds, clearAllFocus } = useAIFocus()
   const toolsCount = useAIToolsStore(state => state.tools.size)
   
   // Create sample messages to demonstrate all message types
@@ -80,7 +80,7 @@ export default function Home() {
         {
           type: 'tool-calculate' as const,
           toolCallId: 'call_demo_1',
-          state: 'complete' as const,
+          state: 'output-available' as const,
           input: {
             operation: 'multiply',
             a: 25,
@@ -245,7 +245,7 @@ export default function Home() {
       clearFocus(itemId)
     } else {
       // Add item to focus with relevant data
-      let focusData: any = { id: itemId }
+      let focusData: Record<string, unknown> = { id: itemId }
       
       if (itemId === 'counter-widget') {
         focusData = {
@@ -372,6 +372,94 @@ export default function Home() {
     }
   })
   
+  // Register chat commands
+  useAIChatCommand({
+    name: 'reset',
+    description: 'Reset all demo widgets to initial state',
+    parameters: z.object({}),
+    execute: async () => {
+      setCounter(0)
+      setCalculation(null)
+      setSelectedSystemPrompt('default')
+      clearAllFocus() // Clear all focus
+    }
+  })
+  
+  useAIChatCommand({
+    name: 'counter',
+    description: 'Set counter to a specific value',
+    parameters: z.object({
+      value: z.number().describe('The value to set')
+    }),
+    execute: async ({ value }) => {
+      setCounter(value)
+    }
+  })
+  
+  useAIChatCommand({
+    name: 'personality',
+    description: 'Change AI personality',
+    parameters: z.object({
+      type: z.enum(['default', 'helpful', 'technical', 'creative']).default('default').describe('Personality type')
+    }),
+    execute: async ({ type }) => {
+      setSelectedSystemPrompt(type)
+    }
+  })
+  
+  useAIChatCommand({
+    name: 'focus',
+    description: 'Focus specific widgets',
+    parameters: z.object({
+      widgetIds: z.string().describe('Widget IDs separated by commas (counter-widget, calculator-widget, settings-widget, db-settings, user-profile, context-panel)')
+    }),
+    execute: async ({ widgetIds }) => {
+      const ids = widgetIds.split(',').map(id => id.trim())
+      ids.forEach(id => {
+        const validIds = ['counter-widget', 'calculator-widget', 'settings-widget', 'db-settings', 'user-profile', 'context-panel']
+        if (validIds.includes(id)) {
+          handleFocusToggle(id)
+        }
+      })
+    }
+  })
+  
+  useAIChatCommand({
+    name: 'clear',
+    description: 'Clear calculator result',
+    parameters: z.object({}),
+    execute: async () => {
+      setCalculation(null)
+    }
+  })
+  
+  useAIChatCommand({
+    name: 'mode',
+    description: 'Switch chat mode',
+    parameters: z.object({
+      mode: z.enum(['overlay', 'inline']).describe('Chat display mode')
+    }),
+    execute: async ({ mode }) => {
+      setChatMode(mode)
+    }
+  })
+
+  useAIChatCommand({
+    name: 'demo',
+    description: 'Demo command with multiple parameters for testing',
+    parameters: z.object({
+      name: z.string().describe('Your name or identifier'),
+      count: z.number().default(1).describe('Number of times to repeat the greeting')
+    }),
+    execute: async ({ name, count }) => {
+      // Just log to console for demo purposes
+      console.log(`Demo executed: Hello ${name}! (repeated ${count} times)`)
+      
+      // Could also update some UI state if needed
+      const message = `Hello ${name}!`.repeat(count)
+      console.log(message)
+    }
+  })
   
   // focusedIds is now reactive from useAIFocus hook
   
@@ -391,10 +479,10 @@ export default function Home() {
     id: string
     title: string
     description: string
-    icon: any
+    icon: React.ComponentType<{ className?: string }>
     children: React.ReactNode
     color?: string
-    focusRef?: any
+    focusRef?: React.RefObject<HTMLElement>
   }) => {
     const focused = !!getFocus(id)
     const colorClasses = {
@@ -635,7 +723,7 @@ export default function Home() {
               <div>counter: <span className="text-primary">{counter}</span></div>
               <div>calculation: <span className="text-primary">{calculation || 'null'}</span></div>
               <div>focused: <span className="text-primary">[{focusedIds.join(', ')}]</span></div>
-              <div>ai_mode: <span className="text-primary">"{selectedSystemPrompt}"</span></div>
+              <div>ai_mode: <span className="text-primary">&quot;{selectedSystemPrompt}&quot;</span></div>
             </div>
             <Badge variant="outline" className="w-full justify-center text-xs">
               <span className="w-2 h-2 bg-primary rounded-full mr-2"></span>
@@ -667,7 +755,7 @@ export default function Home() {
         initialMessages={sampleMessages}
         title="AI Assistant"
         subtitle={`${selectedSystemPrompt} mode • ${focusedIds.length} focused • ${chatMode}`}
-        placeholder="Try: 'Show user profile', 'What are the database settings?', or 'Calculate 25 * 4'..."
+        placeholder="Try: 'Show user profile', 'Calculate 25 * 4', or type '/' for commands..."
         position="right"
         mode={chatMode}
         defaultWidth={450}
@@ -676,6 +764,10 @@ export default function Home() {
         enableSuggestions={true}
         suggestionsCount={4}
         suggestionsPrompt="Generate contextual suggestions based on the focused widgets, tools available, and current conversation. Suggest specific actions the user can take with the counter, calculator, database settings, user profile, or other interactive elements."
+        enableCommands={true}
+        onCommandExecute={(command, args) => {
+          console.log(`Executed command: /${command}${args ? ` ${args}` : ''}`)
+        }}
       />
     </div>
   )

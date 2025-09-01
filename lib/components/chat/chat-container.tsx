@@ -3,7 +3,7 @@ import { cn } from "@lib/utils"
 import type { UIMessage, ChatStatus } from "ai"
 import { ChatHeader } from "@lib/components/chat/chat-header"
 import { ChatMessages } from "@lib/components/chat/chat-messages"
-import { ChatInput } from "@lib/components/chat/chat-input"
+import { ChatInputWithCommands } from "@lib/components/chat/chat-input-with-commands"
 import { useSuggestions } from "@lib/hooks/use-suggestions"
 
 export interface ChatContainerProps {
@@ -40,6 +40,10 @@ export interface ChatContainerProps {
   suggestionsCount?: number
   onAssistantFinish?: (triggerFetch: () => void) => void
   onSendMessage?: (message: string) => void
+  
+  // Commands props
+  enableCommands?: boolean
+  onCommandExecute?: (commandName: string, args?: string) => void
 }
 
 export function ChatContainer({
@@ -75,7 +79,11 @@ export function ChatContainer({
   suggestionsPrompt,
   suggestionsCount = 3,
   onAssistantFinish,
-  onSendMessage
+  onSendMessage,
+  
+  // Commands props
+  enableCommands = false,
+  onCommandExecute
 }: ChatContainerProps) {
   // Handle suggestions
   const { suggestions, handleSuggestionClick, onAssistantFinish: triggerSuggestionsFetch } = useSuggestions({
@@ -119,7 +127,7 @@ export function ChatContainer({
       />
       
       <div className="bg-background/50 backdrop-blur-sm p-4">
-        <ChatInput
+        <ChatInputWithCommands
           value={input}
           onChange={onInputChange}
           onSubmit={onSubmit}
@@ -133,6 +141,9 @@ export function ChatContainer({
           suggestions={suggestions}
           suggestionsCount={suggestionsCount}
           onSuggestionClick={handleSuggestionClick}
+          // Commands props
+          enableCommands={enableCommands}
+          onCommandExecute={onCommandExecute}
         />
       </div>
     </div>

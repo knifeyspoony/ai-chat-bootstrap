@@ -21,11 +21,11 @@ export async function POST(req: Request) {
     const deserializedTools = tools?.reduce((acc, serializedTool) => {
       acc[serializedTool.name] = tool({
         description: serializedTool.description,
-        inputSchema: jsonSchema(serializedTool.inputSchema) as any,
+        inputSchema: jsonSchema(serializedTool.inputSchema) as Parameters<typeof jsonSchema>[0],
         // Note: execute functions are handled on frontend
       })
       return acc
-    }, {} as Record<string, any>) || {}
+    }, {} as Record<string, ReturnType<typeof tool>>) || {}
     
     // Build system message with context, focus, and tools
     const systemMessageParts = ['You are a helpful AI assistant integrated with a React application.']

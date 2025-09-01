@@ -1,7 +1,7 @@
 import React from "react"
 import { cn } from "@lib/utils"
 import { Badge } from "@lib/components/ui/badge"
-import { getToolName, type UIMessage } from "ai"
+import { getToolName, type UIMessage, type UIMessagePart, type ToolUIPart } from "ai"
 import { 
   Conversation, 
   ConversationContent, 
@@ -122,7 +122,7 @@ export function ChatMessages({
   )
 }
 
-function MessagePart({ part, streaming = false }: { part: any, streaming?: boolean }) {
+function MessagePart({ part, streaming = false }: { part: UIMessagePart, streaming?: boolean }) {
   // Remove unused streaming parameter for now
   void streaming;
   switch (part.type) {
@@ -169,8 +169,8 @@ function MessagePart({ part, streaming = false }: { part: any, streaming?: boole
     default:
       // Handle tool-* and data-* parts
       if (part.type?.startsWith('tool-')) {
-        const toolPart = part as any // Type assertion for tool parts
-        const toolName = getToolName(toolPart);
+        const toolPart = part as ToolUIPart
+        void getToolName(toolPart);
         return (
           <Tool>
             <ToolHeader 

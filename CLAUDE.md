@@ -86,7 +86,6 @@ useEffect(() => {
 # Always use pnpm
 pnpm add <package>
 pnpm install
-pnpm run storybook
 ```
 
 ### CSS & Styling
@@ -99,11 +98,6 @@ pnpm run storybook
 - **Path Mapping**: Defined in `tsconfig.json`
 - **Library Build**: `tsconfig.lib.json` for dist output
 - **Components**: Use proper AI SDK types (`UIMessage`, etc.)
-
-### Storybook Setup
-- **Stories Location**: Looks in both `src/**/*.stories.*` and `lib/**/*.stories.*`
-- **CSS Loading**: Imports `lib/styles.css` in preview.ts
-- **Component Examples**: Include markdown rendering demos
 
 ## AI SDK Integration
 
@@ -288,7 +282,6 @@ type ToolUIPart<TOOLS extends UITools = UITools> = ValueOf<{
 ### Development
 ```bash
 pnpm run dev          # Next.js dev server
-pnpm run storybook    # Start Storybook
 pnpm run build:lib    # Build library for npm
 pnpm run lint         # ESLint check
 ```

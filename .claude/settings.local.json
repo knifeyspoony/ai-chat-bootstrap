@@ -8,7 +8,6 @@
       "Bash(pnpm run lint:*)",
       "Bash(npx tsc:*)",
       "Bash(grep:*)",
-      "Bash(pnpm run build-storybook:*)",
       "Bash(find:*)",
       "WebFetch(domain:zustand.docs.pmnd.rs)",
       "WebFetch(domain:sdk.vercel.ai)",

@@ -1,5 +1,5 @@
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, UIMessage } from 'ai'
 import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAIContextStore, useAIToolsStore, useAIFocusStore } from '@lib/stores'
@@ -14,7 +14,7 @@ export function useAIChat(options: {
   systemPrompt?: string
   onToolCall?: (toolCall: unknown) => void
   onFinish?: () => void
-  initialMessages?: unknown[]
+  initialMessages?: UIMessage[]
 } = {}) {
   const { api = '/api/chat', systemPrompt, onToolCall, onFinish, initialMessages } = options
   
@@ -60,16 +60,22 @@ export function useAIChat(options: {
         const currentContext = useAIContextStore.getState().serialize()
         const currentTools = useAIToolsStore.getState().serializeToolsForBackend()
         const currentFocusItems = useAIFocusStore.getState().getAllFocusItems()
+    const callerBody = options.body ?? {}
+    // Per-call overrides: if caller provided tools/systemPrompt, prefer them
+    const overrideTools = (callerBody as any).tools as unknown[] | undefined
+    const overrideSystemPrompt = (callerBody as any).systemPrompt as string | undefined
+    const toolsToSend = overrideTools ?? currentTools
+    const systemPromptToSend = overrideSystemPrompt ?? systemPrompt
         
         return {
           ...options,
           body: {
-            ...options.body,
+      ...callerBody,
             messages: options.messages,
             context: currentContext,
-            tools: currentTools,
+      tools: toolsToSend,
             focus: currentFocusItems, // Send complete focus items
-            systemPrompt
+      systemPrompt: systemPromptToSend
           }
         }
       }
@@ -87,8 +93,6 @@ export function useAIChat(options: {
         onToolCall?.(toolCall)
         // Add the tool result to the chat stream and still return it
         addToolResultForCall(toolCall, result)
-
-        return result
       } catch (error) {
         console.error('Tool execution error:', error)
         setError(error instanceof Error ? error.message : 'Tool execution failed')
@@ -135,33 +139,17 @@ export function useAIChat(options: {
   const sendAICommandMessage = (content: string, toolName: string, commandSystemPrompt?: string) => {
     setError(null)
     
-    // Create a custom transport for this specific message with tool filtering
-    const commandTransport = new DefaultChatTransport({
-      api,
-      prepareSendMessagesRequest: (options) => {
-        const currentContext = useAIContextStore.getState().serialize()
-        const currentFocusItems = useAIFocusStore.getState().getAllFocusItems()
-        
-        // Filter tools to only include the specified tool
-        const allTools = useAIToolsStore.getState().serializeToolsForBackend()
-        const filteredTools = allTools.filter(tool => tool.name === toolName)
-        
-        return {
-          ...options,
-          body: {
-            ...options.body,
-            messages: options.messages,
-            context: currentContext,
-            tools: filteredTools, // Only include the specified tool
-            focus: currentFocusItems,
-            systemPrompt: commandSystemPrompt || systemPrompt // Use command-specific or default system prompt
-          }
-        }
+    // Filter tools to only include the specified tool (per-call override via body)
+    const allTools = useAIToolsStore.getState().serializeToolsForBackend()
+    const filteredTools = allTools.filter(tool => tool.name === toolName)
+
+    // Send message with per-call overrides; transport will pick these up in prepareSendMessagesRequest
+    chatHook.sendMessage({ text: content }, {
+      body: {
+        tools: filteredTools,
+        systemPrompt: commandSystemPrompt || systemPrompt
       }
     })
-
-    // Send message with the filtered transport
-    chatHook.sendMessage({ text: content }, { transport: commandTransport })
   }
 
   // Retry last message with error recovery

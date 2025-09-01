@@ -1,7 +1,7 @@
 import React from "react"
 import { cn } from "@lib/utils"
 import { Badge } from "@lib/components/ui/badge"
-import { getToolName, type UIMessage, type UIMessagePart, type ToolUIPart } from "ai"
+import { getToolName, type UIMessage, type ToolUIPart } from "ai"
 import { 
   Conversation, 
   ConversationContent, 
@@ -122,7 +122,9 @@ export function ChatMessages({
   )
 }
 
-function MessagePart({ part, streaming = false }: { part: UIMessagePart, streaming?: boolean }) {
+type AnyUIPart = UIMessage['parts'][number]
+
+function MessagePart({ part, streaming = false }: { part: AnyUIPart, streaming?: boolean }) {
   // Remove unused streaming parameter for now
   void streaming;
   switch (part.type) {
@@ -158,15 +160,17 @@ function MessagePart({ part, streaming = false }: { part: UIMessagePart, streami
         </div>
       )
       
-    case 'code':
-      return (
-        <CodeBlock 
-          code={part.text} 
-          language={part.language || 'text'} 
-        />
-      )
-      
     default:
+      // Non-standard code part support (not in UIMessagePart union):
+      if ((part as any)?.type === 'code') {
+        const p = part as any
+        return (
+          <CodeBlock 
+            code={p.text} 
+            language={p.language || 'text'} 
+          />
+        )
+      }
       // Handle tool-* and data-* parts
       if (part.type?.startsWith('tool-')) {
         const toolPart = part as ToolUIPart
@@ -178,7 +182,7 @@ function MessagePart({ part, streaming = false }: { part: UIMessagePart, streami
               state={toolPart.state || 'input-streaming'} 
             />
             <ToolContent>
-              {toolPart.input && <ToolInput input={toolPart.input} />}
+              {Boolean(toolPart.input) && <ToolInput input={toolPart.input} />}
               {(toolPart.output || toolPart.errorText) && (
                 <ToolOutput 
                   output={toolPart.output ? (
@@ -193,5 +197,6 @@ function MessagePart({ part, streaming = false }: { part: UIMessagePart, streami
           </Tool>
         )
       }
+  return null
   }
 }

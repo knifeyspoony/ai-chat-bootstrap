@@ -100,7 +100,7 @@ export const ChatInput = ({
         {allFocusItems.length > 0 && (
           <div className="flex flex-wrap gap-1.5 px-1">
             {allFocusItems.map((item) => {
-              const displayText = item.title || item.name || item.id
+              const displayText = String((item as any).title ?? (item as any).name ?? item.id)
               return (
                 <Badge
                   key={item.id}

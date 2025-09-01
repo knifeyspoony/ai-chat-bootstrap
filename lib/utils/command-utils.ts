@@ -1,28 +1,32 @@
 import { z } from 'zod'
 
+// Zod v4 returns internal $ZodType instances from helpers like unwrap/removeDefault/element.
+// This helper safely casts those to the public ZodTypeAny for our introspection utilities.
+const asZod = (s: unknown): z.ZodTypeAny => s as unknown as z.ZodTypeAny
+
 /**
  * Check if a Zod schema has required parameters
  */
-export function hasRequiredParameters(schema: z.ZodSchema): boolean {
+export function hasRequiredParameters(schema: z.ZodTypeAny): boolean {
   if (schema instanceof z.ZodObject) {
     const shape = schema.shape
-    return Object.keys(shape).length > 0
+    // At least one non-optional, non-defaulted param
+    return Object.values(shape).some((s) =>
+      !(s instanceof z.ZodOptional) && !(s instanceof z.ZodDefault)
+    )
   }
-  if (schema instanceof z.ZodVoid || schema instanceof z.ZodUndefined || schema instanceof z.ZodNull) {
-    return false
-  }
-  return true
+  return false
 }
 
 /**
  * Generate simple placeholder text from Zod schema (just parameter names)
  */
-export function generatePlaceholder(schema: z.ZodSchema): string {
+export function generatePlaceholder(schema: z.ZodTypeAny): string {
   if (schema instanceof z.ZodObject) {
     const shape = schema.shape
-    const params = Object.keys(shape).map(key => {
-      const value = shape[key] as z.ZodSchema
-      const isOptional = value instanceof z.ZodOptional || (value as z.ZodOptional<z.ZodTypeAny>).isOptional?.()
+    const params = Object.keys(shape).map((key) => {
+      const value = shape[key] as z.ZodTypeAny
+      const isOptional = value instanceof z.ZodOptional || value instanceof z.ZodDefault
       return isOptional ? `${key}?` : key
     })
     return params.join(' ')
@@ -33,7 +37,7 @@ export function generatePlaceholder(schema: z.ZodSchema): string {
 /**
  * Extract detailed parameter information from Zod schema
  */
-export function getParameterInfo(schema: z.ZodSchema): Array<{
+export function getParameterInfo(schema: z.ZodTypeAny): Array<{
   name: string
   type: string
   description?: string
@@ -43,16 +47,13 @@ export function getParameterInfo(schema: z.ZodSchema): Array<{
   if (schema instanceof z.ZodObject) {
     const shape = schema.shape
     return Object.entries(shape).map(([key, value]) => {
-      const zodSchema = value as z.ZodSchema
-      const isOptional = zodSchema instanceof z.ZodOptional || (zodSchema as z.ZodOptional<z.ZodTypeAny>).isOptional?.()
-      const description = (zodSchema as z.ZodTypeAny)._def?.description
-      let defaultValue: unknown = undefined
-      
-      // Extract default value if present
-      if (zodSchema instanceof z.ZodDefault) {
-        defaultValue = zodSchema._def.defaultValue
-      }
-      
+  const zodSchema = value as z.ZodTypeAny
+  const isOptional = zodSchema instanceof z.ZodOptional || zodSchema instanceof z.ZodDefault
+  // Zod doesn't expose description in public API; best-effort cast.
+  const description = (zodSchema as any)?.description as string | undefined
+  let defaultValue: unknown = undefined
+  // Not reliably accessible in public API; leave undefined.
+
       return {
         name: key,
         type: getZodType(zodSchema),
@@ -68,7 +69,7 @@ export function getParameterInfo(schema: z.ZodSchema): Array<{
 /**
  * Get current parameter index based on input text and cursor position
  */
-export function getCurrentParameterIndex(input: string, cursorPosition: number, schema: z.ZodSchema): number {
+export function getCurrentParameterIndex(input: string, cursorPosition: number, schema: z.ZodTypeAny): number {
   if (!(schema instanceof z.ZodObject)) return 0
   
   // Get the argument part after command name
@@ -89,31 +90,30 @@ export function getCurrentParameterIndex(input: string, cursorPosition: number, 
 /**
  * Get human-readable type from Zod schema
  */
-function getZodType(schema: z.ZodSchema): string {
+function getZodType(schema: z.ZodTypeAny): string {
   if (schema instanceof z.ZodString) return 'string'
   if (schema instanceof z.ZodNumber) return 'number'
   if (schema instanceof z.ZodBoolean) return 'boolean'
   if (schema instanceof z.ZodEnum) {
-    const values = schema.options || (schema as z.ZodTypeAny)._def?.values
-    if (values) return values.join('|')
-    return 'enum'
+    const values = schema.options
+    return values?.join('|') ?? 'enum'
   }
-  if (schema instanceof z.ZodOptional) return getZodType(schema.unwrap())
-  if (schema instanceof z.ZodDefault) return getZodType(schema._def.innerType)
-  if (schema instanceof z.ZodArray) return `${getZodType(schema.element)}[]`
+  if (schema instanceof z.ZodOptional) return getZodType(asZod(schema.unwrap()))
+  if (schema instanceof z.ZodDefault) return getZodType(asZod(schema.removeDefault()))
+  if (schema instanceof z.ZodArray) return `${getZodType(asZod(schema.element))}[]`
   return 'any'
 }
 
 /**
  * Check if all required parameters are provided in the input
  */
-export function hasAllRequiredParams(argsString: string, schema: z.ZodSchema): boolean {
+export function hasAllRequiredParams(argsString: string, schema: z.ZodTypeAny): boolean {
   if (!(schema instanceof z.ZodObject)) return true
   
   const shape = schema.shape
   const requiredParams = Object.entries(shape).filter(([_, value]) => {
-    const zodSchema = value as z.ZodSchema
-    return !(zodSchema instanceof z.ZodOptional || (zodSchema as z.ZodOptional<z.ZodTypeAny>).isOptional?.())
+  const zodSchema = value as z.ZodTypeAny
+  return !(zodSchema instanceof z.ZodOptional) && !(zodSchema instanceof z.ZodDefault)
   })
   
   if (requiredParams.length === 0) return true
@@ -133,7 +133,7 @@ export function hasAllRequiredParams(argsString: string, schema: z.ZodSchema): b
 /**
  * Parse string arguments into parameters based on Zod schema
  */
-export function parseArgsToParams(argsString: string, schema: z.ZodSchema): unknown {
+export function parseArgsToParams(argsString: string, schema: z.ZodTypeAny): unknown {
   if (!argsString.trim()) {
     // Return empty object for commands with no args
     return {}
@@ -146,7 +146,7 @@ export function parseArgsToParams(argsString: string, schema: z.ZodSchema): unkn
     if (keys.length === 1) {
       // Single parameter - use the whole string
       const key = keys[0]
-      const paramSchema = shape[key] as z.ZodSchema
+    const paramSchema = shape[key] as z.ZodTypeAny
       return { [key]: parseValue(argsString.trim(), paramSchema) }
     } else {
       // Multiple parameters - split by spaces/commas
@@ -155,7 +155,7 @@ export function parseArgsToParams(argsString: string, schema: z.ZodSchema): unkn
       
       keys.forEach((key, index) => {
         if (index < args.length) {
-          const paramSchema = shape[key] as z.ZodSchema
+      const paramSchema = shape[key] as z.ZodTypeAny
           result[key] = parseValue(args[index], paramSchema)
         }
       })
@@ -170,13 +170,13 @@ export function parseArgsToParams(argsString: string, schema: z.ZodSchema): unkn
 /**
  * Parse a single value based on its Zod schema type
  */
-function parseValue(value: string, schema: z.ZodSchema): unknown {
+function parseValue(value: string, schema: z.ZodTypeAny): unknown {
   // Handle optional and default schemas
   if (schema instanceof z.ZodOptional) {
-    return parseValue(value, schema.unwrap())
+  return parseValue(value, asZod(schema.unwrap()))
   }
   if (schema instanceof z.ZodDefault) {
-    return parseValue(value, schema._def.innerType)
+  return parseValue(value, asZod(schema.removeDefault()))
   }
   
   if (schema instanceof z.ZodNumber) {
@@ -192,7 +192,7 @@ function parseValue(value: string, schema: z.ZodSchema): unknown {
   }
   
   if (schema instanceof z.ZodEnum) {
-    const values = schema.options || (schema as z.ZodTypeAny)._def?.values
+  const values = schema.options
     if (values && values.includes(value)) return value
     // Return the value anyway and let Zod validation handle it
     return value

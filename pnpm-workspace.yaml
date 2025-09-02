@@ -1,3 +1,6 @@
+packages:
+  - packages/ai-chat-bootstrap
+  - packages/ai-chat-bootstrap-demo
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - core-js-pure

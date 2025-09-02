@@ -11,7 +11,8 @@
       "Bash(find:*)",
       "WebFetch(domain:zustand.docs.pmnd.rs)",
       "WebFetch(domain:sdk.vercel.ai)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(pnpm -w run build:demo)"
     ],
     "deny": [],
     "ask": []

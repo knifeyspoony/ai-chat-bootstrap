@@ -14,8 +14,8 @@ This is a React component library for building AI chat interfaces using the Verc
 ## Project Structure & Conventions
 
 ### Import Paths (DO NOT use relative imports)
-- **Library components**: `@lib/components/...` (points to `./@lib/components/`)
-- **Library utils**: `@lib/utils` (points to `./lib/utils`)
+- **Library components**: `../../components/...` (points to `./../../components/`)
+- **Library utils**: `../../utils` (points to `./lib/utils`)
 - **Source files**: `@/...` (points to `./src/`)
 
 ### Directory Structure
@@ -34,7 +34,7 @@ lib/
 ```
 
 ### Component Architecture
-- **Message Types**: Organized in `@lib/components/chat/messages/` subfolder
+- **Message Types**: Organized in `../../components/chat/messages/` subfolder
   - `TextMessage` with markdown rendering
   - `ReasoningMessage`, `FileMessage`, `SourceUrlMessage`, `ToolMessage`
   - `MarkdownMessage` for rich text formatting
@@ -91,7 +91,7 @@ pnpm install
 ### CSS & Styling
 - **Main CSS**: `lib/styles.css` (included in npm package)
 - **Design System**: Full shadcn/ui tokens with dark/light mode
-- **Components**: Use `cn()` utility from `@lib/utils`
+- **Components**: Use `cn()` utility from `../../utils`
 - **Imports**: Users must import `'ai-sdk-chat/lib/styles.css'`
 
 ### TypeScript Configuration

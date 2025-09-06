@@ -1,235 +1,165 @@
-# Publishing ai-sdk-chat to npm
+# Publishing ai-chat-bootstrap to npm
 
-This guide walks through publishing the `ai-sdk-chat` library to npm for the first time.
+Guide for first-time publication of `ai-chat-bootstrap`.
 
 ## Prerequisites
 
-- Node.js and pnpm installed
-- npm account (create at https://www.npmjs.com/signup)
-- Clean git working directory
+- Node.js 18+ and pnpm installed
+- npm account (https://www.npmjs.com/signup)
+- Clean git working directory (no unstaged changes)
+- Logged into npm (`npm login`)
 
-## Step-by-Step Publishing Guide
+## 1. Build the Library
 
-### Step 1: Build the Library
-
-First, ensure the library builds correctly:
+From repo root (will build the package via workspace script):
 
 ```bash
-# Clean any existing build artifacts
-rm -rf dist/
-
-# Build the library
 pnpm run build:lib
 ```
 
-This creates:
-- `dist/index.js` - CommonJS build
-- `dist/index.mjs` - ESM build  
-- `dist/index.d.ts` - TypeScript definitions
+Produces (inside `packages/ai-chat-bootstrap/dist`):
 
-Verify the build:
-```bash
-ls -la dist/
-# Should show index.js, index.mjs, index.d.ts and other compiled files
-```
+- `index.js` (CJS)
+- `index.mjs` (ESM)
+- `index.d.ts` (types)
+- `styles.css`
 
-### Step 2: Update Package Metadata
-
-Edit `package.json` to update placeholder values:
-
-```json
-{
-  "name": "ai-sdk-chat",
-  "version": "0.1.0",  // Consider if this should be 0.0.1 for first release
-  "author": "Your Name <your.email@example.com>",  // Update this
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/yourusername/ai-sdk-chat.git"  // Update this
-  },
-  "bugs": {
-    "url": "https://github.com/yourusername/ai-sdk-chat/issues"  // Update this
-  },
-  "homepage": "https://github.com/yourusername/ai-sdk-chat#readme"  // Update this
-}
-```
-
-### Step 3: Test Package Locally
-
-Before publishing, test the package works correctly:
+Verify:
 
 ```bash
-# Create a package tarball
+ls -1 packages/ai-chat-bootstrap/dist
+```
+
+## 2. Verify Package Metadata
+
+Check `packages/ai-chat-bootstrap/package.json` key fields:
+
+- name: `ai-chat-bootstrap`
+- version: bump if already published
+- repository / bugs / homepage: correct GitHub URLs
+- files: includes `dist`
+- `sideEffects`: includes `dist/styles.css`
+
+## 3. Local Pack & Inspect
+
+```bash
+cd packages/ai-chat-bootstrap
+npm pack --dry-run
+```
+
+Ensure output shows:
+
+- package/dist/\* (js, mjs, d.ts, css)
+- package/README.md
+- package/LICENSE
+- package/package.json
+
+If good, optionally create the real tarball for local install testing:
+
+```bash
 npm pack
-
-# This creates ai-sdk-chat-0.1.0.tgz
-# Check the contents
-tar -tzf ai-sdk-chat-*.tgz
-
-# Verify it includes:
-# - package/dist/
-# - package/lib/styles.css
-# - package/README.md
-# - package/LICENSE
-# - package/package.json
+tar -tzf ai-chat-bootstrap-*.tgz | sed -n '1,40p'
 ```
 
-#### Test in Another Project (Optional)
+Test in a scratch project (optional):
 
 ```bash
-# In a test project directory
-cd ../test-project
-pnpm add file:../ai-sdk-chat/ai-sdk-chat-0.1.0.tgz
-
-# Test importing
-# Create test.mjs:
-echo "import { ChatContainer } from 'ai-sdk-chat';" > test.mjs
-node test.mjs
+mkdir -p /tmp/ai-chat-bootstrap-test && cd /tmp/ai-chat-bootstrap-test
+pnpm init -y
+pnpm add ../path/to/repo/packages/ai-chat-bootstrap/ai-chat-bootstrap-*.tgz react react-dom
+node -e "require('ai-chat-bootstrap')"
 ```
 
-### Step 4: Check Package Name Availability
+## 4. Name Availability (only first time)
 
 ```bash
-# Check if the name is available
-npm view ai-sdk-chat
-
-# If you get "npm ERR! 404", the name is available
-# If package info is shown, you'll need a different name
+npm view ai-chat-bootstrap || echo 'Name free (404 expected for first publish)'
 ```
 
-### Step 5: Login to npm
+## 5. Final Checklist
+
+- [ ] Clean git status
+- [ ] `pnpm run build:lib` succeeded
+- [ ] Lint passes: `pnpm --filter ai-chat-bootstrap lint`
+- [ ] Types pass: `pnpm --filter ai-chat-bootstrap typecheck`
+- [ ] Dist contains JS, MJS, DTS, CSS
+- [ ] README & LICENSE present
+- [ ] Version correct (e.g. 0.1.0)
+
+## 6. Publish
+
+Inside `packages/ai-chat-bootstrap`:
 
 ```bash
-# Login to npm (creates ~/.npmrc with auth token)
-npm login
-
-# Verify you're logged in
-npm whoami
+npm publish --access public --dry-run
 ```
 
-### Step 6: Final Pre-Publish Checklist
-
-- [ ] `pnpm run lint` passes with no errors
-- [ ] `dist/` directory exists with built files
-- [ ] Package.json metadata is updated
-- [ ] Version number is appropriate (0.1.0 or 0.0.1)
-- [ ] LICENSE file exists
-- [ ] README.md has usage instructions
-
-### Step 7: Publish to npm
+Review file list then:
 
 ```bash
-# Dry run first (shows what would be published)
-npm publish --dry-run
-
-# If everything looks good, publish for real
-npm publish
-
-# Or if you want to publish as beta/next tag
-npm publish --tag beta
-```
-
-The `prepublishOnly` script will automatically run:
-1. `npm run lint` - Ensure code quality
-2. `npm run build:lib` - Rebuild the library
-
-### Step 8: Verify Publication
-
-```bash
-# Check it's on npm
-npm view ai-sdk-chat
-
-# Install in a test project
-cd ../test-project
-pnpm add ai-sdk-chat
-```
-
-## Post-Publish Steps
-
-1. **Create a git tag:**
-   ```bash
-   git tag v0.1.0
-   git push origin v0.1.0
-   ```
-
-2. **Update README** with installation instructions:
-   ```bash
-   npm install ai-sdk-chat
-   # or
-   pnpm add ai-sdk-chat
-   ```
-
-3. **Test the published package** in a new project
-
-## Troubleshooting
-
-### Common Issues
-
-**Build fails:**
-```bash
-# Clear TypeScript cache
-rm -rf dist/ tsconfig.lib.tsbuildinfo
-pnpm run build:lib
-```
-
-**Permission denied:**
-```bash
-# You might need to use npm with your username scope
 npm publish --access public
 ```
 
-**Package too large:**
-```bash
-# Check package size
-npm pack --dry-run 2>&1 | grep "npm notice package size"
-
-# Review .npmignore to exclude unnecessary files
-```
-
-**Name already taken:**
-- Use a scoped package name: `@yourusername/ai-sdk-chat`
-- Update package.json name field
-- Publish with: `npm publish --access public`
-
-## Version Management
-
-For subsequent releases:
+Optionally tag pre-release:
 
 ```bash
-# Patch release (0.1.0 -> 0.1.1)
-npm version patch
-
-# Minor release (0.1.0 -> 0.2.0)
-npm version minor
-
-# Major release (0.1.0 -> 1.0.0)
-npm version major
-
-# Then publish
-npm publish
+npm publish --tag beta --access public
 ```
 
-## NPM Scripts Reference
+## 7. Verify
 
-- `pnpm run build:lib` - Build the library for distribution
-- `pnpm run lint` - Run ESLint checks
-- `pnpm publish` - Publish to npm (runs prepublishOnly first)
-- `npm pack` - Create a local tarball for testing
+```bash
+npm view ai-chat-bootstrap version
+```
 
-## Required Files for Publishing
+Install somewhere fresh:
 
-The package.json `files` field specifies what gets published:
-- `dist/` - Compiled JavaScript and TypeScript definitions
-- `lib/styles.css` - Required CSS styles
-- `README.md` - Package documentation
-- `LICENSE` - License file
+```bash
+mkdir -p /tmp/verify-ai-chat-bootstrap && cd /tmp/verify-ai-chat-bootstrap
+pnpm init -y
+pnpm add ai-chat-bootstrap react react-dom
+grep -R "ai-chat-bootstrap" node_modules/ai-chat-bootstrap/package.json
+```
 
-Files automatically included:
-- `package.json`
-- `README.md` (if exists)
-- `LICENSE` (if exists)
+## 8. Tag & Push
 
-Files excluded by .npmignore:
-- Source files (src/, app/, components/)
-- Config files (next.config.ts, etc.)
-- Development files (.next/, node_modules/)
-- Test files
+```bash
+git tag v$(node -p "require('./packages/ai-chat-bootstrap/package.json').version")
+git push origin --tags
+```
+
+## 9. Bumping Version Later
+
+From package dir:
+
+```bash
+npm version patch   # or minor / major
+npm publish --access public
+```
+
+## Troubleshooting
+
+| Issue           | Fix                                                                          |
+| --------------- | ---------------------------------------------------------------------------- |
+| 403 / Forbidden | Ensure you own the name or use a scoped name (@your-scope/ai-chat-bootstrap) |
+| Files missing   | Check `files` array & run `npm pack --dry-run`                               |
+| Missing CSS     | Ensure `sideEffects` includes `dist/styles.css`                              |
+| Type errors     | Run `pnpm --filter ai-chat-bootstrap typecheck`                              |
+
+## Required Files Summary
+
+- dist/index.js
+- dist/index.mjs
+- dist/index.d.ts
+- dist/styles.css
+- README.md
+- LICENSE
+- package.json
+
+## Quick One-Liner (after checks)
+
+```bash
+pnpm --filter ai-chat-bootstrap lint && pnpm --filter ai-chat-bootstrap typecheck && pnpm --filter ai-chat-bootstrap build && (cd packages/ai-chat-bootstrap && npm publish --access public)
+```
+
+Done.

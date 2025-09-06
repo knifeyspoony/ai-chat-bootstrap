@@ -1,177 +1,173 @@
-# AI SDK Chat
+# ai-chat-bootstrap (Monorepo)
 
-A React component library for building AI chat interfaces using Vercel AI SDK with enhanced UX features.
+React UI + hooks for building modern AI chat interfaces fast. Built on top of Vercel AI SDK and AI SDK Elements.
 
-## Features
+This repository contains:
 
-- **AI SDK Elements Integration**: Pre-built UI components from ai-sdk.dev/elements/
-- **Automatic Context Sharing**: Hooks for seamless chat context management  
-- **Frontend Tools**: Interactive UX components for enhanced user experience
-- **Focus Items**: UI element highlighting for contextual AI assistance
-- **AI Suggestions**: Intelligent suggestions and recommendations
-- **Chat Commands**: Built-in command system for chat interactions
+| Package                | Path                              | Description                                                |
+| ---------------------- | --------------------------------- | ---------------------------------------------------------- |
+| ai-chat-bootstrap      | `packages/ai-chat-bootstrap`      | Distributable component & hooks library (published to npm) |
+| ai-chat-bootstrap-demo | `packages/ai-chat-bootstrap-demo` | Next.js demo app showcasing the library                    |
 
-## Development
+---
 
-```bash
-pnpm install
-pnpm run dev          # Next.js dev server
-pnpm run build:lib    # Build for npm
-pnpm run lint         # Type checking
-```
-
-## Installation (not yet available)
+## Install (Library)
 
 ```bash
-pnpm add ai-sdk-chat
+pnpm add ai-chat-bootstrap
+# or
+npm install ai-chat-bootstrap
 ```
 
-Import the required CSS:
+Add stylesheet once (e.g. in your root layout / entry):
 
-```tsx
-import 'ai-sdk-chat/lib/styles.css'
+```ts
+import "ai-chat-bootstrap/dist/styles.css";
 ```
 
 ## Quick Start
 
 ```tsx
-import { ChatContainer, ChatInput } from 'ai-sdk-chat'
-import { useChat } from 'ai/react'
+import { ChatContainer, ChatInput } from "ai-chat-bootstrap";
+import { useChat } from "ai/react";
 
-export default function App() {
-  const { messages, input, handleInputChange, handleSubmit } = useChat()
+export function App() {
+  const { messages, input, handleInputChange, handleSubmit } = useChat();
 
   return (
-    <ChatContainer>
-      {messages.map(message => (
-        <div key={message.id}>
-          {/* Messages render automatically based on UIMessage parts */}
-        </div>
-      ))}
-      <ChatInput 
+    <ChatContainer messages={messages}>
+      <ChatInput
         input={input}
         handleInputChange={handleInputChange}
         handleSubmit={handleSubmit}
       />
     </ChatContainer>
-  )
+  );
 }
 ```
 
-## Core Components
+## Features
 
-### Chat Components
-- `ChatContainer` - Main chat wrapper
-- `ChatInput` - Input with command support  
-- `ChatMessage` - Message renderer for UIMessage format
+- Chat container + message rendering primitives
+- Slash command system (zod parameter schemas)
+- Frontend tool registration (execute functions client-side)
+- Automatic context sharing hooks
+- Focus/selection tracking for contextual relevance
+- AI suggestion queue components
+- Reasoning / tool / sources / code block message parts
+- Tailwind + shadcn/ui base components
 
-### Message Types
-- `TextMessage` - Markdown text rendering
-- `ReasoningMessage` - AI reasoning display
-- `FileMessage` - File attachments
-- `SourceUrlMessage` - URL references
-- `ToolMessage` - Tool invocation results
+## Hooks Examples
 
-## Hooks
+Context sharing:
 
-### Context Management
 ```tsx
-import { useAIContext } from 'ai-sdk-chat'
-
-// Share app state automatically with chat
-useAIContext('counter', counter)
-useAIContext('userProfile', { 
-  name: user.name, 
-  role: user.role 
-})
+import { useAIContext } from "ai-chat-bootstrap";
+useAIContext("counter", counter);
+useAIContext("userProfile", { name: user.name, role: user.role });
 ```
 
-### Frontend Tools
-```tsx
-import { useAIFrontendTool } from 'ai-sdk-chat'
+Frontend tool:
 
-// Register tools that execute in the browser
+```tsx
+import { useAIFrontendTool } from "ai-chat-bootstrap";
 useAIFrontendTool({
-  name: 'increment_counter',
-  description: 'Increment the demo counter',
-  parameters: z.object({
-    amount: z.number().default(1).describe('Amount to increment by')
-  }),
+  name: "increment_counter",
+  description: "Increment the demo counter",
+  parameters: z.object({ amount: z.number().default(1) }),
   execute: async ({ amount }) => {
-    setCounter(prev => prev + amount)
-    return { newValue: counter + amount }
-  }
-})
+    setCounter((c) => c + amount);
+    return { newValue: counter + amount };
+  },
+});
 ```
 
-### Focus Items
+Focus tracking:
+
 ```tsx
-import { useAIFocus } from 'ai-sdk-chat'
-
-// Track selected UI items for contextual AI assistance
-const { setFocus, clearFocus, focusedIds } = useAIFocus()
-const [selectedNote, setSelectedNote] = useState(null)
-
-// When user selects an item, add it to focus
-useEffect(() => {
-  if (selectedNote) {
-    setFocus(selectedNote.id, {
-      id: selectedNote.id,
-      type: 'note', 
-      title: selectedNote.title,
-      content: selectedNote.content
-    })
-  } else {
-    clearFocus('note-123')
-  }
-}, [selectedNote, setFocus, clearFocus])
-
-// Now when user asks "What's the main point here?", 
-// the LLM gets the selected note's content as context with an indication
-// that the item is selected and so it may be highly relevant
+import { useAIFocus } from "ai-chat-bootstrap";
+const { setFocus, clearFocus } = useAIFocus();
 ```
 
-### Chat Commands
-```tsx
-import { useAIChatCommand } from 'ai-sdk-chat'
+Slash command:
 
-// Register slash commands for quick actions
+```tsx
+import { useAIChatCommand } from "ai-chat-bootstrap";
 useAIChatCommand({
-  name: 'reset',
-  description: 'Reset all demo widgets to initial state',
+  name: "reset",
+  description: "Reset state",
   parameters: z.object({}),
-  execute: async () => {
-    setCounter(0)
-    setCalculation(null)
-    clearAllFocus()
-  }
-})
-
-// User can now type "/reset" in chat to execute
+  execute: async () => resetAll(),
+});
 ```
 
 ## Message Format
 
-Uses AI SDK UIMessage format with support for multiple content types:
+Messages follow the AI SDK UIMessage shape with multiple part types (`text`, `reasoning`, `file`, `source-url`, `tool-*`, `data-*`).
 
-```typescript
-interface UIMessage {
-  id: string
-  role: 'system' | 'user' | 'assistant'
-  parts: Array<{
-    type: 'text' | 'reasoning' | 'file' | 'source-url' | 'tool-*' | 'data-*'
-    // ... type-specific properties
-  }>
-}
+## CSS / Theming
+
+Distributed CSS is pre-built; override via Tailwind layers or custom classes. The package marks `dist/styles.css` as a side-effect so bundlers keep it.
+
+## Development (Monorepo)
+
+```bash
+pnpm install              # install all workspace deps
+pnpm run dev              # runs demo app (and any watch scripts)
+pnpm run build:lib        # build library (ai-chat-bootstrap)
+pnpm run lint             # eslint across workspace
+pnpm run typecheck        # typecheck all packages
 ```
+
+Targeted:
+
+```bash
+pnpm --filter ai-chat-bootstrap build
+pnpm --filter ai-chat-bootstrap-demo dev
+```
+
+Clean & rebuild library only:
+
+```bash
+pnpm rebuild:lib
+```
+
+## Publishing
+
+See `PUBLISH.md` for the full checklist. Quick sequence:
+
+```bash
+pnpm --filter ai-chat-bootstrap lint && \
+pnpm --filter ai-chat-bootstrap typecheck && \
+pnpm --filter ai-chat-bootstrap build && \
+cd packages/ai-chat-bootstrap && npm publish --access public
+```
+
+After publish: tag & push.
+
+## Project Structure
+
+Key folders inside `ai-chat-bootstrap`:
+
+- `lib/components` React components
+- `lib/hooks` React hooks
+- `lib/stores` Zustand stores
+- `lib/types` shared TypeScript types
+- `dist/` build output (generated)
 
 ## Tech Stack
 
-- React 19.1.0
-- Vercel AI SDK v5.x
-- shadcn/ui + Tailwind CSS
-- TypeScript
-- Next.js 15.5.0
+- React 19
+- Vercel AI SDK 5
+- TypeScript 5
+- Tailwind + shadcn/ui
+- Zustand + zod
+
+## Contributing
+
+1. Create a branch
+2. Make changes + ensure build & lint pass
+3. Open PR
 
 ## License
 

@@ -1,9 +1,5 @@
 import { create } from "zustand";
-
-export interface FocusItem {
-  id: string;
-  [key: string]: unknown; // Allow any serializable data
-}
+import type { FocusItem } from "../types/chat";
 
 export interface AIFocusStore {
   focusItems: Map<string, FocusItem>;
@@ -21,8 +17,15 @@ export const useAIFocusStore = create<AIFocusStore>((set, get) => ({
   focusItems: new Map<string, FocusItem>(),
 
   setFocus: (id: string, item: FocusItem) => {
+    // Normalize: ensure id consistency, fall back label to id
+    const normalized: FocusItem = {
+      id,
+      label: item.label || item.id || id,
+      description: item.description,
+      data: item.data,
+    };
     set((state) => ({
-      focusItems: new Map(state.focusItems).set(id, { ...item, id }),
+      focusItems: new Map(state.focusItems).set(id, normalized),
     }));
   },
 

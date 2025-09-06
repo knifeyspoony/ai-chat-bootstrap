@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Suggestion, SuggestionsRequest } from "../types/suggestions";
+import type { Suggestion, SuggestionsRequest } from "../types/chat";
 
 export interface SuggestionsState {
   suggestions: Suggestion[];

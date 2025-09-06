@@ -13,9 +13,10 @@ export * from "./stores";
 // Re-export key types for convenience
 export type { UIMessage } from "ai";
 export type { SerializedTool } from "./stores/tools";
-export type { ChatRequest, FocusItem } from "./types/chat";
 export type {
+  ChatRequest,
+  FocusItem,
   Suggestion,
   SuggestionsRequest,
   SuggestionsResponse,
-} from "./types/suggestions";
+} from "./types/chat";

@@ -110,10 +110,42 @@ export function useDemoAI({
   ); // Empty deps - only create once on mount
 
   // Share state with AI
-  useAIContext("counter", counter);
-  useAIContext("calculation", calculation);
-  useAIContext("selectedSystemPrompt", selectedSystemPrompt);
-  useAIContext("pageInfo", pageInfo);
+  useAIContext(
+    "counter",
+    { value: counter },
+    {
+      label: "Counter",
+      description: "Current counter widget value",
+      scope: "session",
+      priority: 90,
+    }
+  );
+  useAIContext(
+    "calculation",
+    { result: calculation },
+    {
+      label: "Calculation",
+      description: "Most recent calculator result (if any)",
+      scope: "conversation",
+      priority: 70,
+    }
+  );
+  useAIContext(
+    "selectedSystemPrompt",
+    { prompt: selectedSystemPrompt },
+    {
+      label: "System Prompt",
+      description: "Currently selected AI personality / system prompt key",
+      scope: "session",
+      priority: 60,
+    }
+  );
+  useAIContext("pageInfo", pageInfo, {
+    label: "Page Info",
+    description: "Static metadata about the demo page",
+    scope: "session",
+    priority: 40,
+  });
 
   // Focus item handler
   const handleFocusToggle = (itemId: string) => {
@@ -123,41 +155,66 @@ export function useDemoAI({
       clearFocus(itemId);
     } else {
       // Add item to focus with relevant data
-      let focusData: { id: string; [key: string]: unknown } = { id: itemId };
+      let focusData: {
+        id: string;
+        label?: string;
+        description?: string;
+        data?: Record<string, unknown>;
+      } = { id: itemId };
 
       if (itemId === "counter-widget") {
         focusData = {
           id: itemId,
-          type: "counter",
-          currentValue: counter,
-          capabilities: ["increment", "decrement"],
+          label: "Counter",
+          description: "Interactive counter widget state",
+          data: {
+            type: "counter",
+            currentValue: counter,
+            capabilities: ["increment", "decrement"],
+          },
         };
       } else if (itemId === "calculator-widget") {
         focusData = {
           id: itemId,
-          type: "calculator",
-          result: calculation,
-          capabilities: ["calculate", "clear"],
+          label: "Calculator",
+          description: "Latest calculator computation result",
+          data: {
+            type: "calculator",
+            result: calculation,
+            capabilities: ["calculate", "clear"],
+          },
         };
       } else if (itemId === "settings-widget") {
         focusData = {
           id: itemId,
-          type: "settings",
-          systemPrompt: selectedSystemPrompt,
+          label: "Settings",
+          description: "Current system prompt selection",
+          data: {
+            type: "settings",
+            systemPrompt: selectedSystemPrompt,
+          },
         };
       } else if (itemId === "db-settings") {
         // Dump full database settings object
         focusData = {
           id: itemId,
-          ...dbSettings,
-          type: "database",
+          label: "DB Settings",
+          description: "Database configuration and connection state",
+          data: {
+            type: "database",
+            ...dbSettings,
+          },
         };
       } else if (itemId === "user-profile") {
         // Dump full user profile object
         focusData = {
           id: itemId,
-          ...userProfile,
-          type: "user",
+          label: "User Profile",
+          description: "Authenticated user profile information",
+          data: {
+            type: "user",
+            ...userProfile,
+          },
         };
       }
 

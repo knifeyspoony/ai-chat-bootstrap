@@ -1,8 +1,11 @@
 import type { ChatStatus, UIMessage } from "ai";
-import React from "react";
+import React, { useRef } from "react";
 import { ChatHeader } from "../../components/chat/chat-header";
 import { ChatInputWithCommands } from "../../components/chat/chat-input-with-commands";
-import { ChatMessages } from "../../components/chat/chat-messages";
+import {
+  ChatMessages,
+  type ChatMessagesHandle,
+} from "../../components/chat/chat-messages";
 import { useSuggestions } from "../../hooks/use-suggestions";
 import { cn } from "../../utils";
 
@@ -91,6 +94,8 @@ export function ChatContainer({
   onCommandExecute,
   onAICommandExecute,
 }: ChatContainerProps) {
+  // Ref to control scrolling programmatically
+  const messagesRef = useRef<ChatMessagesHandle | null>(null);
   // Handle suggestions
   const {
     suggestions,
@@ -101,9 +106,12 @@ export function ChatContainer({
     prompt: suggestionsPrompt,
     messages,
     onSuggestionClick: (suggestion) => {
-      // Directly send the long suggestion as a message
       if (onSendMessage) {
         onSendMessage(suggestion.longSuggestion);
+        // Scroll after next frame so message is rendered
+        requestAnimationFrame(() => {
+          messagesRef.current?.scrollToBottom();
+        });
       }
     },
   });
@@ -134,6 +142,7 @@ export function ChatContainer({
       />
 
       <ChatMessages
+        ref={messagesRef}
         messages={messages}
         isLoading={isLoading}
         className={messagesClassName}

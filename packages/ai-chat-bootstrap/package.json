@@ -93,7 +93,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/ai-sdk-chat.git"
+    "url": "git+https://github.com/knifeyspoony/ai-sdk-chat.git"
   },
   "keywords": [
     "ai",
@@ -105,9 +105,12 @@
   "author": "Your Name <your.email@example.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/yourusername/ai-sdk-chat/issues"
+    "url": "https://github.com/knifeyspoony/ai-sdk-chat/issues"
   },
-  "homepage": "https://github.com/yourusername/ai-sdk-chat#readme",
+  "homepage": "https://github.com/knifeyspoony/ai-sdk-chat/tree/main/packages/ai-chat-bootstrap#readme",
+  "sideEffects": [
+    "dist/styles.css"
+  ],
   "publishConfig": {
     "access": "public"
   }

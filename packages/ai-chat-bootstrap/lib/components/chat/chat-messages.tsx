@@ -1,5 +1,7 @@
 import { getToolName, type ToolUIPart, type UIMessage } from "ai";
-import React from "react";
+import { SparklesIcon, UserIcon } from "lucide-react";
+import React, { forwardRef, useImperativeHandle } from "react";
+import { useStickToBottomContext } from "use-stick-to-bottom";
 import { CodeBlock } from "../../components/ai-elements/code-block";
 import {
   Conversation,
@@ -33,111 +35,147 @@ export interface ChatMessagesProps {
   emptyState?: React.ReactNode;
 }
 
-export function ChatMessages({
-  messages,
-  isLoading = false,
-  className,
-  messageClassName,
-  emptyState,
-}: ChatMessagesProps) {
-  const defaultEmptyState = (
-    <div className="flex items-center justify-center h-full text-center p-8">
-      <div className="text-muted-foreground">
-        <p className="text-lg mb-2">No messages yet</p>
-        <p className="text-sm">Start a conversation below</p>
-      </div>
-    </div>
-  );
-
-  return (
-    <Conversation className={cn("flex-1", className)}>
-      <ConversationContent>
-        {messages.length === 0
-          ? emptyState || defaultEmptyState
-          : messages
-              .filter((message) => {
-                // Filter out empty assistant messages (likely from cancelled requests)
-                if (message.role === "assistant") {
-                  const hasContent = message.parts?.some(
-                    (part) =>
-                      (part.type === "text" && part.text?.trim()) ||
-                      (part.type === "reasoning" && part.text?.trim()) ||
-                      part.type?.startsWith("tool-") ||
-                      part.type?.startsWith("data-") ||
-                      part.type === "file" ||
-                      part.type === "source-url" ||
-                      part.type === "source-document"
-                  );
-                  return hasContent;
-                }
-                return true;
-              })
-              .map((message, index) => {
-                const isUser = message.role === "user";
-                const isSystem = message.role === "system";
-                const isLast = index === messages.length - 1;
-                const isStreamingLast =
-                  isLoading && isLast && message.role === "assistant";
-
-                if (isSystem) {
-                  const firstPart = message.parts?.[0];
-                  const systemText =
-                    firstPart && "text" in firstPart
-                      ? firstPart.text
-                      : "System message";
-                  return (
-                    <div
-                      key={message.id ?? index}
-                      className={cn(
-                        "flex justify-center px-6 py-4 w-full",
-                        messageClassName
-                      )}
-                    >
-                      <Badge variant="outline" className="text-xs">
-                        {systemText}
-                      </Badge>
-                    </div>
-                  );
-                }
-
-                return (
-                  <Message
-                    key={message.id ?? index}
-                    from={message.role}
-                    className={messageClassName}
-                  >
-                    <MessageContent>
-                      {message.parts?.map((part, partIndex: number) => (
-                        <MessagePart
-                          key={partIndex}
-                          part={part}
-                          streaming={isStreamingLast}
-                        />
-                      ))}
-                    </MessageContent>
-                    <MessageAvatar
-                      src={
-                        isUser ? "/user-avatar.png" : "/assistant-avatar.png"
-                      }
-                      name={isUser ? "You" : "Assistant"}
-                    />
-                  </Message>
-                );
-              })}
-
-        {isLoading && (
-          <Message from="assistant">
-            <MessageContent>
-              <Loader />
-            </MessageContent>
-            <MessageAvatar src="/assistant-avatar.png" name="Assistant" />
-          </Message>
-        )}
-      </ConversationContent>
-      <ConversationScrollButton />
-    </Conversation>
-  );
+export interface ChatMessagesHandle {
+  scrollToBottom: () => void;
 }
+
+export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
+  (
+    { messages, isLoading = false, className, messageClassName, emptyState },
+    ref
+  ) => {
+    const defaultEmptyState = (
+      <div className="flex items-center justify-center h-full text-center p-8">
+        <div className="text-muted-foreground">
+          <p className="text-lg mb-2">No messages yet</p>
+          <p className="text-sm">Start a conversation below</p>
+        </div>
+      </div>
+    );
+
+    return (
+      <Conversation className={cn("flex-1", className)}>
+        <ConversationContent>
+          {messages.length === 0
+            ? emptyState || defaultEmptyState
+            : messages
+                .filter((message) => {
+                  // Filter out empty assistant messages (likely from cancelled requests)
+                  if (message.role === "assistant") {
+                    const hasContent = message.parts?.some(
+                      (part) =>
+                        (part.type === "text" && part.text?.trim()) ||
+                        (part.type === "reasoning" && part.text?.trim()) ||
+                        part.type?.startsWith("tool-") ||
+                        part.type?.startsWith("data-") ||
+                        part.type === "file" ||
+                        part.type === "source-url" ||
+                        part.type === "source-document"
+                    );
+                    return hasContent;
+                  }
+                  return true;
+                })
+                .map((message, index) => {
+                  const isUser = message.role === "user";
+                  const isSystem = message.role === "system";
+                  const isLast = index === messages.length - 1;
+                  const isStreamingLast =
+                    isLoading && isLast && message.role === "assistant";
+
+                  if (isSystem) {
+                    const firstPart = message.parts?.[0];
+                    const systemText =
+                      firstPart && "text" in firstPart
+                        ? firstPart.text
+                        : "System message";
+                    return (
+                      <div
+                        key={message.id ?? index}
+                        className={cn(
+                          "flex justify-center px-6 py-4 w-full",
+                          messageClassName
+                        )}
+                      >
+                        <Badge variant="outline" className="text-xs">
+                          {systemText}
+                        </Badge>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <Message
+                      key={message.id ?? index}
+                      from={message.role}
+                      className={messageClassName}
+                    >
+                      <MessageContent>
+                        {message.parts?.map((part, partIndex: number) => (
+                          <MessagePart
+                            key={partIndex}
+                            part={part}
+                            streaming={isStreamingLast}
+                          />
+                        ))}
+                      </MessageContent>
+                      {/* Icon-based avatars (images commented out per request) */}
+                      <MessageAvatar
+                        // src={isUser ? "/user-avatar.png" : "/assistant-avatar.png"}
+                        name={isUser ? "You" : "Assistant"}
+                        icon={
+                          isUser ? (
+                            <UserIcon className="h-4 w-4" />
+                          ) : (
+                            <SparklesIcon className="h-4 w-4" />
+                          )
+                        }
+                      />
+                    </Message>
+                  );
+                })}
+
+          {isLoading && (
+            <Message from="assistant">
+              <MessageContent>
+                <Loader />
+              </MessageContent>
+              <MessageAvatar
+                // src="/assistant-avatar.png"
+                name="Assistant"
+                icon={<SparklesIcon className="h-4 w-4" />}
+              />
+            </Message>
+          )}
+        </ConversationContent>
+        <ConversationScrollButton />
+        <StickToBottomConnector ref={ref} />
+      </Conversation>
+    );
+  }
+);
+
+const StickToBottomConnector = forwardRef<ChatMessagesHandle, {}>(
+  function StickToBottomConnector(_props, ref) {
+    const { scrollToBottom } = useStickToBottomContext();
+    useImperativeHandle(
+      ref,
+      () => ({
+        scrollToBottom: () => {
+          try {
+            scrollToBottom();
+          } catch {
+            // no-op
+          }
+        },
+      }),
+      [scrollToBottom]
+    );
+    return null;
+  }
+);
+
+ChatMessages.displayName = "ChatMessages";
 
 type AnyUIPart = UIMessage["parts"][number];
 

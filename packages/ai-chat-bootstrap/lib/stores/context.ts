@@ -1,41 +1,49 @@
 import { create } from "zustand";
+import type { ContextItem } from "../types/chat";
 
 export interface AIContextStore {
-  context: Map<string, unknown>;
-  setContext: (key: string, value: unknown) => void;
-  getContext: (key?: string) => unknown;
-  clearContext: (key?: string) => void;
-  serialize: () => Record<string, unknown>;
+  contextItems: Map<string, ContextItem>;
+  setContextItem: (item: ContextItem) => void;
+  getContextItem: (id: string) => ContextItem | undefined;
+  removeContextItem: (id: string) => void;
+  clearContext: () => void;
+  listContext: () => ContextItem[];
+  serialize: () => ContextItem[]; // ready for ChatRequest
 }
 
 export const useAIContextStore = create<AIContextStore>((set, get) => ({
-  context: new Map<string, unknown>(),
+  contextItems: new Map<string, ContextItem>(),
 
-  setContext: (key: string, value: unknown) => {
+  setContextItem: (item: ContextItem) => {
+    const normalized: ContextItem = {
+      id: item.id,
+      data: item.data,
+      label: item.label,
+      description: item.description,
+      scope: item.scope,
+      priority: item.priority,
+    };
     set((state) => ({
-      context: new Map(state.context).set(key, value),
+      contextItems: new Map(state.contextItems).set(item.id, normalized),
     }));
   },
 
-  getContext: (key?: string) => {
-    const context = get().context;
-    return key ? context.get(key) : context;
-  },
+  getContextItem: (id: string) => get().contextItems.get(id),
 
-  clearContext: (key?: string) => {
+  removeContextItem: (id: string) => {
     set((state) => {
-      if (key) {
-        const newContext = new Map(state.context);
-        newContext.delete(key);
-        return { context: newContext };
-      } else {
-        return { context: new Map() };
-      }
+      const next = new Map(state.contextItems);
+      next.delete(id);
+      return { contextItems: next };
     });
   },
 
-  serialize: () => {
-    const context = get().context;
-    return Object.fromEntries(context.entries());
-  },
+  clearContext: () => set({ contextItems: new Map() }),
+
+  listContext: () =>
+    Array.from(get().contextItems.values()).sort(
+      (a, b) => (b.priority ?? 0) - (a.priority ?? 0)
+    ),
+
+  serialize: () => get().listContext(),
 }));

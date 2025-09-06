@@ -20,7 +20,7 @@ import {
 } from "../../components/ui/dropdown-menu";
 import { useAIFocus } from "../../hooks";
 import { useChatStore } from "../../stores/chat";
-import type { Suggestion } from "../../types/suggestions";
+import type { FocusItem, Suggestion } from "../../types/chat";
 import { cn } from "../../utils";
 
 export interface ChatInputProps {
@@ -99,10 +99,8 @@ export const ChatInput = ({
       {/* Focus Item Chips */}
       {allFocusItems.length > 0 && (
         <div className="flex flex-wrap gap-1.5 px-1">
-          {allFocusItems.map((item) => {
-            const displayText = String(
-              (item as any).title ?? (item as any).name ?? item.id
-            );
+          {allFocusItems.map((item: FocusItem) => {
+            const displayText = item.label || item.id;
             return (
               <Badge
                 key={item.id}

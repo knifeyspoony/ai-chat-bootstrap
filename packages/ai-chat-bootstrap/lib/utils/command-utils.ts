@@ -52,8 +52,9 @@ export function getParameterInfo(schema: z.ZodTypeAny): Array<{
       const isOptional =
         zodSchema instanceof z.ZodOptional || zodSchema instanceof z.ZodDefault;
       // Zod doesn't expose description in public API; best-effort cast.
-      const description = (zodSchema as any)?.description as string | undefined;
-      let defaultValue: unknown = undefined;
+      const description = (zodSchema as { description?: string } | undefined)
+        ?.description;
+      const defaultValue: unknown = undefined;
       // Not reliably accessible in public API; leave undefined.
 
       return {
@@ -123,7 +124,7 @@ export function hasAllRequiredParams(
   if (!(schema instanceof z.ZodObject)) return true;
 
   const shape = schema.shape;
-  const requiredParams = Object.entries(shape).filter(([_, value]) => {
+  const requiredParams = Object.entries(shape).filter(([, value]) => {
     const zodSchema = value as z.ZodTypeAny;
     return (
       !(zodSchema instanceof z.ZodOptional) &&

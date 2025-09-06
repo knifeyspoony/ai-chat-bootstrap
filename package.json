@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "pnpm --parallel dev",
     "build": "pnpm -r build",
+    "rebuild": "pnpm -r clean && pnpm -r build",
+    "rebuild:lib": "pnpm --filter ai-chat-bootstrap clean && pnpm --filter ai-chat-bootstrap build",
+    "rebuild:demo": "pnpm --filter ai-chat-bootstrap-demo clean && pnpm --filter ai-chat-bootstrap-demo build",
     "build:lib": "pnpm --filter ai-chat-bootstrap build",
     "build:demo": "pnpm --filter ai-chat-bootstrap-demo build",
     "lint": "eslint .",

@@ -1,7 +1,7 @@
+import "ai-chat-bootstrap/dist/styles.css";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import "ai-chat-bootstrap/dist/styles.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

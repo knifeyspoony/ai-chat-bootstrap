@@ -1,50 +1,54 @@
-import React from "react"
-import { cn } from "../../utils"
-import type { UIMessage, ChatStatus } from "ai"
-import { ChatHeader } from "../../components/chat/chat-header"
-import { ChatMessages } from "../../components/chat/chat-messages"
-import { ChatInputWithCommands } from "../../components/chat/chat-input-with-commands"
-import { useSuggestions } from "../../hooks/use-suggestions"
+import type { ChatStatus, UIMessage } from "ai";
+import React from "react";
+import { ChatHeader } from "../../components/chat/chat-header";
+import { ChatInputWithCommands } from "../../components/chat/chat-input-with-commands";
+import { ChatMessages } from "../../components/chat/chat-messages";
+import { useSuggestions } from "../../hooks/use-suggestions";
+import { cn } from "../../utils";
 
 export interface ChatContainerProps {
-  messages: UIMessage[]
-  input: string
-  onInputChange: (value: string) => void
-  onSubmit: (e: React.FormEvent) => void
-  onAttach?: () => void
-  isLoading?: boolean
-  status?: ChatStatus
-  placeholder?: string
-  className?: string
-  
+  messages: UIMessage[];
+  input: string;
+  onInputChange: (value: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onAttach?: () => void;
+  isLoading?: boolean;
+  status?: ChatStatus;
+  placeholder?: string;
+  className?: string;
+
   // Header props
-  title?: string
-  subtitle?: string
-  avatar?: string
-  headerStatus?: "online" | "offline" | "away" | "busy"
-  badge?: string
-  headerActions?: React.ReactNode
-  
+  title?: string;
+  subtitle?: string;
+  avatar?: string;
+  headerStatus?: "online" | "offline" | "away" | "busy";
+  badge?: string;
+  headerActions?: React.ReactNode;
+
   // Component class overrides
-  headerClassName?: string
-  messagesClassName?: string
-  messageClassName?: string
-  inputClassName?: string
-  
+  headerClassName?: string;
+  messagesClassName?: string;
+  messageClassName?: string;
+  inputClassName?: string;
+
   // Messages props
-  emptyState?: React.ReactNode
-  
-  // Suggestions props  
-  enableSuggestions?: boolean
-  suggestionsPrompt?: string
-  suggestionsCount?: number
-  onAssistantFinish?: (triggerFetch: () => void) => void
-  onSendMessage?: (message: string) => void
-  
+  emptyState?: React.ReactNode;
+
+  // Suggestions props
+  enableSuggestions?: boolean;
+  suggestionsPrompt?: string;
+  suggestionsCount?: number;
+  onAssistantFinish?: (triggerFetch: () => void) => void;
+  onSendMessage?: (message: string) => void;
+
   // Commands props
-  enableCommands?: boolean
-  onCommandExecute?: (commandName: string, args?: string) => void
-  onAICommandExecute?: (message: string, toolName: string, systemPrompt?: string) => void
+  enableCommands?: boolean;
+  onCommandExecute?: (commandName: string, args?: string) => void;
+  onAICommandExecute?: (
+    message: string,
+    toolName: string,
+    systemPrompt?: string
+  ) => void;
 }
 
 export function ChatContainer({
@@ -57,7 +61,7 @@ export function ChatContainer({
   status,
   placeholder,
   className,
-  
+
   // Header props
   title,
   subtitle,
@@ -65,51 +69,60 @@ export function ChatContainer({
   headerStatus,
   badge,
   headerActions,
-  
+
   // Component class overrides
   headerClassName,
   messagesClassName,
   messageClassName,
   inputClassName,
-  
+
   // Messages props
   emptyState,
-  
+
   // Suggestions props
   enableSuggestions = false,
   suggestionsPrompt,
   suggestionsCount = 3,
   onAssistantFinish,
   onSendMessage,
-  
+
   // Commands props
   enableCommands = false,
   onCommandExecute,
-  onAICommandExecute
+  onAICommandExecute,
 }: ChatContainerProps) {
   // Handle suggestions
-  const { suggestions, handleSuggestionClick, onAssistantFinish: triggerSuggestionsFetch } = useSuggestions({
+  const {
+    suggestions,
+    handleSuggestionClick,
+    onAssistantFinish: triggerSuggestionsFetch,
+  } = useSuggestions({
     enabled: enableSuggestions,
     prompt: suggestionsPrompt,
     messages,
     onSuggestionClick: (suggestion) => {
       // Directly send the long suggestion as a message
       if (onSendMessage) {
-        onSendMessage(suggestion.longSuggestion)
+        onSendMessage(suggestion.longSuggestion);
       }
-    }
-  })
+    },
+  });
 
   // Register suggestions fetch function with parent
   React.useEffect(() => {
     if (onAssistantFinish && enableSuggestions) {
-      onAssistantFinish(triggerSuggestionsFetch)
+      onAssistantFinish(triggerSuggestionsFetch);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onAssistantFinish, enableSuggestions]) // Remove triggerSuggestionsFetch to prevent re-registration
+  }, [onAssistantFinish, enableSuggestions]); // Remove triggerSuggestionsFetch to prevent re-registration
 
   return (
-    <div className={cn("flex flex-col h-full bg-background overflow-hidden min-w-0", className)}>
+    <div
+      className={cn(
+        "flex flex-col h-full bg-background overflow-hidden min-w-0",
+        className
+      )}
+    >
       <ChatHeader
         title={title}
         subtitle={subtitle}
@@ -119,7 +132,7 @@ export function ChatContainer({
         actions={headerActions}
         className={headerClassName}
       />
-      
+
       <ChatMessages
         messages={messages}
         isLoading={isLoading}
@@ -127,7 +140,7 @@ export function ChatContainer({
         messageClassName={messageClassName}
         emptyState={emptyState}
       />
-      
+
       <div className="bg-background/50 backdrop-blur-sm p-4">
         <ChatInputWithCommands
           value={input}
@@ -150,5 +163,5 @@ export function ChatContainer({
         />
       </div>
     </div>
-  )
+  );
 }

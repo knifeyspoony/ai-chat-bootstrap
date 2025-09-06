@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -20,6 +24,13 @@
     ],
     "baseUrl": "."
   },
-  "include": ["packages/*/src/**/*.ts", "packages/*/src/**/*.tsx", "packages/*/lib/**/*.ts", "packages/*/lib/**/*.tsx"],
-  "exclude": ["node_modules"]
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/src/**/*.tsx",
+    "packages/*/lib/**/*.ts",
+    "packages/*/lib/**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

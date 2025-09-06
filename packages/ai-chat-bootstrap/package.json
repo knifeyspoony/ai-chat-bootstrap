@@ -1,7 +1,7 @@
 {
   "name": "ai-chat-bootstrap",
   "version": "0.1.0",
-  "description": "AI SDK Chat module for building chat interfaces",
+  "description": "React UI + hooks for building modern AI chat interfaces fast. Based on AISDK and AISDK Elements",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -19,12 +19,14 @@
     "LICENSE"
   ],
   "scripts": {
+    "prebuild": "pnpm clean",
     "build": "pnpm build:css && tsdown",
     "build:css": "node ./scripts/build-css.mjs",
     "dev": "pnpm build:css --watch & tsdown --watch",
     "lint": "eslint lib/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist/",
+    "release": "pnpm typecheck && pnpm lint && pnpm build && pnpm publish --access public",
     "prepublishOnly": "pnpm lint && pnpm build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -105,5 +107,8 @@
   "bugs": {
     "url": "https://github.com/yourusername/ai-sdk-chat/issues"
   },
-  "homepage": "https://github.com/yourusername/ai-sdk-chat#readme"
+  "homepage": "https://github.com/yourusername/ai-sdk-chat#readme",
+  "publishConfig": {
+    "access": "public"
+  }
 }

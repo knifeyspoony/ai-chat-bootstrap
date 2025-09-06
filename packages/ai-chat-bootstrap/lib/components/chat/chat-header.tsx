@@ -1,16 +1,20 @@
-import React from "react"
-import { cn } from "../../utils"
-import { Avatar, AvatarImage, AvatarFallback } from "../../components/ui/avatar"
-import { Badge } from "../../components/ui/badge"
+import React from "react";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "../../components/ui/avatar";
+import { Badge } from "../../components/ui/badge";
+import { cn } from "../../utils";
 
 export interface ChatHeaderProps {
-  title?: string
-  subtitle?: string
-  avatar?: string
-  status?: "online" | "offline" | "away" | "busy"
-  badge?: string
-  className?: string
-  actions?: React.ReactNode
+  title?: string;
+  subtitle?: string;
+  avatar?: string;
+  status?: "online" | "offline" | "away" | "busy";
+  badge?: string;
+  className?: string;
+  actions?: React.ReactNode;
 }
 
 export function ChatHeader({
@@ -20,27 +24,34 @@ export function ChatHeader({
   status,
   badge,
   className,
-  actions
+  actions,
 }: ChatHeaderProps) {
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case "online": return "bg-primary"
-      case "away": return "bg-secondary"
-      case "busy": return "bg-destructive"
-      case "offline": return "bg-muted-foreground"
-      default: return "bg-muted-foreground"
+      case "online":
+        return "bg-primary";
+      case "away":
+        return "bg-secondary";
+      case "busy":
+        return "bg-destructive";
+      case "offline":
+        return "bg-muted-foreground";
+      default:
+        return "bg-muted-foreground";
     }
-  }
+  };
 
   if (!title && !subtitle && !avatar && !actions) {
-    return null
+    return null;
   }
 
   return (
-    <div className={cn(
-      "flex items-center justify-between px-4 py-2 bg-background/80 backdrop-blur-sm border-b border-border/90",
-      className
-    )}>
+    <div
+      className={cn(
+        "flex items-center justify-between px-4 py-2 bg-background/80 backdrop-blur-sm border-b border-border/90",
+        className
+      )}
+    >
       <div className="flex items-center gap-2 min-w-0 flex-1">
         {avatar && (
           <div className="relative flex-shrink-0">
@@ -51,34 +62,34 @@ export function ChatHeader({
               </AvatarFallback>
             </Avatar>
             {status && (
-              <div className={cn(
-                "absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-background",
-                getStatusColor(status)
-              )} />
+              <div
+                className={cn(
+                  "absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-background",
+                  getStatusColor(status)
+                )}
+              />
             )}
           </div>
         )}
-        
+
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          {title && (
-            <h3 className="font-medium text-sm truncate">{title}</h3>
-          )}
+          {title && <h3 className="font-medium text-sm truncate">{title}</h3>}
           {badge && (
             <Badge variant="secondary" className="text-xs flex-shrink-0">
               {badge}
             </Badge>
           )}
           {subtitle && (
-            <span className="text-xs text-muted-foreground truncate">• {subtitle}</span>
+            <span className="text-xs text-muted-foreground truncate">
+              • {subtitle}
+            </span>
           )}
         </div>
       </div>
-      
+
       {actions && (
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {actions}
-        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">{actions}</div>
       )}
     </div>
-  )
+  );
 }

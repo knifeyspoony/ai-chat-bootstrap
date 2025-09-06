@@ -155,25 +155,23 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
   }
 );
 
-const StickToBottomConnector = forwardRef<ChatMessagesHandle, {}>(
-  function StickToBottomConnector(_props, ref) {
-    const { scrollToBottom } = useStickToBottomContext();
-    useImperativeHandle(
-      ref,
-      () => ({
-        scrollToBottom: () => {
-          try {
-            scrollToBottom();
-          } catch {
-            // no-op
-          }
-        },
-      }),
-      [scrollToBottom]
-    );
-    return null;
-  }
-);
+const StickToBottomConnector = forwardRef<ChatMessagesHandle>(function StickToBottomConnector(_props, ref) {
+  const { scrollToBottom } = useStickToBottomContext();
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToBottom: () => {
+        try {
+          scrollToBottom();
+        } catch {
+          // no-op
+        }
+      },
+    }),
+    [scrollToBottom]
+  );
+  return null;
+});
 
 ChatMessages.displayName = "ChatMessages";
 
@@ -215,9 +213,11 @@ function MessagePart({
 
     default:
       // Non-standard code part support (not in UIMessagePart union):
-      if ((part as any)?.type === "code") {
-        const p = part as any;
-        return <CodeBlock code={p.text} language={p.language || "text"} />;
+      if ((part as unknown as { type?: string })?.type === "code") {
+        const p = part as unknown as { text?: string; language?: string };
+        return (
+          <CodeBlock code={p.text || ""} language={p.language || "text"} />
+        );
       }
       // Handle tool-* and data-* parts
       if (part.type?.startsWith("tool-")) {

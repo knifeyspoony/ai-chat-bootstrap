@@ -1,5 +1,9 @@
 # ai-chat-bootstrap (Monorepo)
 
+![npm version](https://img.shields.io/npm/v/ai-chat-bootstrap?color=brightgreen)
+![license](https://img.shields.io/npm/l/ai-chat-bootstrap.svg)
+![types](https://img.shields.io/badge/types-TypeScript-blue)
+
 React UI + hooks for building modern AI chat interfaces fast. Built on top of Vercel AI SDK and AI SDK Elements.
 
 This repository contains:
@@ -144,6 +148,10 @@ cd packages/ai-chat-bootstrap && npm publish --access public
 ```
 
 After publish: tag & push.
+
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for release history.
 
 ## Project Structure
 

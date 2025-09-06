@@ -1,5 +1,9 @@
 # ai-chat-bootstrap
 
+![npm version](https://img.shields.io/npm/v/ai-chat-bootstrap?color=brightgreen)
+![license](https://img.shields.io/npm/l/ai-chat-bootstrap.svg)
+![types](https://img.shields.io/badge/types-TypeScript-blue)
+
 React UI + hooks for building modern AI chat interfaces fast. Built on top of Vercel AI SDK and AI SDK Elements.
 
 ## Install
@@ -70,3 +74,7 @@ MIT
 ## Repository
 
 Issues & source: https://github.com/knifeyspoony/ai-sdk-chat
+
+## Changelog
+
+See the monorepo root [CHANGELOG](../../CHANGELOG.md) for release notes.

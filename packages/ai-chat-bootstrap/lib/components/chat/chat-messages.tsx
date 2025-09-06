@@ -155,23 +155,25 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
   }
 );
 
-const StickToBottomConnector = forwardRef<ChatMessagesHandle>(function StickToBottomConnector(_props, ref) {
-  const { scrollToBottom } = useStickToBottomContext();
-  useImperativeHandle(
-    ref,
-    () => ({
-      scrollToBottom: () => {
-        try {
-          scrollToBottom();
-        } catch {
-          // no-op
-        }
-      },
-    }),
-    [scrollToBottom]
-  );
-  return null;
-});
+const StickToBottomConnector = forwardRef<ChatMessagesHandle>(
+  function StickToBottomConnector(_props, ref) {
+    const { scrollToBottom } = useStickToBottomContext();
+    useImperativeHandle(
+      ref,
+      () => ({
+        scrollToBottom: () => {
+          try {
+            scrollToBottom();
+          } catch {
+            // no-op
+          }
+        },
+      }),
+      [scrollToBottom]
+    );
+    return null;
+  }
+);
 
 ChatMessages.displayName = "ChatMessages";
 

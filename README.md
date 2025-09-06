@@ -1,8 +1,8 @@
 # ai-chat-bootstrap (Monorepo)
 
-![npm version](https://img.shields.io/npm/v/ai-chat-bootstrap?color=brightgreen)
-![license](https://img.shields.io/npm/l/ai-chat-bootstrap.svg)
-![types](https://img.shields.io/badge/types-TypeScript-blue)
+[![npm version](https://img.shields.io/npm/v/ai-chat-bootstrap?color=brightgreen)](https://www.npmjs.com/package/ai-chat-bootstrap)
+[![license](https://img.shields.io/npm/l/ai-chat-bootstrap.svg)](./LICENSE)
+[![types](https://img.shields.io/badge/types-TypeScript-blue)](https://www.npmjs.com/package/ai-chat-bootstrap)
 
 React UI + hooks for building modern AI chat interfaces fast. Built on top of Vercel AI SDK and AI SDK Elements.
 

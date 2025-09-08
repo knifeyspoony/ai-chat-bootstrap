@@ -1,0 +1,35 @@
+{
+  "name": "ai-chat-bootstrap-docs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "postbuild": "pagefind --site .next/server/app --output-path public/_pagefind"
+  },
+  "dependencies": {
+    "ai-chat-bootstrap": "workspace:*",
+    "lucide-react": "^0.462.0",
+    "next": "15.5.2",
+    "nextra": "^4.4.0",
+    "nextra-theme-docs": "^4.4.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "shiki": "^1.22.0",
+    "zod": "^4.0.17"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.2",
+    "pagefind": "^1.4.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

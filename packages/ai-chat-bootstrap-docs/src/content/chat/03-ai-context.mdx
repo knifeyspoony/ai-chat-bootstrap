@@ -1,0 +1,617 @@
+---
+title: Sharing Context
+description: Share React component state with the AI using useAIContext, enabling personalized and state-aware responses without re-renders.
+---
+
+import { AIContextExample, AI_CONTEXT_SOURCE, AI_CONTEXT_API_SOURCE } from "../../components/AIContextExample";
+import { LiveCodeExample } from "../../components/LiveCodeExample";
+
+# Sharing React Context with AI
+
+The `useAIContext` hook allows React components to share their state with the AI without causing re-renders. This enables the AI to provide personalized responses based on user data, app settings, and component state.
+
+<LiveCodeExample code={AI_CONTEXT_SOURCE}>
+  <AIContextExample />
+</LiveCodeExample>
+
+## How Context Sharing Works
+
+Context sharing creates a bridge between your React state and the AI model:
+
+1. **No Re-renders**: Context updates don't trigger chat interface re-renders
+2. **Automatic Updates**: When state changes, context is automatically updated
+3. **Structured Data**: Context items include metadata for better AI understanding
+4. **Priority System**: Control which context is most important to the AI
+5. **Lifecycle Management**: Context is automatically cleaned up when components unmount
+
+## Basic Usage
+
+The `useAIContext` hook takes three parameters:
+
+```tsx
+import { useAIContext } from "ai-chat-bootstrap";
+
+function UserProfile() {
+  const [user, setUser] = useState({
+    name: "Alice Johnson",
+    role: "admin",
+    plan: "pro"
+  });
+
+  // Share user profile with AI
+  useAIContext(
+    "user-profile",        // Unique identifier
+    user,                  // Data to share
+    {
+      label: "User Profile",
+      description: "Current user's profile information",
+      scope: "session",
+      priority: 100,
+    }
+  );
+
+  return <div>...</div>;
+}
+```
+
+## Context Item Properties
+
+Each context item has the following properties:
+
+### Required Properties
+
+- **`id`** (string): Unique identifier for the context item
+- **`data`** (Record\<string, unknown>): The actual data to share with the AI
+
+### Optional Properties  
+
+- **`label`** (string): Human-readable name for the context
+- **`description`** (string): Explains what this context represents to the AI
+- **`scope`** ("session" | "conversation" | "message"): Lifecycle scope
+- **`priority`** (number): Higher numbers are sent first (default: 0)
+
+## Context Scopes
+
+Context scopes determine how long context items persist:
+
+### Session Scope
+Persists across conversations until the component unmounts:
+
+```tsx
+useAIContext(
+  "user-settings",
+  { theme: "dark", language: "en" },
+  {
+    scope: "session",
+    priority: 90,
+    description: "User's app preferences and settings"
+  }
+);
+```
+
+### Conversation Scope
+Lasts for the current chat conversation:
+
+```tsx
+useAIContext(
+  "current-task",
+  { taskId: "task-123", status: "in-progress" },
+  {
+    scope: "conversation", 
+    priority: 70,
+    description: "Currently active task information"
+  }
+);
+```
+
+### Message Scope
+Single-message context (rarely used):
+
+```tsx
+useAIContext(
+  "form-data",
+  currentFormState,
+  {
+    scope: "message",
+    priority: 50,
+    description: "Current form state for this specific query"
+  }
+);
+```
+
+## Priority System
+
+Higher priority context items are sent first to the AI:
+
+```tsx
+// High priority - critical user info
+useAIContext("user-auth", authData, { priority: 100 });
+
+// Medium priority - app state  
+useAIContext("app-settings", settings, { priority: 80 });
+
+// Low priority - metadata
+useAIContext("session-info", sessionData, { priority: 60 });
+```
+
+## Complete Implementation Example
+
+Here's a full example showing multiple context items:
+
+```tsx
+"use client";
+import React, { useState, useMemo } from "react";
+import { ChatContainer, useAIChat, useAIContext } from "ai-chat-bootstrap";
+
+export function AIContextDemo() {
+  const [userProfile, setUserProfile] = useState({
+    userId: "user-123",
+    name: "Alice Johnson",
+    email: "alice@example.com",
+    role: "admin",
+    plan: "pro",
+    notifications: true,
+  });
+
+  const [settings, setSettings] = useState({
+    theme: "dark",
+    language: "en",
+    maxMessages: 100,
+    autoSave: true,
+  });
+
+  // Static session info
+  const sessionInfo = useMemo(() => ({
+    sessionId: "session-" + Date.now(),
+    startedAt: new Date().toISOString(),
+    pageUrl: "/chat",
+    userAgent: navigator.userAgent,
+  }), []);
+
+  // Share context with AI - updates automatically when state changes
+  useAIContext(
+    "user-profile",
+    userProfile,
+    {
+      label: "User Profile",
+      description: "Current authenticated user's profile information",
+      scope: "session",
+      priority: 100,
+    }
+  );
+
+  useAIContext(
+    "app-settings", 
+    settings,
+    {
+      label: "App Settings",
+      description: "User's application configuration and preferences", 
+      scope: "session",
+      priority: 80,
+    }
+  );
+
+  useAIContext(
+    "session-info",
+    sessionInfo, 
+    {
+      label: "Session Info",
+      description: "Current browser session metadata",
+      scope: "session", 
+      priority: 60,
+    }
+  );
+
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You are a helpful assistant with access to the user's profile, settings, and session information. Use this context to provide personalized responses."
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* User Profile Widget */}
+      <div className="p-4 bg-card rounded-lg border">
+        <h3 className="text-lg font-semibold mb-3">User Profile</h3>
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={userProfile.name}
+            onChange={(e) => setUserProfile(prev => ({...prev, name: e.target.value}))}
+            className="w-full px-3 py-2 border rounded-md"
+            placeholder="Name"
+          />
+          <select
+            value={userProfile.role}
+            onChange={(e) => setUserProfile(prev => ({...prev, role: e.target.value}))}
+            className="w-full px-3 py-2 border rounded-md"
+          >
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+            <option value="moderator">Moderator</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Settings Widget */}
+      <div className="p-4 bg-card rounded-lg border">
+        <h3 className="text-lg font-semibold mb-3">Settings</h3>
+        <div className="space-y-2">
+          <select
+            value={settings.theme}
+            onChange={(e) => setSettings(prev => ({...prev, theme: e.target.value}))}
+            className="w-full px-3 py-2 border rounded-md"
+          >
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="auto">Auto</option>
+          </select>
+          <select
+            value={settings.language}
+            onChange={(e) => setSettings(prev => ({...prev, language: e.target.value}))}
+            className="w-full px-3 py-2 border rounded-md"
+          >
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Chat Interface */}
+      <ChatContainer
+        title="AI with Shared Context"
+        subtitle="AI knows your profile and settings"
+        messages={chat.messages}
+        input={chat.input}
+        onInputChange={chat.handleInputChange}
+        onSubmit={chat.handleSubmit}
+        isLoading={chat.isLoading}
+        placeholder="Ask about your profile or settings!"
+      />
+    </div>
+  );
+}
+```
+
+## Backend Integration
+
+The backend automatically receives context items in the request payload:
+
+```tsx
+import { openai } from "@ai-sdk/openai";
+import { streamText, convertToCoreMessages } from "ai";
+import { NextRequest } from "next/server";
+
+export async function POST(req: NextRequest) {
+  const { messages, systemPrompt, tools, context, focus } = await req.json();
+
+  // Context is automatically passed from frontend
+  // context = [
+  //   {
+  //     id: "user-profile",
+  //     label: "User Profile", 
+  //     description: "Current authenticated user's profile information",
+  //     scope: "session",
+  //     priority: 100,
+  //     data: { userId: "user-123", name: "Alice Johnson", role: "admin", ... }
+  //   },
+  //   {
+  //     id: "app-settings",
+  //     label: "App Settings",
+  //     description: "User's application configuration", 
+  //     scope: "session",
+  //     priority: 80,
+  //     data: { theme: "dark", language: "en", ... }
+  //   }
+  // ]
+
+  // Build context-aware system prompt
+  let contextualPrompt = systemPrompt || "You are a helpful AI assistant.";
+  
+  if (context && context.length > 0) {
+    contextualPrompt += "\n\nYou have access to the following context about the user:";
+    context.forEach((item) => {
+      contextualPrompt += `\n- ${item.label || item.id}: ${item.description}`;
+      contextualPrompt += `\n  Data: ${JSON.stringify(item.data)}`;
+    });
+  }
+
+  const result = streamText({
+    model: openai("gpt-4"),
+    system: contextualPrompt,
+    messages: convertToCoreMessages(messages),
+    tools,
+    toolChoice: "auto",
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+```
+
+## Advanced Usage Patterns
+
+### Dynamic Context Updates
+
+Context automatically updates when your state changes:
+
+```tsx
+function TaskManager() {
+  const [currentTask, setCurrentTask] = useState(null);
+  
+  // Context updates automatically when task changes
+  useAIContext(
+    "active-task",
+    currentTask ? {
+      id: currentTask.id,
+      title: currentTask.title,
+      status: currentTask.status,
+      dueDate: currentTask.dueDate,
+    } : { message: "No active task" },
+    {
+      label: "Active Task",
+      description: "Currently selected or active task information",
+      scope: "conversation",
+      priority: 90,
+    }
+  );
+
+  return <div>...</div>;
+}
+```
+
+### Multiple Context Items from One Component
+
+A single component can register multiple context items:
+
+```tsx
+function Dashboard() {
+  const [user, setUser] = useState(userData);
+  const [projects, setProjects] = useState(projectsData);
+  const [notifications, setNotifications] = useState(notificationsData);
+
+  // User context
+  useAIContext("user", user, {
+    label: "User",
+    priority: 100,
+    scope: "session"
+  });
+
+  // Projects context  
+  useAIContext("projects", { 
+    activeProjects: projects.filter(p => p.status === 'active'),
+    totalCount: projects.length 
+  }, {
+    label: "Projects", 
+    priority: 80,
+    scope: "session"
+  });
+
+  // Notifications context
+  useAIContext("notifications", {
+    unreadCount: notifications.filter(n => !n.read).length,
+    latestNotification: notifications[0]
+  }, {
+    label: "Notifications",
+    priority: 60, 
+    scope: "conversation"
+  });
+
+  return <div>...</div>;
+}
+```
+
+### Conditional Context
+
+Only share context when certain conditions are met:
+
+```tsx
+function ConditionalContext() {
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Only share user context when authenticated
+  useAIContext(
+    "authenticated-user",
+    isAuthenticated && user ? {
+      id: user.id,
+      name: user.name,
+      permissions: user.permissions,
+    } : { authenticated: false },
+    {
+      label: "User Authentication",
+      description: isAuthenticated 
+        ? "Authenticated user information and permissions"
+        : "User is not authenticated",
+      scope: "session",
+      priority: 100,
+    }
+  );
+
+  return <div>...</div>;
+}
+```
+
+## Best Practices
+
+### Preventing Re-render Loops
+
+The `useAIContext` hook follows the critical Zustand pattern to prevent infinite re-renders:
+
+```tsx
+// ✅ Correct - Only include stable values in dependencies
+useEffect(() => {
+  setContextItem(contextData);
+  return () => removeContextItem(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps  
+}, [id, data, opts?.label, opts?.description, opts?.scope, opts?.priority]);
+
+// ❌ Wrong - Including Zustand actions causes infinite loops
+}, [id, data, setContextItem, removeContextItem]); // Don't do this!
+```
+
+### Data Structure
+
+Keep context data serializable and structured:
+
+```tsx
+// ✅ Good - Clean, serializable data
+useAIContext("user", {
+  id: user.id,
+  name: user.name,
+  role: user.role,
+  lastActive: user.lastActiveDate.toISOString(),
+});
+
+// ❌ Avoid - Functions, DOM nodes, complex objects  
+useAIContext("user", {
+  ...user,
+  onClick: handleClick,        // Function - not serializable
+  element: domRef.current,     // DOM node - not serializable
+  complexObject: someClass,    // Complex object - may not serialize
+});
+```
+
+### Performance Optimization
+
+Use `useMemo` for expensive context computations:
+
+```tsx
+function ExpensiveContext() {
+  const [rawData, setRawData] = useState([]);
+
+  const processedContext = useMemo(() => ({
+    summary: rawData.reduce((acc, item) => acc + item.value, 0),
+    categories: rawData.reduce((acc, item) => {
+      acc[item.category] = (acc[item.category] || 0) + 1;
+      return acc;
+    }, {}),
+    lastUpdated: new Date().toISOString(),
+  }), [rawData]);
+
+  useAIContext("processed-data", processedContext, {
+    label: "Processed Data",
+    scope: "conversation",
+    priority: 70,
+  });
+
+  return <div>...</div>;
+}
+```
+
+### Security Considerations
+
+Never share sensitive data in context:
+
+```tsx
+// ✅ Safe - Only share necessary, non-sensitive data
+useAIContext("user-profile", {
+  displayName: user.displayName,
+  role: user.role,
+  preferences: user.preferences,
+});
+
+// ❌ Unsafe - Don't share sensitive information
+useAIContext("user-auth", {
+  password: user.password,           // Never share passwords
+  apiKeys: user.apiKeys,            // Never share API keys
+  socialSecurity: user.ssn,         // Never share PII
+  creditCard: user.paymentInfo,     // Never share payment info
+});
+```
+
+## Common Use Cases
+
+### User Profile Context
+Share authenticated user information for personalized responses:
+
+```tsx
+useAIContext("user", userProfile, {
+  label: "User Profile",
+  description: "Current user's profile and preferences",
+  scope: "session",
+  priority: 100,
+});
+```
+
+### Application Settings
+Share app configuration to tailor AI responses:
+
+```tsx  
+useAIContext("settings", appSettings, {
+  label: "App Settings", 
+  description: "User's application preferences and configuration",
+  scope: "session",
+  priority: 90,
+});
+```
+
+### Current Page Context
+Share information about the current page or view:
+
+```tsx
+useAIContext("page-context", {
+  route: router.pathname,
+  params: router.query,
+  title: document.title,
+}, {
+  label: "Page Context",
+  description: "Current page and navigation state",
+  scope: "conversation", 
+  priority: 70,
+});
+```
+
+### Form State
+Share current form data for context-aware assistance:
+
+```tsx
+useAIContext("form-state", {
+  formType: "user-registration",
+  completedFields: Object.keys(formData).filter(key => formData[key]),
+  validationErrors: errors,
+}, {
+  label: "Form State",
+  description: "Current form completion and validation state", 
+  scope: "conversation",
+  priority: 80,
+});
+```
+
+### Shopping Cart Context
+Share e-commerce state for purchase assistance:
+
+```tsx
+useAIContext("cart", {
+  items: cart.items,
+  totalItems: cart.items.length,
+  totalValue: cart.total,
+  currency: "USD",
+}, {
+  label: "Shopping Cart",
+  description: "Current shopping cart contents and totals",
+  scope: "session",
+  priority: 85,
+});
+```
+
+## How Context Flows
+
+1. **Component Registration**: Components call `useAIContext()` with state data
+2. **Store Management**: Context items are stored in a Zustand Map by ID  
+3. **Automatic Updates**: When state changes, context is automatically updated
+4. **Message Preparation**: When sending messages, `serialize()` converts context to array
+5. **Priority Sorting**: Context items are sorted by priority (higher first)
+6. **Backend Delivery**: Context is included in the request payload to your API route
+7. **AI Integration**: Your backend can access structured context for the AI model
+
+## Benefits
+
+- **No Re-renders**: Context updates don't cause chat UI re-renders
+- **Automatic Management**: Context lifecycle is handled automatically  
+- **Type Safety**: Full TypeScript support for context data
+- **Flexible Scoping**: Control context lifetime with session/conversation/message scopes
+- **Priority Control**: Ensure important context reaches the AI first
+- **Performance**: Efficient Map-based storage with O(1) lookups
+- **Integration**: Works seamlessly with the Vercel AI SDK
+
+> **Try the demo above**: Change the user profile or settings and ask the AI about your information to see context sharing in action!

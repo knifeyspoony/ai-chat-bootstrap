@@ -23,11 +23,32 @@ pnpm add ai-chat-bootstrap
 npm install ai-chat-bootstrap
 ```
 
-Add stylesheet once (e.g. in your root layout / entry):
+Consume styles using one of two modes:
+
+Zero‑config (recommended):
+
+```css
+/* globals.css */
+@import "ai-chat-bootstrap/tokens.css"; /* design tokens + minimal globals */
+@import "ai-chat-bootstrap/ai-chat.css"; /* minimal utility slice used by components */
+```
+
+Tailwind‑native (advanced / dedupe with your own utilities):
 
 ```ts
-import "ai-chat-bootstrap/dist/styles.css";
+// tailwind.config.ts
+import preset from "ai-chat-bootstrap/tailwind.preset";
+
+export default {
+  presets: [preset],
+  content: [
+    "./src/**/*.{js,ts,jsx,tsx}",
+    "../../packages/ai-chat-bootstrap/lib/**/*.{js,ts,jsx,tsx}",
+  ],
+};
 ```
+
+In Tailwind‑native mode do NOT import `ai-chat.css`—your build will generate the needed classes. Pick one mode; don't use both.
 
 ## Quick Start
 
@@ -111,7 +132,12 @@ Messages follow the AI SDK UIMessage shape with multiple part types (`text`, `re
 
 ## CSS / Theming
 
-Distributed CSS is pre-built; override via Tailwind layers or custom classes. The package marks `dist/styles.css` as a side-effect so bundlers keep it.
+- `tokens.css` provides CSS custom properties (colors, radius, etc.) and minimal global tweaks.
+- `ai-chat.css` is an optional precompiled, no‑preflight utility slice containing only classes the library uses.
+- The Tailwind preset maps those tokens so you can compile utilities in your own build instead of importing `ai-chat.css`.
+- Override theme by redefining the custom properties after importing `tokens.css`.
+
+Full styling docs live in `packages/ai-chat-bootstrap/README.md`.
 
 ## Development (Monorepo)
 

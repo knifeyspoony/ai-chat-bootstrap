@@ -1,0 +1,163 @@
+---
+title: AI Chat Bootstrap
+description: React UI primitives + hooks for building modern AI chat interfaces quickly. Overview, install options, theming, and core features.
+---
+
+import Link from "next/link";
+
+# AI Chat Bootstrap
+
+AI Chat Bootstrap provides **React components**, **hooks**, and **design tokens** to build AI chat UIs quickly. It layers cleanly on top of the Vercel AI SDK and AI SDK Elements, adding opinionated primitives for messages, commands, contextual tools, suggestions, and theming.
+
+> If you just want to see code first, jump to the <Link href="/chat/basic-chat">Basic Chat example</Link>.
+
+## Install
+
+```bash
+pnpm add ai-chat-bootstrap
+# or
+npm install ai-chat-bootstrap
+# or
+yarn add ai-chat-bootstrap
+```
+
+You also need peer deps in your app (React 18+, react-dom 18+). For full AI functionality install the Vercel AI SDK + a model provider (e.g. `@ai-sdk/openai`) in your application layer—not required to use just the UI primitives.
+
+## Styling Options
+
+There are **two mutually exclusive** ways to consume styles. Pick **one**:
+
+### 1. Zero‑config (fastest)
+
+Drop in our tokens first (so CSS variables are defined), then optionally your own global utility layers, then our **minimal utility slice** (`ai-chat.css`).
+
+```css
+/* globals.css */
+@import "ai-chat-bootstrap/tokens.css"; /* tokens & minimal globals */
+@import "tailwindcss";                  /* (optional) your existing base/util layers */
+@import "tw-animate-css";               /* (optional) any other libs */
+@import "ai-chat-bootstrap/ai-chat.css"; /* curated utility subset used by the library */
+```
+
+No scanning, safelisting, or Tailwind config changes required. The shipped slice:
+
+- Has **preflight disabled** (won't stomp your base styles)
+- Includes **only** utilities referenced by the library
+- Avoids CSS bloat in multi‑app environments
+
+> To theme, override CSS custom properties *after* importing `tokens.css`.
+
+```css
+:root {
+	--radius: 0.75rem;
+	--primary: oklch(0.58 0.2 264);
+	--primary-foreground: oklch(0.985 0 0);
+}
+
+.dark {
+	--background: oklch(0.16 0 0);
+	--foreground: oklch(0.97 0 0);
+}
+```
+
+### 2. Tailwind‑native (advanced / maximum dedupe)
+
+Let **your** Tailwind build emit utilities (enables cross‑library merging / purging). In this mode **do NOT import** `ai-chat.css`—instead add our preset and ensure both your app and the library source appear in `content`.
+
+```ts
+// tailwind.config.ts
+import preset from "ai-chat-bootstrap/tailwind.preset";
+
+export default {
+	presets: [preset],
+	content: [
+		"./src/**/*.{js,ts,jsx,tsx}",
+		// If in a monorepo, include the library source so Tailwind sees usage
+		"../../packages/ai-chat-bootstrap/lib/**/*.{js,ts,jsx,tsx}",
+	],
+};
+```
+
+> Start with Zero‑config. Only switch if you need utility deduplication at scale or centralized Tailwind tuning.
+
+## Quick Start
+
+```tsx
+import { ChatContainer, ChatInput } from "ai-chat-bootstrap";
+import { useChat } from "ai/react"; // from Vercel AI SDK
+
+export function App() {
+	const { messages, input, handleInputChange, handleSubmit } = useChat();
+
+	return (
+		<ChatContainer messages={messages}>
+			<ChatInput
+				input={input}
+				handleInputChange={handleInputChange}
+				handleSubmit={handleSubmit}
+			/>
+		</ChatContainer>
+	);
+}
+```
+
+For a full end‑to‑end example (including API route + streaming) see <Link href="/chat/basic-chat">Basic Chat</Link>.
+
+## Features
+
+- Chat container + composable message primitives
+- Slash command system with parameter schemas (`zod`)
+- Frontend tool registration (client‑side function invocation)
+- Context sharing hooks (inject dynamic UI/app state into model context)
+- Focus / selection tracking for contextual relevance
+- AI suggestion queue + UI components
+- Structured message parts: reasoning, tool calls, sources, code blocks
+- Tailwind + shadcn/ui compatible base components
+
+## CSS & Theming
+
+- `tokens.css`: design tokens + minimal global fixes
+- `ai-chat.css`: optional precompiled library utility slice (only used classes, no preflight)
+- Tailwind preset: maps tokens into Tailwind theme when compiling yourself
+- Theme by overriding CSS variables (`--background`, `--foreground`, `--primary`, etc.)
+
+### Choosing an approach
+
+| Need | Choose |
+| ---- | ------ |
+| Fast drop‑in, minimal config | Zero‑config + `ai-chat.css` |
+| Centralized Tailwind control | Tailwind‑native preset |
+| Lowest duplicate CSS across many libs | Tailwind‑native |
+| Safest isolation from app utilities | Zero‑config |
+
+## Tree‑shaking
+
+In Tailwind‑native mode unused utilities are removed by your Tailwind build. In Zero‑config mode we already ship a pre‑shaken subset containing **only** what components require.
+
+## Peer Dependencies
+
+Provide `react` and `react-dom` (version 18+). The Vercel AI SDK + model provider packages are required only for live AI streaming/inference features—not for purely static UI rendering.
+
+## Repository & Issues
+
+Source & issues live at: https://github.com/knifeyspoony/ai-sdk-chat
+
+## Changelog
+
+See the monorepo root <Link href="https://github.com/knifeyspoony/ai-sdk-chat/blob/main/CHANGELOG.md">CHANGELOG</Link> for release notes.
+
+## License
+
+MIT © Contributors
+
+## Next Steps
+
+- Try the <Link href="/chat/basic-chat">Basic Chat example</Link>
+- Add tools & structured function calling
+- Provide contextual state via `useAIContext`
+- Customize theme tokens / radii / colors
+
+---
+
+Need something that's missing? Open an issue or start a discussion in the repo.
+

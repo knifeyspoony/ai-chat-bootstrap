@@ -152,9 +152,7 @@ export function useAIChat(
     }
   }
 
-  // Enhanced sendMessage - the transport handles all dynamic data injection
   const sendMessageWithContext = (content: string) => {
-    // Clear any existing errors when sending a new message
     setError(null);
     chatHook.sendMessage({ text: content });
   };

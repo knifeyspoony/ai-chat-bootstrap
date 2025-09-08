@@ -1,0 +1,61 @@
+/* ai-chat-bootstrap zero-config: tokens first, then your layers, then precompiled slice */
+@import "ai-chat-bootstrap/tokens.css"; /* design tokens & minimal globals */
+@import "tailwindcss"; /* your tailwind (optional) */
+@import "ai-chat-bootstrap/ai-chat.css"; /* library utility slice */
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Utility styles for the docs live/code toggle */
+.example-frame {
+  @apply rounded-lg border shadow-sm p-4 flex flex-col gap-4;
+  background: var(--card);
+}
+.example-toggle-buttons {
+  @apply inline-flex items-center rounded-md border p-1 text-xs font-medium;
+  background: var(--muted);
+}
+.example-toggle-buttons button {
+  @apply px-2 py-1 rounded-sm transition-colors;
+}
+.example-toggle-buttons button[data-active="true"] {
+  background: var(--background);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Shiki code block styling to match background with padding */
+.shiki-wrapper,
+.shiki-wrapper pre.shiki,
+.shiki-wrapper pre.shiki span {
+  background-color: var(--shiki-light-bg, inherit) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .shiki-wrapper,
+  .shiki-wrapper pre.shiki,
+  .shiki-wrapper pre.shiki span {
+    background-color: var(--shiki-dark-bg, inherit) !important;
+  }
+}

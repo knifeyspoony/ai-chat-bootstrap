@@ -2,13 +2,25 @@ import { asSchema } from "@ai-sdk/provider-utils";
 import { z } from "zod";
 import { create } from "zustand";
 
-export interface FrontendTool {
+/**
+ * Generic frontend tool definition.
+ * P - Zod schema type for input parameters.
+ * R - Return type of the tool execution.
+ * Defaults keep backwards compatibility so existing code that didn't use generics still works.
+ */
+export interface FrontendTool<
+  P extends z.ZodTypeAny = z.ZodTypeAny,
+  R = unknown
+> {
   name: string;
   description: string;
-  parameters: z.ZodSchema;
-  execute: (params: unknown) => Promise<unknown> | unknown;
-  render?: (result: unknown) => React.ReactNode;
+  parameters: P;
+  execute: (params: z.infer<P>) => Promise<R> | R;
+  render?: (result: R) => React.ReactNode;
 }
+
+// Convenience alias for internal non-generic storage usage
+export type AnyFrontendTool = FrontendTool<z.ZodTypeAny, any>;
 
 export interface SerializedTool {
   name: string;
@@ -17,19 +29,19 @@ export interface SerializedTool {
 }
 
 export interface AIToolsStore {
-  tools: Map<string, FrontendTool>;
-  registerTool: (tool: FrontendTool) => void;
+  tools: Map<string, AnyFrontendTool>;
+  registerTool: (tool: AnyFrontendTool) => void;
   unregisterTool: (name: string) => void;
-  getTool: (name: string) => FrontendTool | undefined;
-  getAllTools: () => FrontendTool[];
+  getTool: (name: string) => AnyFrontendTool | undefined;
+  getAllTools: () => AnyFrontendTool[];
   executeTool: (name: string, params: unknown) => Promise<unknown>;
   serializeToolsForBackend: () => SerializedTool[];
 }
 
 export const useAIToolsStore = create<AIToolsStore>((set, get) => ({
-  tools: new Map<string, FrontendTool>(),
+  tools: new Map<string, AnyFrontendTool>(),
 
-  registerTool: (tool: FrontendTool) => {
+  registerTool: (tool: AnyFrontendTool) => {
     set((state) => ({
       tools: new Map(state.tools).set(tool.name, tool),
     }));
@@ -60,7 +72,8 @@ export const useAIToolsStore = create<AIToolsStore>((set, get) => ({
     try {
       // Validate parameters
       const validatedParams = tool.parameters.parse(params);
-      return await tool.execute(validatedParams);
+      // validatedParams now matches z.infer<typeof tool.parameters>
+      return await tool.execute(validatedParams as any);
     } catch (error) {
       console.error(`Error executing tool "${name}":`, error);
       throw error;

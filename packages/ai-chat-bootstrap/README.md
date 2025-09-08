@@ -22,14 +22,14 @@ There are two ways to consume styles:
 
 ### 1. Zero‑config (fastest)
 
-Import the design tokens *before* other layers so CSS variables are defined early, then import our prebuilt minimal utility layer (no Tailwind preflight; only the classes our components actually use):
+Import the design tokens _before_ other layers so CSS variables are defined early, then import our prebuilt minimal utility layer (no Tailwind preflight; only the classes our components actually use):
 
 ```css
 /* globals.css */
-@import "ai-chat-bootstrap/tokens.css";      /* tokens & minimal globals */
-@import "tailwindcss";                       /* (optional) your existing base/util layers */
-@import "tw-animate-css";                    /* (optional) any other libs */
-@import "ai-chat-bootstrap/ai-chat.css";     /* minimal namespaced utility slice */
+@import "ai-chat-bootstrap/tokens.css"; /* tokens & minimal globals */
+@import "tailwindcss"; /* (optional) your existing base/util layers */
+@import "tw-animate-css"; /* (optional) any other libs */
+@import "ai-chat-bootstrap/ai-chat.css"; /* minimal namespaced utility slice */
 ```
 
 That's it—no need to scan our source or safelist classes. The generated `ai-chat.css` only contains the utilities actually used by the library (preflight disabled, curated so they won't stomp your own config).
@@ -49,7 +49,7 @@ Want to theme it? Override the CSS custom properties after importing `tokens.css
 }
 ```
 
-> Choose either Zero‑config *or* Tailwind‑native (below). Don't use both; otherwise you'd duplicate utilities and bloat CSS.
+> Choose either Zero‑config _or_ Tailwind‑native (below). Don't use both; otherwise you'd duplicate utilities and bloat CSS.
 
 ### 2. Tailwind-native (advanced / maximum dedupe)
 
@@ -64,6 +64,7 @@ export default {
   content: ["./src/**/*.{js,ts,jsx,tsx}"],
 };
 ```
+
 Monorepo example (include the library source so Tailwind sees the class usage):
 
 ```ts

@@ -1,0 +1,353 @@
+---
+title: Tool Result Rendering
+description: Create tools with custom React components that render their results directly in the chat interface.
+---
+
+import { ToolRenderingExample, TOOL_RENDERING_SOURCE, TOOL_RENDERING_API_SOURCE } from "../../components/ToolRenderingExample";
+import { LiveCodeExample } from "../../components/LiveCodeExample";
+
+# Tool Result Rendering
+
+Frontend tools can include a `render` method that displays custom React components for their results. This creates rich, interactive content directly in the chat interface, going beyond simple text responses.
+
+<LiveCodeExample code={TOOL_RENDERING_SOURCE}>
+  <ToolRenderingExample />
+</LiveCodeExample>
+
+## Custom Rendering with React Components
+
+The `render` method receives the tool's return value and renders a React component:
+
+```tsx
+useAIFrontendTool({
+  name: "create_chart",
+  description: "Create a data visualization chart",
+  parameters: z.object({
+    title: z.string().describe("Title for the chart"),
+    type: z.enum(["bar", "pie", "line"]).describe("Type of chart"),
+    data: z.array(z.object({
+      label: z.string().describe("Label for data point"),
+      value: z.number().describe("Value for data point"),
+    })).describe("Data points for the chart"),
+  }),
+  execute: async (params) => {
+    return {
+      chartId: `chart-${Date.now()}`,
+      title: params.title,
+      type: params.type,
+      data: params.data,
+      createdAt: new Date().toISOString(),
+    };
+  },
+  render: (result) => (
+    <ChartComponent
+      title={result.title}
+      type={result.type}
+      data={result.data}
+    />
+  ),
+});
+```
+
+## Complete Implementation Example
+
+Here's a full example showing tools with custom rendering:
+
+```tsx
+"use client";
+import React, { useState } from "react";
+import { ChatContainer, useAIChat, useAIFrontendTool } from "ai-chat-bootstrap";
+import { z } from "zod";
+
+// Custom Chart Component
+function ChartComponent({ data, type, title }: { 
+  data: Array<{ label: string; value: number }>; 
+  type: "bar" | "pie" | "line";
+  title: string;
+}) {
+  const maxValue = Math.max(...data.map(d => d.value));
+  
+  return (
+    <div className="p-4 bg-card rounded-lg border">
+      <h3 className="text-lg font-semibold mb-4">{title}</h3>
+      <div className="space-y-3">
+        {data.map((item, index) => (
+          <div key={index} className="flex items-center gap-3">
+            <div className="w-16 text-sm text-muted-foreground">
+              {item.label}
+            </div>
+            <div className="flex-1 bg-muted rounded-full h-6 relative">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-500"
+                style={{ width: `${(item.value / maxValue) * 100}%` }}
+              />
+              <div className="absolute inset-0 flex items-center justify-center text-xs font-medium">
+                {item.value}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ToolRenderingDemo() {
+  // Chart creation tool with custom rendering
+  useAIFrontendTool({
+    name: "create_chart",
+    description: "Create a data visualization chart",
+    parameters: z.object({
+      title: z.string().describe("Title for the chart"),
+      type: z.enum(["bar", "pie", "line"]).describe("Type of chart"),
+      data: z.array(z.object({
+        label: z.string().describe("Label for data point"),
+        value: z.number().describe("Value for data point"),
+      })).describe("Data points for the chart"),
+    }),
+    execute: async (params) => {
+      return {
+        chartId: `chart-${Date.now()}`,
+        title: params.title,
+        type: params.type,
+        data: params.data,
+        createdAt: new Date().toISOString(),
+      };
+    },
+    render: (result) => (
+      <ChartComponent
+        title={result.title}
+        type={result.type}
+        data={result.data}
+      />
+    ),
+  });
+
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You can create charts using the create_chart tool when users request data visualizations."
+  });
+
+  return (
+    <ChatContainer
+      title="AI with Custom Rendering"
+      messages={chat.messages}
+      input={chat.input}
+      onInputChange={chat.handleInputChange}
+      onSubmit={chat.handleSubmit}
+      isLoading={chat.isLoading}
+      placeholder="Ask me to create a chart!"
+    />
+  );
+}
+```
+
+## Backend Integration
+
+The backend API route works the same way - tools with render methods are handled automatically:
+
+```tsx
+import { openai } from "@ai-sdk/openai";
+import { streamText, convertToCoreMessages } from "ai";
+import { NextRequest } from "next/server";
+
+export async function POST(req: NextRequest) {
+  const { messages, systemPrompt, tools, context, focus } = await req.json();
+
+  const result = streamText({
+    model: openai("gpt-4"),
+    system: systemPrompt || "You are a helpful AI assistant that can create data visualizations.",
+    messages: convertToCoreMessages(messages),
+    tools, // Tools with render methods are automatically passed
+    toolChoice: "auto",
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+```
+
+## Rendering Patterns
+
+### Data Visualizations
+
+Perfect for charts, graphs, and data displays:
+
+```tsx
+render: (result) => (
+  <div className="p-4 bg-card rounded-lg border">
+    <h3 className="font-semibold mb-3">{result.title}</h3>
+    <ResponsiveChart data={result.data} type={result.chartType} />
+  </div>
+)
+```
+
+### Interactive Cards
+
+Create rich content cards with actions:
+
+```tsx
+render: (result) => (
+  <div className="p-4 bg-card rounded-lg border space-y-3">
+    <div className="flex items-center justify-between">
+      <h3 className="font-semibold">{result.title}</h3>
+      <span className="text-sm text-muted-foreground">{result.status}</span>
+    </div>
+    <p className="text-sm">{result.description}</p>
+    <div className="flex gap-2">
+      <button className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm">
+        View Details
+      </button>
+      <button className="px-3 py-1 bg-secondary text-secondary-foreground rounded text-sm">
+        Share
+      </button>
+    </div>
+  </div>
+)
+```
+
+### Progress Indicators
+
+Show task completion or loading states:
+
+```tsx
+render: (result) => (
+  <div className="p-3 bg-card rounded-lg border">
+    <div className="flex justify-between items-center mb-2">
+      <span className="text-sm font-medium">{result.taskName}</span>
+      <span className="text-sm text-muted-foreground">{result.progress}%</span>
+    </div>
+    <div className="w-full bg-muted rounded-full h-2">
+      <div
+        className="bg-primary h-2 rounded-full transition-all duration-300"
+        style={{ width: `${result.progress}%` }}
+      />
+    </div>
+  </div>
+)
+```
+
+### Form Components
+
+Render interactive forms or input controls:
+
+```tsx
+render: (result) => (
+  <div className="p-4 bg-card rounded-lg border space-y-3">
+    <h3 className="font-semibold">Configure Settings</h3>
+    {result.fields.map((field) => (
+      <div key={field.name} className="space-y-1">
+        <label className="text-sm font-medium">{field.label}</label>
+        <input
+          type={field.type}
+          defaultValue={field.value}
+          className="w-full px-3 py-2 border rounded-md"
+        />
+      </div>
+    ))}
+    <button className="w-full bg-primary text-primary-foreground py-2 rounded-md">
+      Apply Changes
+    </button>
+  </div>
+)
+```
+
+## Advanced Features
+
+### Conditional Rendering
+
+Render different components based on the result:
+
+```tsx
+render: (result) => {
+  if (result.type === 'success') {
+    return <SuccessCard message={result.message} />;
+  }
+  if (result.type === 'error') {
+    return <ErrorCard error={result.error} retry={result.retry} />;
+  }
+  return <DefaultCard data={result} />;
+}
+```
+
+### State Management
+
+Tools can interact with external state:
+
+```tsx
+render: (result) => (
+  <div onClick={() => setSelectedItem(result.id)}>
+    <ItemCard 
+      item={result} 
+      isSelected={selectedItem === result.id}
+    />
+  </div>
+)
+```
+
+### Event Handling
+
+Components can trigger additional actions:
+
+```tsx
+render: (result) => (
+  <div className="p-4 bg-card rounded-lg border">
+    <h3>{result.title}</h3>
+    <button 
+      onClick={() => {
+        // Trigger another tool or action
+        executeAnotherTool(result.id);
+      }}
+      className="mt-2 bg-primary text-primary-foreground px-4 py-2 rounded"
+    >
+      Process Result
+    </button>
+  </div>
+)
+```
+
+## Best Practices
+
+### Styling
+- Use consistent design tokens and Tailwind classes
+- Match the chat interface's theme and spacing
+- Ensure components work in both light and dark modes
+
+### Performance
+- Keep render methods lightweight
+- Avoid heavy computations in the render function
+- Use React.memo for expensive components
+
+### Accessibility
+- Include proper ARIA labels and roles
+- Ensure keyboard navigation works
+- Provide alt text for images and charts
+
+### Error Handling
+- Handle cases where result data might be incomplete
+- Provide fallback rendering for errors
+- Show loading states for async operations
+
+### TypeScript
+- Type the result parameter for better development experience
+- Use generic types for reusable render functions
+- Ensure render methods return valid React nodes
+
+## Common Use Cases
+
+- **Data Visualization**: Charts, graphs, tables
+- **Media Display**: Images, videos, audio players  
+- **Interactive Widgets**: Calculators, configurators, mini-apps
+- **Status Displays**: Progress bars, health checks, metrics
+- **Content Cards**: Rich previews, summaries, highlights
+- **Form Interfaces**: Input controls, settings panels
+
+## How It Works
+
+1. **Tool Execution**: Tool runs and returns structured data
+2. **Render Invocation**: The `render` method receives the result
+3. **Component Creation**: A React component is created and rendered
+4. **Chat Integration**: The component appears in the chat message
+5. **Interactivity**: Users can interact with the rendered component
+6. **State Updates**: Components can trigger further tool executions
+
+> **Try the demo above**: Ask for "create a bar chart" or "show progress" to see custom rendering in action!

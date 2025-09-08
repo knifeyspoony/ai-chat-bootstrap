@@ -1,6 +1,5 @@
 import { getToolName, type ToolUIPart, type UIMessage } from "ai";
-import { SparklesIcon, UserIcon } from "lucide-react";
-import React, { forwardRef, useImperativeHandle } from "react";
+import React, { forwardRef, ReactNode, useImperativeHandle } from "react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
 import { CodeBlock } from "../../components/ai-elements/code-block";
 import {
@@ -25,6 +24,7 @@ import {
   ToolOutput,
 } from "../../components/ai-elements/tool";
 import { Badge } from "../../components/ui/badge";
+import { AnyFrontendTool, useAIToolsStore } from "../../stores";
 import { cn } from "../../utils";
 
 export interface ChatMessagesProps {
@@ -44,6 +44,8 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
     { messages, isLoading = false, className, messageClassName, emptyState },
     ref
   ) => {
+    const getTool = useAIToolsStore((s) => s.getTool);
+
     const defaultEmptyState = (
       <div className="flex items-center justify-center h-full text-center p-8">
         <div className="text-muted-foreground">
@@ -116,19 +118,16 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                             key={partIndex}
                             part={part}
                             streaming={isStreamingLast}
+                            getTool={getTool}
                           />
                         ))}
                       </MessageContent>
                       {/* Icon-based avatars (images commented out per request) */}
                       <MessageAvatar
-                        // src={isUser ? "/user-avatar.png" : "/assistant-avatar.png"}
+                        //
                         name={isUser ? "You" : "Assistant"}
-                        icon={
-                          isUser ? (
-                            <UserIcon className="h-4 w-4" />
-                          ) : (
-                            <SparklesIcon className="h-4 w-4" />
-                          )
+                        src={
+                          isUser ? "/user-avatar.png" : "/assistant-avatar.png"
                         }
                       />
                     </Message>
@@ -140,11 +139,7 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
               <MessageContent>
                 <Loader />
               </MessageContent>
-              <MessageAvatar
-                // src="/assistant-avatar.png"
-                name="Assistant"
-                icon={<SparklesIcon className="h-4 w-4" />}
-              />
+              <MessageAvatar name="Assistant" src="/assistant-avatar.png" />
             </Message>
           )}
         </ConversationContent>
@@ -182,9 +177,11 @@ type AnyUIPart = UIMessage["parts"][number];
 function MessagePart({
   part,
   streaming = false,
+  getTool,
 }: {
   part: AnyUIPart;
   streaming?: boolean;
+  getTool: (name: string) => AnyFrontendTool | undefined;
 }) {
   // Remove unused streaming parameter for now
   void streaming;
@@ -214,10 +211,63 @@ function MessagePart({
       );
 
     default:
-      // Handle tool-* and data-* parts
+      // Handle tool-* parts (data-* could be added later)
       if (part.type?.startsWith("tool-")) {
         const toolPart = part as ToolUIPart;
-        void getToolName(toolPart);
+        // Extract the base tool name (library helper handles variations)
+        const baseName = getToolName(toolPart);
+
+        // Lookup registered frontend tool to see if it defines a custom render
+        const toolStoreTool = getTool(baseName);
+
+        // Attempt custom render ONLY when output is available
+        let customRendered: ReactNode | undefined;
+        let customRenderError: unknown;
+        if (
+          toolStoreTool?.render &&
+          toolPart.state === "output-available" &&
+          toolPart.output
+        ) {
+          try {
+            customRendered = toolStoreTool.render(toolPart.output as any);
+          } catch (err) {
+            customRenderError = err;
+            // eslint-disable-next-line no-console
+            console.warn("Custom tool render failed", err);
+          }
+        }
+
+        // If custom render succeeded, show only that (no default chrome)
+        if (customRendered) {
+          return <>{customRendered}</>;
+        }
+
+        // Build fallback output (default tool chrome)
+        const fallbackOutput = toolPart.output ? (
+          typeof toolPart.output === "string" ? (
+            toolPart.output
+          ) : (
+            <CodeBlock
+              code={JSON.stringify(toolPart.output, null, 2)}
+              language="json"
+            />
+          )
+        ) : undefined;
+
+        const combinedErrorText =
+          toolPart.errorText || customRenderError
+            ? [
+                toolPart.errorText,
+                customRenderError
+                  ? `Custom render error: ${
+                      (customRenderError as any)?.message || customRenderError
+                    }`
+                  : undefined,
+              ]
+                .filter(Boolean)
+                .join("\n")
+            : undefined;
+
         return (
           <Tool>
             <ToolHeader
@@ -226,21 +276,10 @@ function MessagePart({
             />
             <ToolContent>
               {Boolean(toolPart.input) && <ToolInput input={toolPart.input} />}
-              {(toolPart.output || toolPart.errorText) && (
+              {(toolPart.output || combinedErrorText) && (
                 <ToolOutput
-                  output={
-                    toolPart.output ? (
-                      typeof toolPart.output === "string" ? (
-                        toolPart.output
-                      ) : (
-                        <CodeBlock
-                          code={JSON.stringify(toolPart.output, null, 2)}
-                          language="json"
-                        />
-                      )
-                    ) : undefined
-                  }
-                  errorText={toolPart.errorText}
+                  output={fallbackOutput}
+                  errorText={combinedErrorText}
                 />
               )}
             </ToolContent>

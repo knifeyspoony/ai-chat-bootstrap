@@ -1,0 +1,84 @@
+---
+title: Basic Chat
+description: The minimal setup for getting started with AI chat interfaces, including frontend and backend examples.
+---
+
+import { BasicChatExample, BASIC_CHAT_SOURCE, BASIC_CHAT_API_SOURCE } from "../../components/BasicChatExample";
+import { LiveCodeExample } from "../../components/LiveCodeExample";
+
+# Basic Chat
+
+This example shows the **minimal setup** needed for an AI chat interface. The demo uses mocked responses, but the code examples show real implementation patterns.
+
+<LiveCodeExample code={BASIC_CHAT_SOURCE}>
+  <BasicChatExample />
+</LiveCodeExample>
+
+## Frontend Implementation
+
+The frontend uses the `useAIChat` hook to handle all message state, streaming, and API communication:
+
+```tsx
+import React from "react";
+import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+
+export function BasicChat() {
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You are a helpful AI assistant."
+  });
+
+  return (
+    <div className="h-[420px] w-full">
+      <ChatContainer
+        title="AI Assistant"
+        subtitle="Connected to AI"
+        messages={chat.messages}
+        input={chat.input}
+        onInputChange={chat.handleInputChange}
+        onSubmit={chat.handleSubmit}
+        isLoading={chat.isLoading}
+        placeholder="Ask me anything..."
+      />
+    </div>
+  );
+}
+```
+
+## Backend API Route
+
+Create an API route at `app/api/chat/route.ts` (Next.js App Router):
+
+```tsx
+import { openai } from "@ai-sdk/openai";
+import { streamText } from "ai";
+import { NextRequest, NextResponse } from "next/server";
+
+export async function POST(req: NextRequest) {
+  const { messages, systemPrompt } = await req.json();
+
+  const result = streamText({
+    model: openai("gpt-4"),
+    system: systemPrompt || "You are a helpful AI assistant.",
+    messages,
+  });
+
+  return result.toDataStreamResponse();
+}
+```
+
+## How it works
+
+1. **Frontend**: The `useAIChat` hook manages message state and automatically posts to `/api/chat`
+2. **Backend**: The API route receives messages and streams responses using the Vercel AI SDK
+3. **Streaming**: Responses are streamed back to the frontend and rendered in real-time
+4. **State Management**: All message history and loading states are handled automatically
+
+## Next steps
+
+- **Add tools**: Enable function calling by passing tools to both `useAIChat` and `streamText`
+- **Add context**: Use `useAIContext` to share app state with the AI
+- **Add suggestions**: Enable contextual suggestions with `enableSuggestions={true}`
+- **Style**: Customize appearance via Tailwind classes or component props
+
+> **Installation**: `pnpm add ai @ai-sdk/openai ai-chat-bootstrap` and add your API key to `.env.local`

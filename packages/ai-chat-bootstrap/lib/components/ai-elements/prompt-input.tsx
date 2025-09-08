@@ -1,15 +1,6 @@
 "use client";
 
 import type { ChatStatus } from "ai";
-import { Button } from "lib/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "lib/components/ui/select";
-import { Textarea } from "lib/components/ui/textarea";
 import { Loader2Icon, SendIcon, SquareIcon, XIcon } from "lucide-react";
 import type {
   ComponentProps,
@@ -17,6 +8,15 @@ import type {
   KeyboardEventHandler,
 } from "react";
 import { Children } from "react";
+import { Button } from "../../components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { Textarea } from "../../components/ui/textarea";
 import { cn } from "../../utils";
 
 export type PromptInputProps = HTMLAttributes<HTMLFormElement>;
@@ -40,11 +40,20 @@ export const PromptInputTextarea = ({
   onChange,
   className,
   placeholder = "What would you like to know?",
-  minHeight = 48,
-  maxHeight = 164,
+  minHeight, // eslint-disable-line @typescript-eslint/no-unused-vars
+  maxHeight, // eslint-disable-line @typescript-eslint/no-unused-vars
+  onKeyDown,
   ...props
 }: PromptInputTextareaProps) => {
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
+    // Call parent's onKeyDown handler first (if provided)
+    onKeyDown?.(e);
+
+    // If parent prevented default, don't proceed with internal handling
+    if (e.defaultPrevented) {
+      return;
+    }
+
     if (e.key === "Enter") {
       // Don't submit if IME composition is in progress
       if (e.nativeEvent.isComposing) {

@@ -1,18 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pnpm dlx shadcn@latest add:*)",
       "WebFetch(domain:ai-sdk.dev)",
       "Bash(mkdir:*)",
-      "WebFetch(domain:docs.anthropic.com)",
       "Bash(pnpm run lint:*)",
       "Bash(npx tsc:*)",
       "Bash(grep:*)",
       "Bash(find:*)",
       "WebFetch(domain:zustand.docs.pmnd.rs)",
       "WebFetch(domain:sdk.vercel.ai)",
-      "WebFetch(domain:github.com)",
-      "Bash(pnpm -w run build:demo)"
+      "WebSearch",
+      "Bash(pnpm create:*)",
+      "Bash(pnpm add:*)",
+      "WebFetch(domain:mdxjs.com)",
+      "WebFetch(domain:shiki.style)"
     ],
     "deny": [],
     "ask": []

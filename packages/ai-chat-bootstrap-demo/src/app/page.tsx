@@ -48,6 +48,14 @@ export default function Home() {
   const [selectedSystemPrompt, setSelectedSystemPrompt] =
     useState<string>("default");
   const [chatMode, setChatMode] = useState<"overlay" | "inline">("inline");
+  const [altTheme, setAltTheme] = useState(false);
+
+  // Alt theme effect
+  React.useEffect(() => {
+    const body = document.body;
+    if (altTheme) body.classList.add("demo-alt");
+    else body.classList.remove("demo-alt");
+  }, [altTheme]);
 
   // AI integration - all AI logic is handled by the custom hook
   const {
@@ -372,6 +380,36 @@ export default function Home() {
               )}
             >
               Inline
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="font-medium">Alt Theme:</span>
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "text-sm",
+                !altTheme
+                  ? "text-primary font-medium"
+                  : "text-muted-foreground"
+              )}
+            >
+              Default
+            </span>
+            <Switch
+              checked={altTheme}
+              onCheckedChange={setAltTheme}
+            />
+            <span
+              className={cn(
+                "text-sm",
+                altTheme
+                  ? "text-primary font-medium"
+                  : "text-muted-foreground"
+              )}
+            >
+              Alt
             </span>
           </div>
         </div>

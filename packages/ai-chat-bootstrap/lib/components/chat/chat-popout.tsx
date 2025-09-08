@@ -322,7 +322,7 @@ export function ChatPopout({
           >
             <div
               className={cn(
-                "w-4 h-8 bg-border rounded-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center mx-auto mt-4",
+                "absolute top-1/2 -translate-y-1/2 w-4 h-8 bg-border rounded-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center mx-auto",
                 isDragging && "opacity-100 bg-primary/20"
               )}
             >

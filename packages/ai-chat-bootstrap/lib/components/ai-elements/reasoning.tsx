@@ -1,16 +1,16 @@
-'use client';
+"use client";
 
-import { useControllableState } from '@radix-ui/react-use-controllable-state';
+import { useControllableState } from "@radix-ui/react-use-controllable-state";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from '../../components/ui/collapsible';
-import { cn } from '../../utils';
-import { BrainIcon, ChevronDownIcon } from 'lucide-react';
-import type { ComponentProps } from 'react';
-import { createContext, memo, useContext, useEffect, useState } from 'react';
-import { Response } from './response';
+} from "lib/components/ui/collapsible";
+import { BrainIcon, ChevronDownIcon } from "lucide-react";
+import type { ComponentProps } from "react";
+import { createContext, memo, useContext, useEffect, useState } from "react";
+import { cn } from "../../utils";
+import { Response } from "./response";
 
 type ReasoningContextValue = {
   isStreaming: boolean;
@@ -24,7 +24,7 @@ const ReasoningContext = createContext<ReasoningContextValue | null>(null);
 const useReasoning = () => {
   const context = useContext(ReasoningContext);
   if (!context) {
-    throw new Error('Reasoning components must be used within Reasoning');
+    throw new Error("Reasoning components must be used within Reasoning");
   }
   return context;
 };
@@ -71,7 +71,7 @@ export const Reasoning = memo(
           setStartTime(Date.now());
         }
       } else if (startTime !== null) {
-        setDuration(Math.round((Date.now() - startTime) / MS_IN_S));
+        setDuration(Math.ceil((Date.now() - startTime) / MS_IN_S));
         setStartTime(null);
       }
     }, [isStreaming, startTime, setDuration]);
@@ -79,14 +79,14 @@ export const Reasoning = memo(
     // Auto-open when streaming starts, auto-close when streaming ends (once only)
     useEffect(() => {
       if (defaultOpen && !isStreaming && isOpen && !hasAutoClosedRef) {
-          // Add a small delay before closing to allow user to see the content
-          const timer = setTimeout(() => {
-            setIsOpen(false);
-            setHasAutoClosedRef(true);
-          }, AUTO_CLOSE_DELAY);
+        // Add a small delay before closing to allow user to see the content
+        const timer = setTimeout(() => {
+          setIsOpen(false);
+          setHasAutoClosedRef(true);
+        }, AUTO_CLOSE_DELAY);
 
-          return () => clearTimeout(timer);
-        }
+        return () => clearTimeout(timer);
+      }
     }, [isStreaming, isOpen, defaultOpen, setIsOpen, hasAutoClosedRef]);
 
     const handleOpenChange = (newOpen: boolean) => {
@@ -98,7 +98,7 @@ export const Reasoning = memo(
         value={{ isStreaming, isOpen, setIsOpen, duration }}
       >
         <Collapsible
-          className={cn('not-prose mb-4', className)}
+          className={cn("not-prose mb-4", className)}
           onOpenChange={handleOpenChange}
           open={isOpen}
           {...props}
@@ -119,7 +119,7 @@ export const ReasoningTrigger = memo(
     return (
       <CollapsibleTrigger
         className={cn(
-          'flex items-center gap-2 text-muted-foreground text-sm',
+          "flex items-center gap-2 text-muted-foreground text-sm",
           className
         )}
         {...props}
@@ -130,12 +130,14 @@ export const ReasoningTrigger = memo(
             {isStreaming || duration === 0 ? (
               <p>Thinking...</p>
             ) : (
-              <p>Thought for {duration} seconds</p>
+              <p>
+                Thought for {duration} {duration === 1 ? "second" : "seconds"}
+              </p>
             )}
             <ChevronDownIcon
               className={cn(
-                'size-4 text-muted-foreground transition-transform',
-                isOpen ? 'rotate-180' : 'rotate-0'
+                "size-4 text-muted-foreground transition-transform",
+                isOpen ? "rotate-180" : "rotate-0"
               )}
             />
           </>
@@ -155,8 +157,8 @@ export const ReasoningContent = memo(
   ({ className, children, ...props }: ReasoningContentProps) => (
     <CollapsibleContent
       className={cn(
-        'mt-4 text-sm',
-        'data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in',
+        "mt-4 text-sm",
+        "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
         className
       )}
       {...props}
@@ -166,6 +168,6 @@ export const ReasoningContent = memo(
   )
 );
 
-Reasoning.displayName = 'Reasoning';
-ReasoningTrigger.displayName = 'ReasoningTrigger';
-ReasoningContent.displayName = 'ReasoningContent';
+Reasoning.displayName = "Reasoning";
+ReasoningTrigger.displayName = "ReasoningTrigger";
+ReasoningContent.displayName = "ReasoningContent";

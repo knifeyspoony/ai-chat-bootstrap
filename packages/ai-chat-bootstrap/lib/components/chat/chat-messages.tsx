@@ -214,13 +214,6 @@ function MessagePart({
       );
 
     default:
-      // Non-standard code part support (not in UIMessagePart union):
-      if ((part as unknown as { type?: string })?.type === "code") {
-        const p = part as unknown as { text?: string; language?: string };
-        return (
-          <CodeBlock code={p.text || ""} language={p.language || "text"} />
-        );
-      }
       // Handle tool-* and data-* parts
       if (part.type?.startsWith("tool-")) {
         const toolPart = part as ToolUIPart;

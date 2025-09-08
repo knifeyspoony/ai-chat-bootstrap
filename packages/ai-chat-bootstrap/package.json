@@ -11,7 +11,10 @@
       "require": "./dist/index.js",
       "import": "./dist/index.mjs"
     },
-    "./dist/styles.css": "./dist/styles.css"
+    "./tokens.css": "./dist/tokens.css",
+    "./tailwind.preset": "./dist/tailwind.preset.mjs",
+    "./ai-chat.css": "./dist/ai-chat.css",
+    "./tailwind.css": "./dist/ai-chat.css"
   },
   "files": [
     "dist",
@@ -20,9 +23,8 @@
   ],
   "scripts": {
     "prebuild": "pnpm clean",
-    "build": "pnpm build:css && tsdown",
-    "build:css": "node ./scripts/build-css.mjs",
-    "dev": "pnpm build:css --watch & tsdown --watch",
+    "build": "node ./scripts/build-css.mjs && tsdown",
+    "dev": "node ./scripts/build-css.mjs --watch & tsdown --watch",
     "lint": "eslint lib/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist/",
@@ -58,8 +60,8 @@
     "react-syntax-highlighter": "^15.6.3",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
-    "shiki": "^3.11.0",
-    "streamdown": "^1.0.12",
+    "shiki": "^3.12.2",
+    "streamdown": "^1.2.0",
     "tailwind-merge": "^2.2.0",
     "tailwindcss-animate": "^1.0.7",
     "use-stick-to-bottom": "^1.1.1",
@@ -109,7 +111,8 @@
   },
   "homepage": "https://github.com/knifeyspoony/ai-chat-bootstrap#readme",
   "sideEffects": [
-    "dist/styles.css"
+    "dist/tokens.css",
+    "dist/ai-chat.css"
   ],
   "publishConfig": {
     "access": "public"

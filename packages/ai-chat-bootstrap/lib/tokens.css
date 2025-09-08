@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Design tokens & minimal globals for ai-chat-bootstrap.
+   Import this BEFORE your Tailwind layers in the app (e.g. in globals.css).
+*/
 
 :root {
   --radius: 0.625rem;
@@ -71,61 +71,35 @@
   --sidebar-ring: oklch(0.439 0 0);
 }
 
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-}
-
-/* Fix for code blocks horizontal scrolling and syntax highlighting */
+/* Minimal global tweaks (avoid redefining tailwind layers) */
 pre {
-  overflow-x: auto !important;
+  overflow-x: auto;
 }
-
 pre code {
-  display: block !important;
-  width: max-content !important;
-  min-width: 100% !important;
+  display: block;
+  width: max-content;
+  min-width: 100%;
 }
-
-/* Ensure shiki highlighting spans full width */
 .shiki {
-  overflow-x: auto !important;
+  overflow-x: auto;
 }
-
 .shiki pre {
-  overflow-x: auto !important;
+  overflow-x: auto;
 }
-
 .shiki code {
-  display: block !important;
-  width: max-content !important;
-  min-width: 100% !important;
+  display: block;
+  width: max-content;
+  min-width: 100%;
 }
 
-/* Fix Streamdown code block copy button hover behavior */
-/* Only show copy button when hovering the specific code block, not parent containers */
-pre .group button,
-.group.relative button {
-  opacity: 0 !important;
-  transition: opacity 0.2s ease-in-out !important;
+/* Copy button visibility logic remains utility-friendly, unscoped to avoid specificity wars */
+/* Updated: visibility now managed via group/code utility; fallback selectors kept minimal */
+.group\/code [data-slot="code-copy"],
+.group\/code .code-copy-button {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
 }
-
-pre .group:hover button,
-.group.relative:hover button {
-  opacity: 1 !important;
+.group\/code:hover [data-slot="code-copy"],
+.group\/code:hover .code-copy-button {
+  opacity: 1;
 }
-
-/* Ensure copy button doesn't show from parent group hover */
-.group pre .group button {
-  opacity: 0 !important;
-}
-
-.group:hover pre .group button {
-  opacity: 0 !important;
-}
-
-.group pre .group:hover button {
-  opacity: 1 !important;
-}
-

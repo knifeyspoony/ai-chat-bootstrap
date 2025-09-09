@@ -30,5 +30,10 @@
   "engines": {
     "node": ">=18",
     "pnpm": ">=8"
+  },
+  "pnpm": {
+    "overrides": {
+      "title@4.0.1>chalk": "5.3.0"
+    }
   }
 }

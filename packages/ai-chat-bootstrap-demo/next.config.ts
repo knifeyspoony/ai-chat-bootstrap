@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Ensure workspace packages are watched/transpiled for HMR
+  transpilePackages: ["ai-chat-bootstrap"],
 };
 
 export default nextConfig;

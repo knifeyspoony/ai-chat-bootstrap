@@ -1,6 +1,5 @@
 import type { ChatStatus, UIMessage } from "ai";
 import React, { useCallback, useRef, useState } from "react";
-import { ChatHeader } from "../../components/chat/chat-header";
 import { ChatInputWithCommands } from "../../components/chat/chat-input-with-commands";
 import {
   ChatMessages,
@@ -11,6 +10,7 @@ import { cn } from "../../utils";
 
 // type-only import to avoid cycles
 import type { useAIChat } from "../../hooks";
+import { ChatHeader } from "./chat-header";
 type ChatHook = ReturnType<typeof useAIChat>;
 
 export interface ChatContainerProps {
@@ -30,7 +30,6 @@ export interface ChatContainerProps {
     title?: string;
     subtitle?: string;
     avatar?: React.ReactNode;
-    status?: React.ReactNode;
     badge?: React.ReactNode;
     actions?: React.ReactNode;
     className?: string;
@@ -153,7 +152,7 @@ export function ChatContainer(props: ChatContainerProps) {
   return (
     <div
       className={cn(
-        "flex flex-col h-full bg-background overflow-hidden min-w-0",
+        "flex flex-col h-full bg-background overflow-hidden min-w-0 rounded-md border border-secondary",
         props.ui?.className
       )}
     >
@@ -161,7 +160,6 @@ export function ChatContainer(props: ChatContainerProps) {
         title={props.header?.title}
         subtitle={props.header?.subtitle}
         avatar={props.header?.avatar}
-        status={props.header?.status}
         badge={props.header?.badge}
         actions={props.header?.actions}
         className={props.header?.className ?? props.ui?.classes?.header}
@@ -176,7 +174,7 @@ export function ChatContainer(props: ChatContainerProps) {
         emptyState={props.ui?.emptyState}
       />
 
-      <div className="bg-background/50 backdrop-blur-sm p-4">
+      <div className="bg-background/50 backdrop-blur-sm p-4 rounded-b-md">
         <ChatInputWithCommands
           value={inputValue}
           onChange={onChange}

@@ -99,6 +99,16 @@ export function getCurrentParameterIndex(
     }
   }
 
+  // If the cursor is exactly at the end of the last token and there is no trailing
+  // delimiter (i.e., user hasn't typed a space yet), keep focus on the current token
+  // rather than advancing to the next parameter.
+  if (tokens.length > 0) {
+    const last = tokens[tokens.length - 1]!;
+    if (cursorInArgs === last.end && cursorInArgs === argsText.length) {
+      return clampIndex(tokens.length - 1, schema);
+    }
+  }
+
   // Cursor is in whitespace/comma gap. Determine the index by counting tokens starting before it
   const numTokensBefore = tokens.filter((t) => t.start < cursorInArgs).length;
   // If there's trailing whitespace after the last token and cursor is there, it's next param index
@@ -152,7 +162,7 @@ export function hasAllRequiredParams(
     return argsString.trim().length > 0;
   }
 
-  // For multiple parameters, count provided args using quote-aware tokenization
+  // For multiple parameters, count provided args using quote-aware tokenization (whitespace-delimited)
   const args = tokenizeArgs(argsString);
   return args.length >= requiredParams.length;
 }
@@ -179,7 +189,7 @@ export function parseArgsToParams(
       const paramSchema = shape[key] as z.ZodTypeAny;
       return { [key]: parseValue(argsString.trim(), paramSchema) };
     } else {
-      // Multiple parameters - use quote-aware tokenizer (spaces/commas outside quotes)
+      // Multiple parameters - use quote-aware tokenizer (whitespace outside quotes)
       const args = tokenizeArgs(argsString).map((t) => t.value);
       const result: Record<string, unknown> = {};
 
@@ -234,7 +244,7 @@ function parseValue(value: string, schema: z.ZodTypeAny): unknown {
 
 /**
  * Quote-aware tokenizer for argument strings.
- * Splits on whitespace or commas that are not inside single or double quotes.
+ * Splits on whitespace that is not inside single or double quotes.
  * Returns tokens with their unquoted/escaped value and start/end indices in the original args string.
  */
 function tokenizeArgs(
@@ -244,8 +254,7 @@ function tokenizeArgs(
   const n = args.length;
   let i = 0;
 
-  const isDelimiter = (ch: string) =>
-    ch === " " || ch === "\t" || ch === "\n" || ch === ",";
+  const isDelimiter = (ch: string) => ch === " " || ch === "\t" || ch === "\n";
 
   while (i < n) {
     // Skip leading delimiters

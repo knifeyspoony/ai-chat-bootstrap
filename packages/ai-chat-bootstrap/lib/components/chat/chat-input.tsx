@@ -1,6 +1,6 @@
 import type { ChatStatus } from "ai";
 import { PlusIcon, RotateCcwIcon, SparklesIcon, XIcon } from "lucide-react";
-import React from "react";
+import React, { useCallback, useRef } from "react";
 import {
   PromptInput,
   PromptInputButton,
@@ -63,9 +63,26 @@ export const ChatInput = ({
   suggestionsCount = 3,
   onSuggestionClick,
 }: ChatInputProps) => {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const { allFocusItems, clearFocus } = useAIFocus();
   const error = useChatStore((state) => state.error);
   const setError = useChatStore((state) => state.setError);
+
+  // Keep focus in the input after submit
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      onSubmit(e);
+      // Restore focus on the next tick to avoid blur from form submission state changes
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 0);
+    },
+    [onSubmit]
+  );
+
+  // Do not disable textarea while sending/streaming; keep it interactive to preserve focus
+  const textareaDisabled =
+    disabled && !["submitted", "streaming"].includes(String(status ?? ""));
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
@@ -120,14 +137,15 @@ export const ChatInput = ({
         </div>
       )}
 
-      <PromptInput onSubmit={onSubmit} className="w-full">
+      <PromptInput onSubmit={handleSubmit} className="w-full">
         <PromptInputTextarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          disabled={disabled}
+          disabled={textareaDisabled}
           maxHeight={maxRows * 24}
           onKeyDown={onKeyDown}
+          ref={textareaRef}
         />
         <PromptInputToolbar>
           <PromptInputTools>
@@ -192,6 +210,7 @@ export const ChatInput = ({
 
             <PromptInputSubmit
               status={status}
+              // Disable submit while loading or when empty, but keep textarea enabled
               disabled={disabled || !value.trim()}
             />
           </div>

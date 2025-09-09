@@ -17,5 +17,3 @@ export * from "../../components/ai-elements/response";
 export * from "../../components/ai-elements/sources";
 export * from "../../components/ai-elements/suggestion";
 export * from "../../components/ai-elements/tool";
-
-// Legacy components removed - use AI Elements Message component directly

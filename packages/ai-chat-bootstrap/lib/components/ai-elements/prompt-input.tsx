@@ -2,12 +2,13 @@
 
 import type { ChatStatus } from "ai";
 import { Loader2Icon, SendIcon, SquareIcon, XIcon } from "lucide-react";
-import type {
-  ComponentProps,
-  HTMLAttributes,
-  KeyboardEventHandler,
+import {
+  Children,
+  forwardRef,
+  type ComponentProps,
+  type HTMLAttributes,
+  type KeyboardEventHandler,
 } from "react";
-import { Children } from "react";
 import { Button } from "../../components/ui/button";
 import {
   Select,
@@ -36,62 +37,72 @@ export type PromptInputTextareaProps = ComponentProps<typeof Textarea> & {
   maxHeight?: number;
 };
 
-export const PromptInputTextarea = ({
-  onChange,
-  className,
-  placeholder = "What would you like to know?",
-  minHeight, // eslint-disable-line @typescript-eslint/no-unused-vars
-  maxHeight, // eslint-disable-line @typescript-eslint/no-unused-vars
-  onKeyDown,
-  ...props
-}: PromptInputTextareaProps) => {
-  const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
-    // Call parent's onKeyDown handler first (if provided)
-    onKeyDown?.(e);
+export const PromptInputTextarea = forwardRef<
+  HTMLTextAreaElement,
+  PromptInputTextareaProps
+>(
+  (
+    {
+      onChange,
+      className,
+      placeholder = "What would you like to know?",
+      minHeight, // eslint-disable-line @typescript-eslint/no-unused-vars
+      maxHeight, // eslint-disable-line @typescript-eslint/no-unused-vars
+      onKeyDown,
+      ...props
+    }: PromptInputTextareaProps,
+    ref
+  ) => {
+    const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
+      // Call parent's onKeyDown handler first (if provided)
+      onKeyDown?.(e);
 
-    // If parent prevented default, don't proceed with internal handling
-    if (e.defaultPrevented) {
-      return;
-    }
-
-    if (e.key === "Enter") {
-      // Don't submit if IME composition is in progress
-      if (e.nativeEvent.isComposing) {
+      // If parent prevented default, don't proceed with internal handling
+      if (e.defaultPrevented) {
         return;
       }
 
-      if (e.shiftKey) {
-        // Allow newline
-        return;
-      }
+      if (e.key === "Enter") {
+        // Don't submit if IME composition is in progress
+        if (e.nativeEvent.isComposing) {
+          return;
+        }
 
-      // Submit on Enter (without Shift)
-      e.preventDefault();
-      const form = e.currentTarget.form;
-      if (form) {
-        form.requestSubmit();
-      }
-    }
-  };
+        if (e.shiftKey) {
+          // Allow newline
+          return;
+        }
 
-  return (
-    <Textarea
-      className={cn(
-        "w-full resize-none rounded-none border-none p-3 shadow-none outline-none ring-0",
-        "field-sizing-content max-h-[6lh] bg-transparent dark:bg-transparent",
-        "focus-visible:ring-0",
-        className
-      )}
-      name="message"
-      onChange={(e) => {
-        onChange?.(e);
-      }}
-      onKeyDown={handleKeyDown}
-      placeholder={placeholder}
-      {...props}
-    />
-  );
-};
+        // Submit on Enter (without Shift)
+        e.preventDefault();
+        const form = e.currentTarget.form;
+        if (form) {
+          form.requestSubmit();
+        }
+      }
+    };
+
+    return (
+      <Textarea
+        className={cn(
+          "w-full resize-none rounded-none border-none p-3 shadow-none outline-none ring-0",
+          "field-sizing-content max-h-[6lh] bg-transparent dark:bg-transparent",
+          "focus-visible:ring-0",
+          className
+        )}
+        data-testid="chat-input"
+        name="message"
+        onChange={(e) => {
+          onChange?.(e);
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        ref={ref}
+        {...props}
+      />
+    );
+  }
+);
 
 export type PromptInputToolbarProps = HTMLAttributes<HTMLDivElement>;
 

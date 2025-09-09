@@ -1,4 +1,5 @@
 import { getToolName, type ToolUIPart, type UIMessage } from "ai";
+import { UserIcon } from "lucide-react";
 import React, { forwardRef, ReactNode, useImperativeHandle } from "react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
 import { CodeBlock } from "../../components/ai-elements/code-block";
@@ -29,6 +30,8 @@ import { cn } from "../../utils";
 
 export interface ChatMessagesProps {
   messages: UIMessage[];
+  assistantAvatar?: string;
+  userAvatar?: string;
   isLoading?: boolean;
   className?: string;
   messageClassName?: string;
@@ -41,7 +44,15 @@ export interface ChatMessagesHandle {
 
 export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
   (
-    { messages, isLoading = false, className, messageClassName, emptyState },
+    {
+      messages,
+      isLoading = false,
+      className,
+      messageClassName,
+      emptyState,
+      assistantAvatar = "/acb.png",
+      userAvatar,
+    },
     ref
   ) => {
     const getTool = useAIToolsStore((s) => s.getTool);
@@ -127,7 +138,9 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                         //
                         name={isUser ? "You" : "Assistant"}
                         src={
-                          isUser ? "/user-avatar.png" : "/assistant-avatar.png"
+                          isUser
+                            ? userAvatar || <UserIcon size={24} />
+                            : assistantAvatar
                         }
                       />
                     </Message>
@@ -139,7 +152,7 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
               <MessageContent>
                 <Loader />
               </MessageContent>
-              <MessageAvatar name="Assistant" src="/assistant-avatar.png" />
+              <MessageAvatar name="Assistant" src={assistantAvatar} />
             </Message>
           )}
         </ConversationContent>

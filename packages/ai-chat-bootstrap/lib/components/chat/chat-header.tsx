@@ -11,7 +11,6 @@ export interface ChatHeaderProps {
   title?: string;
   subtitle?: string;
   avatar?: React.ReactNode; // string URL or custom node
-  status?: React.ReactNode; // union string values or custom node
   badge?: React.ReactNode; // string or custom node
   className?: string;
   actions?: React.ReactNode;
@@ -21,26 +20,10 @@ export function ChatHeader({
   title,
   subtitle,
   avatar,
-  status,
   badge,
   className,
   actions,
 }: ChatHeaderProps) {
-  const getStatusColor = (status?: string) => {
-    switch (status) {
-      case "online":
-        return "bg-primary";
-      case "away":
-        return "bg-secondary";
-      case "busy":
-        return "bg-destructive";
-      case "offline":
-        return "bg-muted-foreground";
-      default:
-        return "bg-muted-foreground";
-    }
-  };
-
   if (!title && !subtitle && !avatar && !actions) {
     return null;
   }
@@ -48,7 +31,7 @@ export function ChatHeader({
   return (
     <div
       className={cn(
-        "flex items-center justify-between px-4 py-2 bg-background/80 backdrop-blur-sm border-b border-border/90",
+        "flex items-center justify-between px-4 py-2 bg-background/80 backdrop-blur-sm rounded-t-md border-b border-secondary",
         className
       )}
     >
@@ -67,14 +50,6 @@ export function ChatHeader({
                 {avatar}
               </div>
             )}
-            {typeof status === "string" ? (
-              <div
-                className={cn(
-                  "absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-background",
-                  getStatusColor(status)
-                )}
-              />
-            ) : null}
           </div>
         )}
 
@@ -91,11 +66,6 @@ export function ChatHeader({
           {subtitle && (
             <span className="text-xs text-muted-foreground truncate">
               • {subtitle}
-            </span>
-          )}
-          {status && typeof status !== "string" && (
-            <span className="text-xs text-muted-foreground truncate">
-              {status}
             </span>
           )}
         </div>

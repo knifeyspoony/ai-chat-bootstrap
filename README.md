@@ -53,20 +53,23 @@ In Tailwind‑native mode do NOT import `ai-chat.css`—your build will generate
 ## Quick Start
 
 ```tsx
-import { ChatContainer, ChatInput } from "ai-chat-bootstrap";
-import { useChat } from "ai/react";
+import React from "react";
+import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
 
 export function App() {
-  const { messages, input, handleInputChange, handleSubmit } = useChat();
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You are a helpful AI assistant.",
+  });
 
   return (
-    <ChatContainer messages={messages}>
-      <ChatInput
-        input={input}
-        handleInputChange={handleInputChange}
-        handleSubmit={handleSubmit}
-      />
-    </ChatContainer>
+    <ChatContainer
+      messages={chat.messages}
+      input={chat.input}
+      onInputChange={chat.handleInputChange}
+      onSubmit={chat.handleSubmit}
+      isLoading={chat.isLoading}
+    />
   );
 }
 ```

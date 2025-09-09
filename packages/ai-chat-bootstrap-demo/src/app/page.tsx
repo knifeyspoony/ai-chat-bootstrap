@@ -390,23 +390,16 @@ export default function Home() {
             <span
               className={cn(
                 "text-sm",
-                !altTheme
-                  ? "text-primary font-medium"
-                  : "text-muted-foreground"
+                !altTheme ? "text-primary font-medium" : "text-muted-foreground"
               )}
             >
               Default
             </span>
-            <Switch
-              checked={altTheme}
-              onCheckedChange={setAltTheme}
-            />
+            <Switch checked={altTheme} onCheckedChange={setAltTheme} />
             <span
               className={cn(
                 "text-sm",
-                altTheme
-                  ? "text-primary font-medium"
-                  : "text-muted-foreground"
+                altTheme ? "text-primary font-medium" : "text-muted-foreground"
               )}
             >
               Alt
@@ -647,24 +640,37 @@ export default function Home() {
 
       {/* Chat Interface */}
       <ChatPopout
-        systemPrompt={
-          systemPrompts[selectedSystemPrompt as keyof typeof systemPrompts]
-        }
-        initialMessages={sampleMessages}
-        title="AI Assistant"
-        subtitle={`${selectedSystemPrompt} mode • ${focusedIds.length} focused • ${chatMode}`}
-        placeholder="Try: 'Show user profile', 'Calculate 25 * 4', or type '/' for UI/AI commands..."
-        position="right"
-        mode={chatMode}
-        defaultWidth={450}
-        minWidth={400}
-        maxWidth={600}
-        enableSuggestions={true}
-        suggestionsCount={4}
-        suggestionsPrompt="Generate contextual suggestions based on the focused widgets, tools available, and current conversation. Suggest specific actions the user can take with the counter, calculator, database settings, user profile, or other interactive elements."
-        enableCommands={true}
-        onCommandExecute={(command, args) => {
-          console.log(`Executed command: /${command}${args ? ` ${args}` : ""}`);
+        chatOptions={{
+          systemPrompt:
+            systemPrompts[selectedSystemPrompt as keyof typeof systemPrompts],
+          initialMessages: sampleMessages,
+        }}
+        header={{
+          title: "AI Assistant",
+          subtitle: `${selectedSystemPrompt} mode • ${focusedIds.length} focused • ${chatMode}`,
+        }}
+        ui={{
+          placeholder:
+            "Try: 'Show user profile', 'Calculate 25 * 4', or type '/' for UI/AI commands...",
+        }}
+        popout={{
+          position: "right",
+          mode: chatMode as "overlay" | "inline",
+          width: { default: 450, min: 400, max: 600 },
+        }}
+        suggestions={{
+          enabled: true,
+          count: 4,
+          prompt:
+            "Generate contextual suggestions based on the focused widgets, tools available, and current conversation. Suggest specific actions the user can take with the counter, calculator, database settings, user profile, or other interactive elements.",
+        }}
+        commands={{
+          enabled: true,
+          onExecute: (command: string, args?: string) => {
+            console.log(
+              `Executed command: /${command}${args ? ` ${args}` : ""}`
+            );
+          },
         }}
       />
     </div>

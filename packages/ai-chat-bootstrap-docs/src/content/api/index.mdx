@@ -1,0 +1,328 @@
+---
+title: API Reference
+description: Complete API documentation for hooks, components, and interfaces in the AI Chat Bootstrap library.
+---
+
+# API Reference
+
+Complete API documentation for all hooks, components, and TypeScript interfaces in the AI Chat Bootstrap library.
+
+## Hooks
+
+### Chat Management
+
+- **[useAIChat](/api/hooks/use-ai-chat)** - Main hook for managing chat state and AI interactions with automatic context and tool integration
+
+### Context & Focus
+
+- **[useAIContext](/api/hooks/use-ai-context)** - Share React component state with the AI without causing re-renders
+- **[useAIFocus](/api/hooks/use-ai-focus)** - Enable users to explicitly mark which items should be prioritized in AI conversations
+
+### Tools
+
+- **[useAIFrontendTool](/api/hooks/use-ai-frontend-tool)** - Register tools that the AI can execute in your React components for direct UI interaction
+
+## Components
+
+### Chat Interface Components
+
+- **[ChatContainer](/api/components/chat-container)** - Main chat interface component with message display and input
+- **[ChatMessage](/api/components/chat-message)** - Individual message component with support for different message types  
+- **[ChatInput](/api/components/chat-input)** - Standalone input component for chat interfaces
+
+## Core Concepts
+
+### Message Format
+
+The library uses the Vercel AI SDK `UIMessage` format for all chat interactions:
+
+```typescript
+interface UIMessage {
+  id: string;
+  role: 'system' | 'user' | 'assistant';
+  metadata?: unknown;
+  parts: Array<UIMessagePart>;
+}
+```
+
+### Context vs Focus
+
+- **Context** (`useAIContext`): Automatic, ambient information that's always available to the AI
+- **Focus** (`useAIFocus`): User-controlled, explicit items that are temporarily prioritized
+
+### Tools Integration
+
+Frontend tools execute in the browser and allow the AI to:
+- Modify React component state
+- Trigger UI actions
+- Fetch data from APIs
+- Update forms and user interfaces
+
+## Getting Started
+
+1. **Install the library**:
+   ```bash
+   npm install ai-chat-bootstrap
+   ```
+
+2. **Import styles**:
+   ```tsx
+   import 'ai-chat-bootstrap/lib/styles.css';
+   ```
+
+3. **Use the main chat hook**:
+   ```tsx
+   import { useAIChat } from 'ai-chat-bootstrap';
+   
+   const chat = useAIChat({ api: '/api/chat' });
+   ```
+
+## Quick Examples
+
+### Basic Chat
+
+```tsx
+import { ChatContainer, useAIChat } from 'ai-chat-bootstrap';
+
+function MyChat() {
+  const chat = useAIChat({
+    api: '/api/chat',
+    systemPrompt: 'You are a helpful assistant.'
+  });
+
+  return (
+    <ChatContainer
+      messages={chat.messages}
+      input={chat.input}
+      onInputChange={chat.handleInputChange}
+      onSubmit={chat.handleSubmit}
+      isLoading={chat.isLoading}
+    />
+  );
+}
+```
+
+### With Context
+
+```tsx
+import { useAIChat, useAIContext } from 'ai-chat-bootstrap';
+
+function ChatWithContext() {
+  const [user] = useState({ name: 'Alice', role: 'admin' });
+  
+  // Share user context with AI
+  useAIContext('user', user, {
+    label: 'User Profile',
+    description: 'Current user information'
+  });
+
+  const chat = useAIChat({ api: '/api/chat' });
+  
+  return <ChatContainer {...chat} />;
+}
+```
+
+### With Tools
+
+```tsx
+import { useAIChat, useAIFrontendTool } from 'ai-chat-bootstrap';
+import { z } from 'zod';
+
+function ChatWithTools() {
+  const [count, setCount] = useState(0);
+
+  // Register a tool the AI can use
+  useAIFrontendTool({
+    name: 'increment',
+    description: 'Increment the counter',
+    parameters: z.object({
+      amount: z.number().default(1)
+    }),
+    execute: async ({ amount }) => {
+      setCount(prev => prev + amount);
+      return { newValue: count + amount };
+    }
+  });
+
+  const chat = useAIChat({ api: '/api/chat' });
+  
+  return (
+    <div>
+      <div>Count: {count}</div>
+      <ChatContainer {...chat} />
+    </div>
+  );
+}
+```
+
+## Component Reference
+
+### ChatContainer
+
+Main chat interface component with message display and input.
+
+```tsx
+interface ChatContainerProps {
+  title?: string;
+  subtitle?: string;
+  messages: UIMessage[];
+  input: string;
+  onInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onSubmit: (e?: FormEvent) => void;
+  isLoading?: boolean;
+  error?: Error | null;
+  placeholder?: string;
+  className?: string;
+}
+```
+
+### ChatMessage
+
+Individual message component with support for different message types.
+
+```tsx
+interface ChatMessageProps {
+  message: UIMessage;
+  className?: string;
+}
+```
+
+### ChatInput
+
+Standalone input component for chat interfaces.
+
+```tsx
+interface ChatInputProps {
+  input: string;
+  onInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onSubmit: (e?: FormEvent) => void;
+  isLoading?: boolean;
+  placeholder?: string;
+  className?: string;
+}
+```
+
+## TypeScript Interfaces
+
+### Core Types
+
+```typescript
+// Focus item structure
+interface FocusItem {
+  id: string;
+  label?: string;
+  description?: string;
+  data?: Record<string, unknown>;
+}
+
+// Context item structure
+interface ContextItem {
+  id: string;
+  label?: string;
+  description?: string;
+  scope: "session" | "conversation" | "message";
+  priority: number;
+  data: Record<string, unknown>;
+}
+
+// Frontend tool definition
+interface FrontendTool {
+  name: string;
+  description: string;
+  parameters: ZodSchema;
+  execute: (params: any) => Promise<any> | any;
+}
+```
+
+### Message Types
+
+```typescript
+// Message part types
+type UIMessagePart = 
+  | { type: 'text'; text: string; state?: 'streaming' | 'done' }
+  | { type: 'reasoning'; text: string; state?: 'streaming' | 'done' }
+  | { type: 'file'; mediaType: string; filename?: string; url: string }
+  | { type: 'source-url'; sourceId: string; url: string; title?: string }
+  | { type: 'tool-*'; toolCallId: string; /* ... */ }
+  | { type: 'data-*'; id?: string; data: any };
+```
+
+## Backend Integration
+
+The library automatically sends structured payloads to your API endpoint:
+
+```typescript
+interface ChatRequestPayload {
+  messages: UIMessage[];
+  systemPrompt?: string;
+  tools?: Record<string, ToolDefinition>;
+  context?: ContextItem[];
+  focus?: FocusItem[];
+}
+```
+
+### Example API Route (Next.js)
+
+```tsx
+import { openai } from '@ai-sdk/openai';
+import { streamText, convertToCoreMessages } from 'ai';
+import { NextRequest } from 'next/server';
+
+export async function POST(req: NextRequest) {
+  const { messages, systemPrompt, tools, context, focus } = await req.json();
+
+  let prompt = systemPrompt || 'You are a helpful AI assistant.';
+  
+  if (context?.length > 0) {
+    prompt += '\n\nContext:\n' + context.map(item => 
+      `- ${item.label}: ${JSON.stringify(item.data)}`
+    ).join('\n');
+  }
+
+  const result = streamText({
+    model: openai('gpt-4'),
+    system: prompt,
+    messages: convertToCoreMessages(messages),
+    tools,
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+```
+
+## Best Practices
+
+### Performance
+
+- Use `useMemo` for expensive context computations
+- Limit message history in long conversations
+- Follow Zustand patterns to avoid re-render loops
+
+### Security
+
+- Never share sensitive data in context or focus items
+- Validate all tool parameters
+- Sanitize user inputs
+
+### User Experience
+
+- Provide clear loading states
+- Handle errors gracefully with user-friendly messages
+- Show visual feedback for focused items and active context
+
+## Migration from Other Libraries
+
+The AI Chat Bootstrap library is designed to work seamlessly with the Vercel AI SDK while adding powerful context and tool management capabilities. If you're migrating from other chat libraries, the `useAIChat` hook provides a familiar interface while adding automatic integration with context, focus, and tools.
+
+## Examples & Tutorials
+
+- [Basic Chat](/chat/basic-chat) - Simple chat implementation
+- [Chat with Tools](/chat/chat-with-tools) - Adding frontend tools  
+- [Sharing Context](/chat/ai-context) - Using ambient context
+- [Focus Items](/chat/focus-items) - User-controlled focus
+
+## Support
+
+For issues, feature requests, or questions:
+- GitHub: [ai-chat-bootstrap repository](https://github.com/knifeyspoony/ai-chat-bootstrap)
+- Documentation: Complete guides and examples available in this documentation

@@ -40,14 +40,14 @@ export function BasicChatExample() {
   return (
     <div className="h-[420px] w-full">
       <ChatContainer
-        title="AI Assistant"
-        subtitle="Connected to AI"
-        messages={messages}
-        input={input}
-        onInputChange={setInput}
-        onSubmit={handleSubmit}
-        isLoading={isLoading}
-        placeholder="Ask me anything..."
+        header={{ title: "AI Assistant", subtitle: "Connected to AI" }}
+        ui={{ placeholder: "Ask me anything..." }}
+        state={{ messages, isLoading }}
+        inputProps={{
+          value: input,
+          onChange: setInput,
+          onSubmit: handleSubmit,
+        }}
       />
     </div>
   );
@@ -66,14 +66,9 @@ export function BasicChat() {
   return (
     <div className="h-[420px] w-full">
       <ChatContainer
-        title="AI Assistant"
-        subtitle="Connected to AI"
-        messages={chat.messages}
-        input={chat.input}
-        onInputChange={chat.handleInputChange}
-        onSubmit={chat.handleSubmit}
-        isLoading={chat.isLoading}
-        placeholder="Ask me anything..."
+  header={{ title: "AI Assistant", subtitle: "Connected to AI" }}
+  ui={{ placeholder: "Ask me anything..." }}
+  chat={chat}
       />
     </div>
   );

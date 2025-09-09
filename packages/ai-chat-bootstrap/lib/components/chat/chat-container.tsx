@@ -1,5 +1,5 @@
 import type { ChatStatus, UIMessage } from "ai";
-import React, { useRef } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { ChatHeader } from "../../components/chat/chat-header";
 import { ChatInputWithCommands } from "../../components/chat/chat-input-with-commands";
 import {
@@ -9,105 +9,115 @@ import {
 import { useSuggestions } from "../../hooks/use-suggestions";
 import { cn } from "../../utils";
 
+// type-only import to avoid cycles
+import type { useAIChat } from "../../hooks";
+type ChatHook = ReturnType<typeof useAIChat>;
+
 export interface ChatContainerProps {
-  messages: UIMessage[];
-  input: string;
-  onInputChange: (value: string) => void;
-  onSubmit: (e: React.FormEvent) => void;
-  onAttach?: () => void;
-  isLoading?: boolean;
-  status?: ChatStatus;
-  placeholder?: string;
-  className?: string;
+  // Preferred: pass chat hook result
+  chat?: ChatHook;
 
-  // Header props
-  title?: string;
-  subtitle?: string;
-  avatar?: string;
-  headerStatus?: "online" | "offline" | "away" | "busy";
-  badge?: string;
-  headerActions?: React.ReactNode;
+  // Grouped input config
+  inputProps?: {
+    value?: string;
+    onChange?: (value: string) => void;
+    onSubmit?: (e: React.FormEvent) => void;
+    onAttach?: () => void;
+  };
 
-  // Component class overrides
-  headerClassName?: string;
-  messagesClassName?: string;
-  messageClassName?: string;
-  inputClassName?: string;
+  // Header group
+  header?: {
+    title?: string;
+    subtitle?: string;
+    avatar?: React.ReactNode;
+    status?: React.ReactNode;
+    badge?: React.ReactNode;
+    actions?: React.ReactNode;
+    className?: string;
+  };
 
-  // Messages props
-  emptyState?: React.ReactNode;
+  // UI group
+  ui?: {
+    placeholder?: string;
+    className?: string;
+    classes?: {
+      header?: string;
+      messages?: string;
+      message?: string;
+      input?: string;
+    };
+    emptyState?: React.ReactNode;
+  };
 
-  // Suggestions props
-  enableSuggestions?: boolean;
-  suggestionsPrompt?: string;
-  suggestionsCount?: number;
-  onAssistantFinish?: (triggerFetch: () => void) => void;
-  onSendMessage?: (message: string) => void;
+  // Suggestions group
+  suggestions?: {
+    enabled?: boolean;
+    prompt?: string;
+    count?: number;
+    onAssistantFinish?: (triggerFetch: () => void) => void;
+    onSendMessage?: (message: string) => void;
+  };
 
-  // Commands props
-  enableCommands?: boolean;
-  onCommandExecute?: (commandName: string, args?: string) => void;
-  onAICommandExecute?: (
-    message: string,
-    toolName: string,
-    systemPrompt?: string
-  ) => void;
+  // Commands group
+  commands?: {
+    enabled?: boolean;
+    onExecute?: (commandName: string, args?: string) => void;
+    onAICommandExecute?: (
+      message: string,
+      toolName: string,
+      systemPrompt?: string
+    ) => void;
+  };
+
+  // Explicit state overrides if not using chat
+  state?: {
+    messages?: UIMessage[];
+    isLoading?: boolean;
+    status?: ChatStatus;
+  };
 }
 
-export function ChatContainer({
-  messages,
-  input,
-  onInputChange,
-  onSubmit,
-  onAttach,
-  isLoading = false,
-  status,
-  placeholder,
-  className,
-
-  // Header props
-  title,
-  subtitle,
-  avatar,
-  headerStatus,
-  badge,
-  headerActions,
-
-  // Component class overrides
-  headerClassName,
-  messagesClassName,
-  messageClassName,
-  inputClassName,
-
-  // Messages props
-  emptyState,
-
-  // Suggestions props
-  enableSuggestions = false,
-  suggestionsPrompt,
-  suggestionsCount = 3,
-  onAssistantFinish,
-  onSendMessage,
-
-  // Commands props
-  enableCommands = false,
-  onCommandExecute,
-  onAICommandExecute,
-}: ChatContainerProps) {
+export function ChatContainer(props: ChatContainerProps) {
   // Ref to control scrolling programmatically
   const messagesRef = useRef<ChatMessagesHandle | null>(null);
+  // Internal input state for uncontrolled mode
+  const [internalInput, setInternalInput] = useState("");
+  const inputValue = props.inputProps?.value ?? internalInput;
+  const onChange = props.inputProps?.onChange ?? setInternalInput;
+  const onAttach = props.inputProps?.onAttach;
+
+  // Resolve state from chat -> state -> legacy
+  const messages = props.chat?.messages ?? props.state?.messages ?? [];
+  const isLoading = props.chat?.isLoading ?? props.state?.isLoading ?? false;
+  const status = props.chat?.status ?? props.state?.status;
+
+  const providedOnSubmit = props.inputProps?.onSubmit;
+  const onSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (providedOnSubmit) return providedOnSubmit(e);
+      const text = (inputValue ?? "").toString();
+      if (!text.trim()) return;
+      if (props.chat) {
+        props.chat.sendMessageWithContext(text);
+        setInternalInput("");
+      }
+    },
+    [providedOnSubmit, props.chat, inputValue]
+  );
   // Handle suggestions
   const {
     suggestions,
     handleSuggestionClick,
     onAssistantFinish: triggerSuggestionsFetch,
   } = useSuggestions({
-    enabled: enableSuggestions,
-    prompt: suggestionsPrompt,
+    enabled: props.suggestions?.enabled ?? false,
+    prompt: props.suggestions?.prompt,
     messages,
     onSuggestionClick: (suggestion) => {
-      if (onSendMessage) {
-        onSendMessage(suggestion.longSuggestion);
+      const send = props.suggestions?.onSendMessage;
+      if (send) {
+        send(suggestion.longSuggestion);
         // Scroll after next frame so message is rendered
         requestAnimationFrame(() => {
           messagesRef.current?.scrollToBottom();
@@ -118,57 +128,59 @@ export function ChatContainer({
 
   // Register suggestions fetch function with parent
   React.useEffect(() => {
-    if (onAssistantFinish && enableSuggestions) {
-      onAssistantFinish(triggerSuggestionsFetch);
+    const cb = props.suggestions?.onAssistantFinish;
+    const enabled = props.suggestions?.enabled;
+    if (cb && enabled) {
+      cb(triggerSuggestionsFetch);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onAssistantFinish, enableSuggestions]); // Remove triggerSuggestionsFetch to prevent re-registration
+  }, [props.suggestions?.onAssistantFinish, props.suggestions?.enabled]); // Remove triggerSuggestionsFetch to prevent re-registration
 
   return (
     <div
       className={cn(
         "flex flex-col h-full bg-background overflow-hidden min-w-0",
-        className
+        props.ui?.className
       )}
     >
       <ChatHeader
-        title={title}
-        subtitle={subtitle}
-        avatar={avatar}
-        status={headerStatus}
-        badge={badge}
-        actions={headerActions}
-        className={headerClassName}
+        title={props.header?.title}
+        subtitle={props.header?.subtitle}
+        avatar={props.header?.avatar}
+        status={props.header?.status}
+        badge={props.header?.badge}
+        actions={props.header?.actions}
+        className={props.header?.className ?? props.ui?.classes?.header}
       />
 
       <ChatMessages
         ref={messagesRef}
         messages={messages}
         isLoading={isLoading}
-        className={messagesClassName}
-        messageClassName={messageClassName}
-        emptyState={emptyState}
+        className={props.ui?.classes?.messages}
+        messageClassName={props.ui?.classes?.message}
+        emptyState={props.ui?.emptyState}
       />
 
       <div className="bg-background/50 backdrop-blur-sm p-4">
         <ChatInputWithCommands
-          value={input}
-          onChange={onInputChange}
+          value={inputValue}
+          onChange={onChange}
           onSubmit={onSubmit}
           onAttach={onAttach}
-          placeholder={placeholder}
+          placeholder={props.ui?.placeholder}
           disabled={isLoading}
           status={status}
-          className={inputClassName}
+          className={props.ui?.classes?.input}
           // Suggestions props
-          enableSuggestions={enableSuggestions}
+          enableSuggestions={props.suggestions?.enabled}
           suggestions={suggestions}
-          suggestionsCount={suggestionsCount}
+          suggestionsCount={props.suggestions?.count ?? 3}
           onSuggestionClick={handleSuggestionClick}
           // Commands props
-          enableCommands={enableCommands}
-          onCommandExecute={onCommandExecute}
-          onAICommandExecute={onAICommandExecute}
+          enableCommands={props.commands?.enabled}
+          onCommandExecute={props.commands?.onExecute}
+          onAICommandExecute={props.commands?.onAICommandExecute}
         />
       </div>
     </div>

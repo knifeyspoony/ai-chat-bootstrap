@@ -5,6 +5,7 @@ description: Enable AI to interact with your React components using frontend too
 
 import { ChatWithToolsExample, TOOLS_CHAT_SOURCE, TOOLS_API_SOURCE } from "../../components/ChatWithToolsExample";
 import { LiveCodeExample } from "../../components/LiveCodeExample";
+import { Api as API } from "../../components/ApiLink";
 
 # Chat with Tools
 
@@ -16,7 +17,7 @@ Frontend tools allow the AI to execute functions in your React components, enabl
 
 ## How Frontend Tools Work
 
-Frontend tools are functions registered with `useAIFrontendTool` that:
+Frontend tools are functions registered with <API name="useAIFrontendTool">useAIFrontendTool</API> that:
 
 1. **Execute in the browser** - Run client-side in your React component
 2. **Have typed parameters** - Use Zod schemas for validation
@@ -25,7 +26,7 @@ Frontend tools are functions registered with `useAIFrontendTool` that:
 
 ## Basic Tool Registration
 
-The `useAIFrontendTool` hook registers tools that the AI can call:
+The <API name="useAIFrontendTool">useAIFrontendTool</API> hook registers tools that the AI can call:
 
 ```tsx
 import { useAIFrontendTool } from "ai-chat-bootstrap";
@@ -160,6 +161,10 @@ export async function POST(req: NextRequest) {
 }
 ```
 
+## API Reference
+
+- Hook: [useAIFrontendTool](/api/hooks/use-ai-frontend-tool)
+
 ## Tool Features
 
 ### Parameter Validation
@@ -221,15 +226,6 @@ execute: async (params) => {
 5. **Context Update**: Tool results are added to the conversation context
 6. **UI Updates**: Tools can modify React state, triggering re-renders
 
-## Best Practices
-
-- **Clear Descriptions**: Write detailed tool descriptions so the AI knows when to use them
-- **Typed Parameters**: Use specific Zod schemas for better validation
-- **Meaningful Returns**: Return structured data that helps the AI understand what happened
-- **Error Handling**: Handle failures gracefully and return error information
-- **State Management**: Keep tool state in sync with your component state
-- **Performance**: Avoid heavy computations in tool execution
-
 ## Next Steps
 
 - **Add Context**: Use `useAIContext` to share additional app state with tools
@@ -237,4 +233,6 @@ execute: async (params) => {
 - **Multiple Tools**: Create tool libraries for different feature areas
 - **Tool Composition**: Combine multiple tools for complex operations
 
-> **Try the demo above**: Ask the AI to "increment by 5" or "decrease the counter by 3" to see tools in action!
+## Next
+
+Continue to [Tool Result Rendering →](/chat/tool-result-rendering)

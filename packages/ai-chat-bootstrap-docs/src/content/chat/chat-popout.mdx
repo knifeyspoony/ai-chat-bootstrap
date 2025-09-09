@@ -1,0 +1,60 @@
+---
+title: Popout Chat
+description: Use ChatPopout for a drop-in assistant with a resizable inline or overlay panel.
+---
+
+import { PopoutDocsBlock } from "../../components/PopoutDocsBlock";
+import { Api as API } from "../../components/ApiLink";
+
+# Popout Chat
+
+The <API name="ChatPopout" /> component provides a complete assistant UI that manages its own input/messages state using <API name="useAIChat" />. It supports overlay and inline modes, left/right positioning, and a draggable resize handle.
+
+<PopoutDocsBlock />
+
+## When to use
+
+- You want a quick, drop-in assistant without wiring message state
+- You prefer a panel that can overlay the page or live inline in the layout
+- You need resizable width and easy open/close behavior
+
+## Inline vs Overlay
+
+- Inline mode inserts a resizable panel in your layout
+- Overlay mode slides in from left/right and can show a backdrop on mobile
+
+```tsx
+import { ChatPopout } from "ai-chat-bootstrap";
+
+export function App() {
+  return (
+    <>
+      {/* Inline mode */}
+      <ChatPopout
+        header={{ title: "Assistant" }}
+        ui={{ placeholder: "Ask me anything..." }}
+        popout={{ mode: "inline", position: "right", width: { default: 420 } }}
+      />
+
+      {/* Overlay mode (left) */}
+      <ChatPopout
+        header={{ title: "Assistant" }}
+        ui={{ placeholder: "Ask me anything..." }}
+        popout={{ mode: "overlay", position: "left", width: { default: 480, min: 360, max: 640 }, height: "100%" }}
+      />
+    </>
+  );
+}
+```
+
+## Props overview
+
+- header: title, subtitle, actions, etc.
+- ui: placeholder, emptyState, classes
+- popout: mode, position, width, height, className
+- button: show, label, icon, className
+- suggestions and commands: enable built-in suggestions and command actions
+
+## Next
+
+Continue to [Chat with Tools →](/chat/chat-with-tools)

@@ -391,14 +391,19 @@ export function AIContextExample() {
       {/* Chat Interface */}
       <div className="h-[400px] w-full">
         <ChatContainer
-          title="AI with Shared Context"
-          subtitle="AI knows your profile, settings, and session state"
-          messages={messages}
-          input={input}
-          onInputChange={setInput}
-          onSubmit={handleSubmit}
-          isLoading={isLoading}
-          placeholder="Try: 'What's my name?' or 'What are my settings?'"
+          header={{
+            title: "AI with Shared Context",
+            subtitle: "AI knows your profile, settings, and session state",
+          }}
+          ui={{
+            placeholder: "Try: 'What's my name?' or 'What are my settings?'",
+          }}
+          state={{ messages, isLoading }}
+          inputProps={{
+            value: input,
+            onChange: setInput,
+            onSubmit: handleSubmit,
+          }}
         />
       </div>
     </div>

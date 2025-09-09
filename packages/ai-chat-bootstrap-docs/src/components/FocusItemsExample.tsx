@@ -199,20 +199,22 @@ export function FocusItemsExample() {
       </div>
       <div className="border rounded-lg">
         <ChatContainer
-          title="AI Assistant"
-          subtitle={
-            focusedIds.length > 0
-              ? `${focusedIds.length} item${
-                  focusedIds.length !== 1 ? "s" : ""
-                } in focus`
-              : "No items focused"
-          }
-          messages={messages}
-          input={input}
-          onInputChange={setInput}
-          onSubmit={handleSubmit}
-          isLoading={isLoading}
-          placeholder="Ask about your focused items..."
+          header={{
+            title: "AI Assistant",
+            subtitle:
+              focusedIds.length > 0
+                ? `${focusedIds.length} item${
+                    focusedIds.length !== 1 ? "s" : ""
+                  } in focus`
+                : "No items focused",
+          }}
+          ui={{ placeholder: "Ask about your focused items..." }}
+          state={{ messages, isLoading }}
+          inputProps={{
+            value: input,
+            onChange: setInput,
+            onSubmit: handleSubmit,
+          }}
         />
       </div>
     </div>

@@ -30,7 +30,7 @@ body {
 
 /* Utility styles for the docs live/code toggle */
 .example-frame {
-  @apply rounded-lg border shadow-sm p-4 flex flex-col gap-4;
+  @apply rounded-lg border shadow-sm p-4 flex flex-col gap-4 my-6 md:my-8;
   background: var(--card);
 }
 .example-toggle-buttons {

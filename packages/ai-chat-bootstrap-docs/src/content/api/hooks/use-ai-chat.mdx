@@ -1,0 +1,531 @@
+---
+title: useAIChat
+description: Main hook for managing chat state and AI interactions with automatic context and tool integration.
+---
+
+# useAIChat
+
+The `useAIChat` hook is the main hook for managing chat state and AI interactions. It automatically integrates with context items from `useAIContext`, focus items from `useAIFocus`, and frontend tools from `useAIFrontendTool`.
+
+## Syntax
+
+```typescript
+interface UseAIChatOptions {
+  api: string;
+  systemPrompt?: string;
+  initialMessages?: UIMessage[];
+  onFinish?: (message: UIMessage) => void;
+  onError?: (error: Error) => void;
+}
+
+function useAIChat(options: UseAIChatOptions): UseAIChatReturn
+```
+
+## Parameters
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `api` | `string` | Yes | API endpoint for chat requests |
+| `systemPrompt` | `string` | No | System prompt for the AI |
+| `initialMessages` | `UIMessage[]` | No | Initial chat messages |
+| `onFinish` | `(message: UIMessage) => void` | No | Callback when a message is completed |
+| `onError` | `(error: Error) => void` | No | Error callback |
+
+## Return Value
+
+```typescript
+interface UseAIChatReturn {
+  messages: UIMessage[];
+  input: string;
+  isLoading: boolean;
+  error: Error | null;
+  handleInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  handleSubmit: (e?: FormEvent) => void;
+  setInput: (input: string) => void;
+  setMessages: (messages: UIMessage[]) => void;
+  append: (message: UIMessage) => void;
+  reload: () => void;
+  stop: () => void;
+}
+```
+
+### State Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `messages` | `UIMessage[]` | Array of chat messages |
+| `input` | `string` | Current input value |
+| `isLoading` | `boolean` | Whether a request is in progress |
+| `error` | `Error \| null` | Current error state |
+
+### Action Methods
+
+| Method | Parameters | Description |
+|--------|------------|-------------|
+| `handleInputChange` | `e: ChangeEvent` | Handle input field changes |
+| `handleSubmit` | `e?: FormEvent` | Submit the current message |
+| `setInput` | `input: string` | Set input value programmatically |
+| `setMessages` | `messages: UIMessage[]` | Replace all messages |
+| `append` | `message: UIMessage` | Add a new message |
+| `reload` | None | Regenerate the last AI response |
+| `stop` | None | Stop the current streaming response |
+
+## Examples
+
+### Basic Usage
+
+```tsx
+import { useAIChat } from "ai-chat-bootstrap";
+
+function ChatInterface() {
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You are a helpful AI assistant."
+  });
+
+  return (
+    <ChatContainer
+      messages={chat.messages}
+      input={chat.input}
+      onInputChange={chat.handleInputChange}
+      onSubmit={chat.handleSubmit}
+      isLoading={chat.isLoading}
+    />
+  );
+}
+```
+
+### With Initial Messages
+
+```tsx
+const initialMessages: UIMessage[] = [
+  {
+    id: "1",
+    role: "assistant",
+    parts: [{
+      type: "text",
+      text: "Hello! How can I help you today?"
+    }]
+  }
+];
+
+const chat = useAIChat({
+  api: "/api/chat",
+  systemPrompt: "You are a helpful assistant.",
+  initialMessages
+});
+```
+
+### With Event Handlers
+
+```tsx
+const chat = useAIChat({
+  api: "/api/chat",
+  onFinish: (message) => {
+    console.log("AI response completed:", message);
+    
+    // Save to database, analytics, etc.
+    saveMessageToHistory(message);
+  },
+  onError: (error) => {
+    console.error("Chat error:", error);
+    
+    // Show user-friendly error message
+    toast.error("Sorry, there was an error processing your request.");
+  }
+});
+```
+
+### Programmatic Message Control
+
+```tsx
+function ChatWithControls() {
+  const chat = useAIChat({ api: "/api/chat" });
+
+  const sendPredefinedMessage = () => {
+    chat.append({
+      id: Date.now().toString(),
+      role: "user",
+      parts: [{ type: "text", text: "What's the weather like?" }]
+    });
+    
+    // Trigger AI response
+    chat.handleSubmit();
+  };
+
+  const clearChat = () => {
+    chat.setMessages([]);
+  };
+
+  const stopGeneration = () => {
+    chat.stop();
+  };
+
+  return (
+    <div>
+      <div className="mb-4 space-x-2">
+        <button onClick={sendPredefinedMessage}>Ask about weather</button>
+        <button onClick={clearChat}>Clear chat</button>
+        <button onClick={stopGeneration}>Stop generation</button>
+      </div>
+      
+      <ChatContainer
+        messages={chat.messages}
+        input={chat.input}
+        onInputChange={chat.handleInputChange}
+        onSubmit={chat.handleSubmit}
+        isLoading={chat.isLoading}
+      />
+    </div>
+  );
+}
+```
+
+## Automatic Integration
+
+The `useAIChat` hook automatically integrates with other hooks:
+
+### Context Integration
+
+```tsx
+function ChatWithContext() {
+  const [user, setUser] = useState({ name: "Alice", role: "admin" });
+
+  // This context is automatically included in chat requests
+  useAIContext("user", user, {
+    label: "User Profile",
+    description: "Current user information",
+    priority: 100
+  });
+
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You have access to the user's profile information."
+  });
+
+  return <ChatContainer {...chat} />;
+}
+```
+
+### Focus Integration
+
+```tsx
+function ChatWithFocus() {
+  const { focusedIds, allFocusItems } = useAIFocus();
+
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You have access to the user's focused documents."
+  });
+
+  return (
+    <div>
+      <div className="mb-2">
+        {allFocusItems.length > 0 && (
+          <div className="text-sm text-muted-foreground">
+            {allFocusItems.length} items in focus
+          </div>
+        )}
+      </div>
+      <ChatContainer {...chat} />
+    </div>
+  );
+}
+```
+
+### Tools Integration
+
+```tsx
+function ChatWithTools() {
+  const [counter, setCounter] = useState(0);
+
+  // This tool is automatically available to the AI
+  useAIFrontendTool({
+    name: "increment_counter",
+    description: "Increment the counter",
+    parameters: z.object({
+      amount: z.number().default(1)
+    }),
+    execute: async ({ amount }) => {
+      setCounter(prev => prev + amount);
+      return { newValue: counter + amount };
+    }
+  });
+
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You can control the counter using the available tools."
+  });
+
+  return (
+    <div>
+      <div className="mb-4">Counter: {counter}</div>
+      <ChatContainer {...chat} />
+    </div>
+  );
+}
+```
+
+## Request Payload
+
+The hook automatically sends a structured payload to your API endpoint:
+
+```typescript
+interface ChatRequestPayload {
+  messages: UIMessage[];
+  systemPrompt?: string;
+  tools?: Record<string, ToolDefinition>;
+  context?: ContextItem[];
+  focus?: FocusItem[];
+}
+```
+
+### Example API Route
+
+```tsx
+import { openai } from "@ai-sdk/openai";
+import { streamText, convertToCoreMessages } from "ai";
+
+export async function POST(req: NextRequest) {
+  const { messages, systemPrompt, tools, context, focus } = await req.json();
+
+  // Build context-aware system prompt
+  let enhancedPrompt = systemPrompt || "You are a helpful AI assistant.";
+  
+  if (context?.length > 0) {
+    enhancedPrompt += "\n\nContext:\n";
+    context.forEach((item) => {
+      enhancedPrompt += `- ${item.label}: ${JSON.stringify(item.data)}\n`;
+    });
+  }
+  
+  if (focus?.length > 0) {
+    enhancedPrompt += "\n\nFocused items:\n";
+    focus.forEach((item) => {
+      enhancedPrompt += `- ${item.label}: ${JSON.stringify(item.data)}\n`;
+    });
+  }
+
+  const result = streamText({
+    model: openai("gpt-4"),
+    system: enhancedPrompt,
+    messages: convertToCoreMessages(messages),
+    tools,
+    toolChoice: "auto",
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+```
+
+## Advanced Usage
+
+### Custom Message Processing
+
+```tsx
+function ChatWithCustomProcessing() {
+  const chat = useAIChat({
+    api: "/api/chat",
+    onFinish: (message) => {
+      // Process completed message
+      const textParts = message.parts
+        .filter(part => part.type === 'text')
+        .map(part => part.text);
+      
+      // Extract and save any code blocks
+      const codeBlocks = textParts
+        .join(' ')
+        .match(/```[\s\S]*?```/g) || [];
+      
+      if (codeBlocks.length > 0) {
+        saveCodeBlocks(codeBlocks);
+      }
+    }
+  });
+
+  return <ChatContainer {...chat} />;
+}
+```
+
+### Error Recovery
+
+```tsx
+function ChatWithErrorRecovery() {
+  const [retryCount, setRetryCount] = useState(0);
+  
+  const chat = useAIChat({
+    api: "/api/chat",
+    onError: (error) => {
+      console.error("Chat error:", error);
+      
+      // Automatic retry for network errors
+      if (error.name === 'NetworkError' && retryCount < 3) {
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          chat.reload();
+        }, 1000 * (retryCount + 1)); // Exponential backoff
+      } else {
+        // Show error to user
+        toast.error(`Failed to get response: ${error.message}`);
+      }
+    }
+  });
+
+  return <ChatContainer {...chat} />;
+}
+```
+
+### Message Validation
+
+```tsx
+function ChatWithValidation() {
+  const chat = useAIChat({
+    api: "/api/chat",
+    onFinish: (message) => {
+      // Validate message content
+      const textContent = message.parts
+        .filter(part => part.type === 'text')
+        .map(part => part.text)
+        .join(' ');
+      
+      // Check for inappropriate content
+      if (containsInappropriateContent(textContent)) {
+        console.warn("Inappropriate content detected");
+        
+        // Replace with filtered version
+        const filteredMessage = {
+          ...message,
+          parts: message.parts.map(part => 
+            part.type === 'text' 
+              ? { ...part, text: filterContent(part.text) }
+              : part
+          )
+        };
+        
+        chat.setMessages(prev => 
+          prev.map(msg => 
+            msg.id === message.id ? filteredMessage : msg
+          )
+        );
+      }
+    }
+  });
+
+  return <ChatContainer {...chat} />;
+}
+```
+
+## Message Format
+
+The hook works with the Vercel AI SDK `UIMessage` format:
+
+```typescript
+interface UIMessage {
+  id: string;
+  role: 'system' | 'user' | 'assistant';
+  metadata?: unknown;
+  parts: Array<UIMessagePart>;
+}
+
+type UIMessagePart = 
+  | { type: 'text'; text: string; state?: 'streaming' | 'done' }
+  | { type: 'reasoning'; text: string; state?: 'streaming' | 'done' }
+  | { type: 'file'; mediaType: string; filename?: string; url: string }
+  | { type: 'source-url'; sourceId: string; url: string; title?: string }
+  // ... other part types
+```
+
+## Performance Considerations
+
+### Message History Management
+
+```tsx
+function ChatWithHistoryLimit() {
+  const MAX_MESSAGES = 50;
+  
+  const chat = useAIChat({
+    api: "/api/chat",
+    onFinish: (message) => {
+      // Trim message history to prevent memory issues
+      if (chat.messages.length > MAX_MESSAGES) {
+        const trimmedMessages = chat.messages.slice(-MAX_MESSAGES);
+        chat.setMessages(trimmedMessages);
+      }
+    }
+  });
+
+  return <ChatContainer {...chat} />;
+}
+```
+
+### Debounced Input
+
+```tsx
+import { useMemo } from 'react';
+import { debounce } from 'lodash';
+
+function ChatWithDebouncedInput() {
+  const chat = useAIChat({ api: "/api/chat" });
+  
+  const debouncedSubmit = useMemo(
+    () => debounce(chat.handleSubmit, 500),
+    [chat.handleSubmit]
+  );
+
+  const handleInputChange = (e) => {
+    chat.handleInputChange(e);
+    
+    // Auto-submit after 500ms of no typing
+    if (e.target.value.trim()) {
+      debouncedSubmit();
+    }
+  };
+
+  return (
+    <ChatContainer
+      {...chat}
+      onInputChange={handleInputChange}
+      onSubmit={debouncedSubmit}
+    />
+  );
+}
+```
+
+## Error Types
+
+```typescript
+// Common error types you might encounter
+interface ChatError extends Error {
+  name: 'ChatError';
+  cause?: unknown;
+}
+
+interface NetworkError extends Error {
+  name: 'NetworkError';
+  status?: number;
+  statusText?: string;
+}
+
+interface ValidationError extends Error {
+  name: 'ValidationError';
+  field?: string;
+  value?: unknown;
+}
+```
+
+## Best Practices
+
+1. **Handle Errors Gracefully**: Always implement `onError` for production apps
+2. **Validate Input**: Check message content before sending
+3. **Manage Memory**: Limit message history in long conversations
+4. **Monitor Performance**: Watch for expensive re-renders
+5. **User Feedback**: Show loading states and error messages clearly
+6. **Accessibility**: Ensure keyboard navigation and screen reader support
+
+## See Also
+
+- [Basic Chat guide](/chat/basic-chat) - Complete tutorial with live examples
+- [useAIContext](/api/hooks/use-ai-context) - For sharing context
+- [useAIFocus](/api/hooks/use-ai-focus) - For focus items
+- [useAIFrontendTool](/api/hooks/use-ai-frontend-tool) - For frontend tools
+- [ChatContainer](/api/components/chat-container) - UI component for chat interfaces

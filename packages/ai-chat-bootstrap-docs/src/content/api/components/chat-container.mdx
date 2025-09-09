@@ -1,0 +1,23 @@
+---
+title: ChatContainer
+description: Main chat interface component with message display and input.
+---
+
+# ChatContainer
+
+Main chat interface component with message display and input.
+
+```tsx
+interface ChatContainerProps {
+  title?: string;
+  subtitle?: string;
+  messages: UIMessage[];
+  input: string;
+  onInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onSubmit: (e?: FormEvent) => void;
+  isLoading?: boolean;
+  error?: Error | null;
+  placeholder?: string;
+  className?: string;
+}
+```

@@ -1,0 +1,19 @@
+---
+title: ChatInput
+description: Standalone input component for chat interfaces.
+---
+
+# ChatInput
+
+Standalone input component for chat interfaces.
+
+```tsx
+interface ChatInputProps {
+  input: string;
+  onInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onSubmit: (e?: FormEvent) => void;
+  isLoading?: boolean;
+  placeholder?: string;
+  className?: string;
+}
+```

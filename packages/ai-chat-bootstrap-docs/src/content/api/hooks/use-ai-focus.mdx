@@ -1,0 +1,351 @@
+---
+title: useAIFocus
+description: Enable users to explicitly mark which items should be prioritized in AI conversations.
+---
+
+# useAIFocus
+
+The `useAIFocus` hook allows users to **explicitly mark which items** (documents, notes, files, etc.) should be prioritized and included as context in AI conversations. Unlike ambient context that's always present, focus items are user-controlled and explicit.
+
+## Syntax
+
+```typescript
+function useAIFocus(): {
+  // Actions
+  setFocus: (id: string, item: FocusItem) => void;
+  clearFocus: (id: string) => void;
+  clearAllFocus: () => void;
+  getFocus: (id: string) => FocusItem | undefined;
+  
+  // Reactive State
+  focusedIds: string[];
+  allFocusItems: FocusItem[];
+  hasFocusedItems: boolean;
+  focusItemsRecord: Record<string, FocusItem>;
+}
+```
+
+## Return Value
+
+### Actions
+
+| Method | Parameters | Description |
+|--------|------------|-------------|
+| `setFocus(id, item)` | `id: string`, `item: FocusItem` | Add an item to focus |
+| `clearFocus(id)` | `id: string` | Remove a specific item from focus by ID |
+| `clearAllFocus()` | None | Remove all items from focus |
+| `getFocus(id)` | `id: string` | Retrieve a specific focused item by ID |
+
+### Reactive State
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `focusedIds` | `string[]` | Array of focused item IDs - re-renders when focus changes |
+| `allFocusItems` | `FocusItem[]` | Array of all focused items - re-renders when focus changes |
+| `hasFocusedItems` | `boolean` | Whether any items are currently focused |
+| `focusItemsRecord` | `Record<string, FocusItem>` | Object mapping IDs to focus items |
+
+## FocusItem Interface
+
+```typescript
+interface FocusItem {
+  id: string;                        // Unique identifier
+  label?: string;                    // Display label for UI (chips, badges)
+  description?: string;              // Semantic description to help the AI understand context
+  data?: Record<string, unknown>;    // Structured payload sent to the AI model
+}
+```
+
+## Examples
+
+### Basic Usage
+
+```tsx
+import React from "react";
+import { ChatContainer, useAIChat, useAIFocus } from "ai-chat-bootstrap";
+
+function DocumentSelector({ documents }: { documents: Document[] }) {
+  const { setFocus, clearFocus, focusedIds } = useAIFocus();
+  
+  const handleDocumentToggle = (doc: Document) => {
+    if (focusedIds.includes(doc.id)) {
+      clearFocus(doc.id);
+    } else {
+      setFocus(doc.id, {
+        id: doc.id,
+        label: doc.title,
+        description: `Document: ${doc.title}`,
+        data: {
+          type: 'document',
+          title: doc.title,
+          content: doc.content,
+          lastModified: doc.lastModified
+        }
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      {documents.map((doc) => (
+        <button
+          key={doc.id}
+          onClick={() => handleDocumentToggle(doc)}
+          className={`p-3 rounded-lg border ${
+            focusedIds.includes(doc.id)
+              ? 'border-blue-500 bg-blue-50'
+              : 'border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          {doc.title}
+        </button>
+      ))}
+    </div>
+  );
+}
+```
+
+### Complete Implementation
+
+```tsx
+export function ChatWithFocus() {
+  const { allFocusItems } = useAIFocus();
+  
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You are a helpful assistant with access to the user's focused documents."
+  });
+
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <DocumentSelector documents={myDocuments} />
+      <ChatContainer
+        title="AI Assistant"
+        subtitle={`${allFocusItems.length} items in focus`}
+        messages={chat.messages}
+        input={chat.input}
+        onInputChange={chat.handleInputChange}
+        onSubmit={chat.handleSubmit}
+        isLoading={chat.isLoading}
+      />
+    </div>
+  );
+}
+```
+
+### Focus Management Actions
+
+```tsx
+function FocusControls() {
+  const { focusedIds, clearAllFocus, clearFocus, allFocusItems } = useAIFocus();
+
+  return (
+    <div className="space-y-2">
+      <div className="flex justify-between items-center">
+        <span>{focusedIds.length} items focused</span>
+        <button onClick={clearAllFocus}>Clear All</button>
+      </div>
+      
+      {allFocusItems.map((item) => (
+        <div key={item.id} className="flex justify-between items-center">
+          <span>{item.label || item.id}</span>
+          <button onClick={() => clearFocus(item.id)}>Remove</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Different Item Types
+
+```tsx
+function MultiTypeSelector() {
+  const { setFocus, clearFocus, focusedIds } = useAIFocus();
+  
+  const focusDocument = (doc) => {
+    setFocus(doc.id, {
+      id: doc.id,
+      label: doc.title,
+      description: `Document: ${doc.title}`,
+      data: {
+        type: 'document',
+        title: doc.title,
+        content: doc.content,
+        wordCount: doc.content.split(' ').length
+      }
+    });
+  };
+
+  const focusImage = (img) => {
+    setFocus(img.id, {
+      id: img.id,
+      label: img.filename,
+      description: `Image: ${img.filename}`,
+      data: {
+        type: 'image',
+        filename: img.filename,
+        url: img.url,
+        alt: img.alt,
+        dimensions: img.dimensions
+      }
+    });
+  };
+
+  const focusNote = (note) => {
+    setFocus(note.id, {
+      id: note.id,
+      label: note.title,
+      description: `Note: ${note.title}`,
+      data: {
+        type: 'note',
+        title: note.title,
+        content: note.content,
+        tags: note.tags,
+        createdAt: note.createdAt
+      }
+    });
+  };
+
+  return <div>...</div>;
+}
+```
+
+## Backend Integration
+
+Focus items are **automatically included** in chat requests when using `useAIChat`:
+
+```tsx
+import { streamText } from 'ai';
+import { openai } from '@ai-sdk/openai';
+
+export async function POST(request: Request) {
+  const { messages, focusItems } = await request.json();
+
+  // Focus items are automatically included by useAIChat
+  const contextualSystemPrompt = `You are a helpful AI assistant.
+  
+${focusItems?.length > 0 ? 
+  `The user has focused on these items:
+${focusItems.map((item: any) => 
+  `- ${item.label}: ${item.description || ''}
+    Data: ${JSON.stringify(item.data, null, 2)}`
+).join('\n')}
+
+Consider this context when providing responses.` : 
+  'The user has no specific items in focus.'
+}`;
+
+  const result = await streamText({
+    model: openai('gpt-4-turbo'),
+    system: contextualSystemPrompt,
+    messages,
+  });
+
+  return result.toDataStreamResponse();
+}
+```
+
+## How Focus Works
+
+1. **User Selection**: Users actively choose which items to focus on through your UI
+2. **Visual Feedback**: Focused items are typically shown as chips, badges, or highlighted elements
+3. **AI Context**: Focused items are automatically included in chat requests to provide relevant context
+4. **Dynamic Management**: Users can add/remove items from focus at any time
+
+## Best Practices
+
+### 1. Meaningful Labels and Descriptions
+
+```tsx
+setFocus(doc.id, {
+  id: doc.id,
+  label: doc.title,                    // User-friendly display name
+  description: `Document: ${doc.title}`, // Context for the AI
+  data: { ... }                        // Full structured data
+});
+```
+
+### 2. Include Relevant Data
+
+```tsx
+// Good: Include the data the AI needs
+setFocus(note.id, {
+  id: note.id,
+  label: note.title,
+  data: {
+    type: 'note',
+    title: note.title,
+    content: note.content,
+    tags: note.tags,
+    createdAt: note.createdAt
+  }
+});
+
+// Less helpful: Minimal data
+setFocus(note.id, {
+  id: note.id,
+  label: note.title
+});
+```
+
+### 3. Visual Feedback
+
+Always provide clear visual indicators for focused items:
+- Chips/badges showing focused items with remove buttons
+- Different styling for focused vs unfocused items in lists
+- Counter showing number of focused items
+
+### 4. Avoiding Re-render Loops
+
+Follow the Zustand patterns:
+
+```tsx
+// ✅ Correct - stable dependencies
+const setFocus = useAIFocus(state => state.setFocus);
+
+useEffect(() => {
+  if (shouldFocusDocument) {
+    setFocus(docId, focusItem);
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps  
+}, [docId, shouldFocusDocument]); // Only data dependencies
+```
+
+## Common Use Cases
+
+- **Document Editor**: Users select which documents are relevant to their current editing task
+- **Note-Taking App**: Users focus on specific notes when asking questions or generating content
+- **File Explorer**: Users mark files they're currently working with for AI assistance
+- **Research Tool**: Users focus on specific sources or references for contextual analysis
+
+## TypeScript Types
+
+```typescript
+interface FocusItem {
+  id: string;
+  label?: string;
+  description?: string;
+  data?: Record<string, unknown>;
+}
+
+interface UseAIFocusReturn {
+  // Actions
+  setFocus: (id: string, item: FocusItem) => void;
+  clearFocus: (id: string) => void;
+  clearAllFocus: () => void;
+  getFocus: (id: string) => FocusItem | undefined;
+  
+  // Reactive State
+  focusedIds: string[];
+  allFocusItems: FocusItem[];
+  hasFocusedItems: boolean;
+  focusItemsRecord: Record<string, FocusItem>;
+}
+```
+
+## See Also
+
+- [Focus Items guide](/chat/focus-items) - Complete tutorial with live examples
+- [useAIContext](/api/hooks/use-ai-context) - For automatic context sharing
+- [useAIChat](/api/hooks/use-ai-chat) - Main chat hook

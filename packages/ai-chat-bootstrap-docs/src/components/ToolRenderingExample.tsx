@@ -307,14 +307,17 @@ export function ToolRenderingExample() {
   return (
     <div className="h-[500px] w-full">
       <ChatContainer
-        title="AI with Custom Tool Rendering"
-        subtitle="Tools that render React components"
-        messages={messages}
-        input={input}
-        onInputChange={setInput}
-        onSubmit={handleSubmit}
-        isLoading={isLoading}
-        placeholder="Try: 'create a bar chart' or 'show progress'"
+        header={{
+          title: "AI with Custom Tool Rendering",
+          subtitle: "Tools that render React components",
+        }}
+        ui={{ placeholder: "Try: 'create a bar chart' or 'show progress'" }}
+        state={{ messages, isLoading }}
+        inputProps={{
+          value: input,
+          onChange: setInput,
+          onSubmit: handleSubmit,
+        }}
       />
     </div>
   );
@@ -397,13 +400,9 @@ export function ToolRenderingDemo() {
 
   return (
     <ChatContainer
-      title="AI with Custom Rendering"
-      messages={chat.messages}
-      input={chat.input}
-      onInputChange={chat.handleInputChange}
-      onSubmit={chat.handleSubmit}
-      isLoading={chat.isLoading}
-      placeholder="Ask me to create a chart!"
+  header={{ title: "AI with Custom Rendering" }}
+  ui={{ placeholder: "Ask me to create a chart!" }}
+  chat={chat}
     />
   );
 }`;

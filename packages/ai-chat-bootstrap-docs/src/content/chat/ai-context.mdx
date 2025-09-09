@@ -5,10 +5,11 @@ description: Share React component state with the AI using useAIContext, enablin
 
 import { AIContextExample, AI_CONTEXT_SOURCE, AI_CONTEXT_API_SOURCE } from "../../components/AIContextExample";
 import { LiveCodeExample } from "../../components/LiveCodeExample";
+import { Api as API } from "../../components/ApiLink";
 
 # Sharing React Context with AI
 
-The `useAIContext` hook allows React components to share their state with the AI without causing re-renders. This enables the AI to provide personalized responses based on user data, app settings, and component state.
+The <API name="useAIContext">useAIContext</API> hook allows React components to share their state with the AI without causing re-renders. This enables the AI to provide personalized responses based on user data, app settings, and component state.
 
 <LiveCodeExample code={AI_CONTEXT_SOURCE}>
   <AIContextExample />
@@ -26,7 +27,7 @@ Context sharing creates a bridge between your React state and the AI model:
 
 ## Basic Usage
 
-The `useAIContext` hook takes three parameters:
+The <API name="useAIContext">useAIContext</API> hook takes three parameters:
 
 ```tsx
 import { useAIContext } from "ai-chat-bootstrap";
@@ -53,22 +54,6 @@ function UserProfile() {
   return <div>...</div>;
 }
 ```
-
-## Context Item Properties
-
-Each context item has the following properties:
-
-### Required Properties
-
-- **`id`** (string): Unique identifier for the context item
-- **`data`** (Record\<string, unknown>): The actual data to share with the AI
-
-### Optional Properties  
-
-- **`label`** (string): Human-readable name for the context
-- **`description`** (string): Explains what this context represents to the AI
-- **`scope`** ("session" | "conversation" | "message"): Lifecycle scope
-- **`priority`** (number): Higher numbers are sent first (default: 0)
 
 ## Context Scopes
 
@@ -431,6 +416,10 @@ function ConditionalContext() {
 }
 ```
 
+## API Reference
+
+- Hook: [useAIContext](/api/hooks/use-ai-context)
+
 ## Best Practices
 
 ### Preventing Re-render Loops
@@ -604,14 +593,6 @@ useAIContext("cart", {
 6. **Backend Delivery**: Context is included in the request payload to your API route
 7. **AI Integration**: Your backend can access structured context for the AI model
 
-## Benefits
+## Next
 
-- **No Re-renders**: Context updates don't cause chat UI re-renders
-- **Automatic Management**: Context lifecycle is handled automatically  
-- **Type Safety**: Full TypeScript support for context data
-- **Flexible Scoping**: Control context lifetime with session/conversation/message scopes
-- **Priority Control**: Ensure important context reaches the AI first
-- **Performance**: Efficient Map-based storage with O(1) lookups
-- **Integration**: Works seamlessly with the Vercel AI SDK
-
-> **Try the demo above**: Change the user profile or settings and ask the AI about your information to see context sharing in action!
+Continue to [Focus Items →](/chat/focus-items)

@@ -4,6 +4,7 @@ import "nextra-theme-docs/style.css";
 import "./globals.css";
 import { Head } from "nextra/components";
 import { getPageMap } from "nextra/page-map";
+import { Space_Grotesk } from "next/font/google";
 
 export const metadata = {
   // Define your metadata here
@@ -15,9 +16,19 @@ const imageStyle = {
   width: 'auto',
 }
 
+const displayFont = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["500", "600"],
+});
+
 const navbar = (
   <Navbar
-    logo={<img src="/acb.png" alt="AI Chat Bootstrap" style={imageStyle} />}
+    logo={
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <img src="/acb.png" alt="AI Chat Bootstrap" style={imageStyle} />
+  <span className={displayFont.className} style={{ fontWeight: 600, fontSize: 16 }}>ai chat bootstrap</span>
+      </div>
+    }
     projectLink="https://github.com/knifeyspoony/ai-chat-bootstrap"
     // ... Your additional navbar options
   />

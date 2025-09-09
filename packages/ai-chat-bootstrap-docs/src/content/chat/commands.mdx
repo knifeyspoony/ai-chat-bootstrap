@@ -1,0 +1,564 @@
+---
+title: Commands
+description: Create powerful chat commands for both AI and UI interactions in your chat applications.
+---
+
+import { CommandsExample, COMMANDS_CHAT_SOURCE, COMMANDS_API_SOURCE } from "../../components/CommandsExample";
+import { LiveCodeExample } from "../../components/LiveCodeExample";
+import { Api as API } from "../../components/ApiLink";
+
+# Commands
+
+Commands provide powerful shortcuts for users to interact with your chat application. There are two types of commands: **AI Commands** that are processed by the LLM, and **UI Commands** that execute directly on the client.
+
+<LiveCodeExample code={COMMANDS_CHAT_SOURCE}>
+  <CommandsExample />
+</LiveCodeExample>
+
+## Command Types
+
+### AI Commands
+AI commands send targeted messages to the LLM with specific tools and system prompts. They're perfect for content generation, analysis, and complex operations that benefit from AI reasoning.
+
+### UI Commands  
+UI commands execute directly on the client without involving the AI. They're ideal for settings changes, navigation, data management, and instant UI actions.
+
+## Command Syntax
+
+Commands use a slash prefix followed by the command name and parameters:
+
+```
+/commandname param1:value1 param2:value2
+```
+
+Examples:
+- `/clear` - Simple command with no parameters
+- `/theme mode:dark` - Command with one parameter  
+- `/summarize url:https://example.com style:brief` - Command with multiple parameters
+
+## AI Commands
+
+AI commands are registered with <API name="useAIChatCommand">useAIChatCommand</API> and require a corresponding frontend tool:
+
+```tsx
+import { useAIChatCommand, useAIFrontendTool } from "ai-chat-bootstrap";
+import { z } from "zod";
+
+function MyAICommands() {
+  // Register the frontend tool
+  useAIFrontendTool({
+    name: "url_summarizer",
+    description: "Summarize content from a URL",
+    parameters: z.object({
+      url: z.string().url(),
+      style: z.enum(["brief", "detailed", "bullet-points"]),
+    }),
+    execute: async (params) => {
+      const response = await fetch("/api/summarize", {
+        method: "POST",
+        body: JSON.stringify(params),
+      });
+      return response.json();
+    },
+  });
+
+  // Register the AI command
+  useAIChatCommand({
+    name: "summarize",
+    description: "Summarize a URL using AI",
+    toolName: "url_summarizer",
+    parameters: z.object({
+      url: z.string().url().describe("URL to summarize"),
+      style: z.enum(["brief", "detailed", "bullet-points"])
+        .default("brief")
+        .describe("Summary style"),
+    }),
+    systemPrompt: "You are a concise summarizer. Extract key points and provide clear, factual summaries."
+  });
+
+  return null;
+}
+```
+
+### AI Command Flow
+
+1. User types `/summarize url:https://example.com style:brief`
+2. System parses and validates parameters
+3. AI receives the command with the custom system prompt
+4. AI calls the `url_summarizer` tool with the parameters
+5. Tool executes and returns results
+6. AI processes the results and generates a response
+
+## UI Commands
+
+UI commands are registered with <API name="useUIChatCommand">useUIChatCommand</API> and execute immediately:
+
+```tsx
+import { useUIChatCommand } from "ai-chat-bootstrap";
+import { z } from "zod";
+
+function MyUICommands() {
+  const [theme, setTheme] = useState("light");
+
+  useUIChatCommand({
+    name: "theme",
+    description: "Change the application theme",
+    parameters: z.object({
+      mode: z.enum(["light", "dark", "auto"]).describe("Theme mode"),
+    }),
+    execute: async ({ mode }) => {
+      setTheme(mode);
+      document.documentElement.setAttribute("data-theme", mode);
+      localStorage.setItem("theme", mode);
+    }
+  });
+
+  useUIChatCommand({
+    name: "clear",
+    description: "Clear the chat history",
+    parameters: z.object({}),
+    execute: async () => {
+      clearMessages();
+      console.log("Chat cleared");
+    }
+  });
+
+  return null;
+}
+```
+
+### UI Command Flow
+
+1. User types `/theme mode:dark`
+2. System parses and validates parameters
+3. Execute function runs immediately
+4. UI updates happen synchronously
+5. No AI involvement
+
+## Complete Example
+
+Here's a comprehensive example showing both command types:
+
+```tsx
+"use client";
+import React, { useState } from "react";
+import { 
+  ChatContainer, 
+  useAIChat, 
+  useAIChatCommand,
+  useUIChatCommand,
+  useAIFrontendTool 
+} from "ai-chat-bootstrap";
+import { z } from "zod";
+
+export function ChatWithCommands() {
+  const [messages, setMessages] = useState([]);
+  const [theme, setTheme] = useState("light");
+  const [debugMode, setDebugMode] = useState(false);
+
+  // Frontend tool for AI commands
+  useAIFrontendTool({
+    name: "content_analyzer",
+    description: "Analyze text content",
+    parameters: z.object({
+      text: z.string(),
+      type: z.enum(["sentiment", "keywords", "summary"]),
+    }),
+    execute: async (params) => {
+      // Simulate analysis
+      const results = {
+        sentiment: { score: 0.8, label: "positive" },
+        keywords: ["example", "content", "analysis"],
+        summary: "This is a summary of the content.",
+      };
+      
+      return {
+        success: true,
+        analysis: results[params.type],
+        type: params.type,
+      };
+    },
+  });
+
+  // AI Command - processed by LLM
+  useAIChatCommand({
+    name: "analyze",
+    description: "Analyze text content using AI",
+    toolName: "content_analyzer",
+    parameters: z.object({
+      text: z.string().describe("Text to analyze"),
+      type: z.enum(["sentiment", "keywords", "summary"])
+        .default("summary")
+        .describe("Type of analysis"),
+    }),
+    systemPrompt: `You are an expert content analyst. When analyzing content:
+    - For sentiment: Explain the emotional tone and provide insights
+    - For keywords: Identify key themes and important terms
+    - For summary: Create a concise, informative summary
+    Always be thorough and provide actionable insights.`
+  });
+
+  // UI Commands - execute directly
+  useUIChatCommand({
+    name: "theme",
+    description: "Change the application theme",
+    parameters: z.object({
+      mode: z.enum(["light", "dark", "auto"]).describe("Theme mode"),
+    }),
+    execute: async ({ mode }) => {
+      setTheme(mode);
+      document.documentElement.setAttribute("data-theme", mode);
+      localStorage.setItem("theme", mode);
+    }
+  });
+
+  useUIChatCommand({
+    name: "clear",
+    description: "Clear the chat history",
+    parameters: z.object({}),
+    execute: async () => {
+      setMessages([]);
+    }
+  });
+
+  useUIChatCommand({
+    name: "debug",
+    description: "Toggle debug mode",
+    parameters: z.object({
+      enabled: z.boolean().optional().describe("Enable or disable debug"),
+    }),
+    execute: async ({ enabled }) => {
+      const newState = enabled !== undefined ? enabled : !debugMode;
+      setDebugMode(newState);
+      console.log(`Debug mode: ${newState ? "ON" : "OFF"}`);
+    }
+  });
+
+  useUIChatCommand({
+    name: "export",
+    description: "Export chat history",
+    parameters: z.object({
+      format: z.enum(["json", "txt", "markdown"])
+        .default("json")
+        .describe("Export format"),
+    }),
+    execute: async ({ format }) => {
+      const data = messages.map(m => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp,
+      }));
+      
+      let content;
+      let filename;
+      
+      switch (format) {
+        case "json":
+          content = JSON.stringify(data, null, 2);
+          filename = "chat-export.json";
+          break;
+        case "txt":
+          content = data.map(m => `${m.role}: ${m.content}`).join("\\n\\n");
+          filename = "chat-export.txt";
+          break;
+        case "markdown":
+          content = data.map(m => `**${m.role}**: ${m.content}`).join("\\n\\n");
+          filename = "chat-export.md";
+          break;
+      }
+      
+      // Create download
+      const blob = new Blob([content], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  });
+
+  const chat = useAIChat({
+    api: "/api/chat",
+    messages,
+    onMessagesChange: setMessages,
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="h-[500px] w-full">
+        <ChatContainer
+          title="Chat with Commands"
+          subtitle="Try AI: /analyze or UI: /theme, /clear, /debug"
+          messages={chat.messages}
+          input={chat.input}
+          onInputChange={chat.handleInputChange}
+          onSubmit={chat.handleSubmit}
+          isLoading={chat.isLoading}
+          placeholder="Type / to see available commands"
+        />
+      </div>
+      
+      {debugMode && (
+        <div className="p-4 bg-muted rounded-lg">
+          <h3 className="font-bold mb-2">Debug Info</h3>
+          <pre className="text-xs overflow-auto">
+            {JSON.stringify({
+              messageCount: messages.length,
+              theme,
+              debugMode,
+              timestamp: new Date().toISOString(),
+            }, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## Command Parameters
+
+Commands use Zod schemas for parameter validation:
+
+### Simple Parameters
+
+```tsx
+parameters: z.object({
+  message: z.string().describe("Message to display"),
+  count: z.number().default(1).describe("Number of times to repeat"),
+})
+```
+
+### Complex Parameters
+
+```tsx
+parameters: z.object({
+  source: z.object({
+    type: z.enum(["url", "file", "text"]),
+    value: z.string(),
+  }).describe("Source to process"),
+  
+  options: z.object({
+    format: z.enum(["json", "markdown", "html"]).default("markdown"),
+    includeMetadata: z.boolean().default(false),
+    maxLength: z.number().optional(),
+  }).describe("Processing options"),
+  
+  filters: z.array(z.string()).optional().describe("Content filters"),
+})
+```
+
+### Parameter Validation
+
+```tsx
+parameters: z.object({
+  email: z.string().email().describe("Valid email address"),
+  age: z.number().min(0).max(120).describe("Age in years"),
+  tags: z.array(z.string()).min(1).describe("At least one tag required"),
+  url: z.string().url().describe("Valid URL"),
+})
+```
+
+## Command Discovery
+
+Users can discover available commands by:
+
+1. **Typing `/`** - Shows all available commands
+2. **Auto-completion** - Suggests commands as user types
+3. **Help command** - Can implement `/help` to list commands
+4. **Parameter hints** - Shows parameter requirements for each command
+
+## Best Practices
+
+### Command Design
+
+1. **Clear Names**: Use descriptive, memorable command names
+2. **Consistent Patterns**: Follow consistent naming conventions
+3. **Parameter Descriptions**: Provide clear descriptions for all parameters
+4. **Defaults**: Use sensible defaults for optional parameters
+5. **Validation**: Use strict Zod schemas to validate input
+
+### AI Commands
+
+1. **System Prompts**: Craft specific prompts for each command's purpose
+2. **Tool Alignment**: Ensure tool names match registered frontend tools
+3. **Error Handling**: Tools should handle errors gracefully
+4. **Context**: Provide relevant context in tool responses
+
+### UI Commands
+
+1. **Instant Feedback**: Provide immediate visual feedback
+2. **State Sync**: Keep UI state consistent with command effects
+3. **Undo Support**: Consider implementing undo for destructive operations
+4. **Performance**: Avoid heavy computations in synchronous operations
+
+### Error Handling
+
+```tsx
+// For UI commands
+execute: async (params) => {
+  try {
+    await performOperation(params);
+    toast.success("Operation completed");
+  } catch (error) {
+    console.error("Command failed:", error);
+    toast.error("Operation failed: " + error.message);
+  }
+}
+
+// For AI commands (in the tool)
+execute: async (params) => {
+  try {
+    const result = await processData(params);
+    return { success: true, result };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error.message,
+      details: "Please check your input and try again"
+    };
+  }
+}
+```
+
+## Backend Integration
+
+For AI commands, the backend receives the tools automatically:
+
+```tsx
+// app/api/chat/route.ts
+import { openai } from "@ai-sdk/openai";
+import { streamText, convertToCoreMessages } from "ai";
+
+export async function POST(req: NextRequest) {
+  const { messages, systemPrompt, tools } = await req.json();
+
+  const result = streamText({
+    model: openai("gpt-4"),
+    system: systemPrompt || "You are a helpful assistant with access to various tools and commands.",
+    messages: convertToCoreMessages(messages),
+    tools, // Frontend tools are automatically included
+    toolChoice: "auto",
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+```
+
+## Common Command Examples
+
+### Content Management
+
+```tsx
+// AI: Generate content
+useAIChatCommand({
+  name: "generate",
+  description: "Generate content using AI",
+  toolName: "content_generator",
+  parameters: z.object({
+    type: z.enum(["blog", "email", "summary"]),
+    topic: z.string().describe("Content topic"),
+    length: z.enum(["short", "medium", "long"]).default("medium"),
+  }),
+});
+
+// UI: Save content
+useUIChatCommand({
+  name: "save",
+  description: "Save current content",
+  parameters: z.object({
+    name: z.string().describe("File name"),
+  }),
+  execute: async ({ name }) => {
+    await saveContent(name, getCurrentContent());
+  }
+});
+```
+
+### Data Operations
+
+```tsx
+// AI: Analyze data
+useAIChatCommand({
+  name: "analyze",
+  description: "Analyze data with AI insights",
+  toolName: "data_analyzer",
+  parameters: z.object({
+    data: z.string().describe("Data to analyze"),
+    type: z.enum(["statistical", "trends", "predictions"]),
+  }),
+});
+
+// UI: Export data
+useUIChatCommand({
+  name: "export",
+  description: "Export data in various formats",
+  parameters: z.object({
+    format: z.enum(["csv", "json", "excel"]),
+    filter: z.string().optional(),
+  }),
+  execute: async ({ format, filter }) => {
+    const data = getData(filter);
+    downloadFile(data, format);
+  }
+});
+```
+
+### Application Control
+
+```tsx
+// UI: Settings
+useUIChatCommand({
+  name: "settings",
+  description: "Update application settings",
+  parameters: z.object({
+    theme: z.enum(["light", "dark"]).optional(),
+    language: z.string().optional(),
+    notifications: z.boolean().optional(),
+  }),
+  execute: async (params) => {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        updateSetting(key, value);
+      }
+    });
+  }
+});
+
+// UI: Navigation
+useUIChatCommand({
+  name: "goto",
+  description: "Navigate to a page",
+  parameters: z.object({
+    page: z.enum(["home", "settings", "profile", "help"]),
+    newTab: z.boolean().default(false),
+  }),
+  execute: async ({ page, newTab }) => {
+    const url = getPageUrl(page);
+    if (newTab) {
+      window.open(url, "_blank");
+    } else {
+      router.push(url);
+    }
+  }
+});
+```
+
+## API Reference
+
+- <API name="useAIChatCommand">useAIChatCommand</API> - Register AI commands
+- <API name="useUIChatCommand">useUIChatCommand</API> - Register UI commands  
+- <API name="useAIFrontendTool">useAIFrontendTool</API> - Register tools for AI commands
+- <API name="useAIChat">useAIChat</API> - Main chat hook
+
+## Next Steps
+
+Commands open up powerful possibilities for your chat application:
+
+- **Custom Workflows**: Create domain-specific commands for your use case
+- **Integration**: Connect commands to external APIs and services
+- **Automation**: Build commands that automate complex multi-step processes
+- **User Experience**: Design intuitive command interfaces for your users
+
+Commands transform your chat from simple conversation to a powerful interface for interacting with your application and AI capabilities.

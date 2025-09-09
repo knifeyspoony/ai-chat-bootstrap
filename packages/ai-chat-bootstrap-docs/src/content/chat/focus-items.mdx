@@ -5,6 +5,7 @@ description: Enable users to explicitly mark which items should be prioritized i
 
 import { FocusItemsExample, FOCUS_ITEMS_FRONTEND_SOURCE, FOCUS_ITEMS_API_SOURCE, FOCUS_ITEMS_HOOK_SOURCE } from "../../components/FocusItemsExample";
 import { LiveCodeExample } from "../../components/LiveCodeExample";
+import { Api as API } from "../../components/ApiLink";
 
 # Focus Items
 
@@ -25,7 +26,7 @@ Unlike ambient context that's always present, focus items are **user-controlled 
 
 ## Frontend Implementation
 
-The `useAIFocus` hook provides everything needed to manage focus items:
+The <API name="useAIFocus">useAIFocus</API> hook provides everything needed to manage focus items:
 
 ```tsx
 import React from "react";
@@ -131,46 +132,13 @@ Consider this context when providing responses.` :
 }
 ```
 
-## useAIFocus Hook API
+## API Reference
 
-The `useAIFocus` hook provides actions and reactive state for managing focus items:
+- Hook: [useAIFocus](/api/hooks/use-ai-focus)
 
-<LiveCodeExample code={FOCUS_ITEMS_HOOK_SOURCE}>
-  <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-    <div className="text-sm text-gray-600 dark:text-gray-400">
-      Complete API reference for the useAIFocus hook
-    </div>
-  </div>
-</LiveCodeExample>
+## Next
 
-### Actions
-
-| Method | Description |
-|--------|-------------|
-| `setFocus(id, item)` | Add an item to focus. Item should include `id`, `label`, optional `description`, and optional `data` |
-| `clearFocus(id)` | Remove a specific item from focus by ID |
-| `clearAllFocus()` | Remove all items from focus |
-| `getFocus(id)` | Retrieve a specific focused item by ID |
-
-### Reactive State
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `focusedIds` | `string[]` | Array of focused item IDs - re-renders when focus changes |
-| `allFocusItems` | `FocusItem[]` | Array of all focused items - re-renders when focus changes |
-| `hasFocusedItems` | `boolean` | Whether any items are currently focused |
-| `focusItemsRecord` | `Record<string, FocusItem>` | Object mapping IDs to focus items |
-
-## FocusItem Interface
-
-```typescript
-interface FocusItem {
-  id: string;                        // Unique identifier
-  label?: string;                    // Display label for UI (chips, badges)
-  description?: string;              // Semantic description to help the AI understand context
-  data?: Record<string, unknown>;    // Structured payload sent to the AI model
-}
-```
+You’ve completed the core chat guides. Explore the full [API Reference](/api) or jump back to [Basic Chat](/chat/basic-chat).
 
 ## Best Practices
 

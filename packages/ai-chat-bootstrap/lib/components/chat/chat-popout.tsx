@@ -1,12 +1,6 @@
 import type { UIMessage } from "ai";
 import { GripVerticalIcon, MessageCircleIcon, XIcon } from "lucide-react";
-import React, {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChatContainer,
   type ChatContainerProps,
@@ -15,173 +9,131 @@ import { Button } from "../../components/ui/button";
 import { useAIChat } from "../../hooks";
 import { cn } from "../../utils";
 
-export interface ChatPopoutProps
-  extends Omit<
-    ChatContainerProps,
-    | "className"
-    | "input"
-    | "onInputChange"
-    | "onSubmit"
-    | "messages"
-    | "isLoading"
-  > {
-  // Chat configuration props (replaces direct chat state)
-  systemPrompt?: string;
-  onToolCall?: (toolCall: unknown) => void;
-  api?: string;
-  initialMessages?: UIMessage[];
+export interface ChatPopoutProps extends ChatContainerProps {
+  // If no chat is provided via ChatContainerProps, the popout can create one
+  chatOptions?: {
+    api?: string;
+    systemPrompt?: string;
+    onToolCall?: (toolCall: unknown) => void;
+    initialMessages?: UIMessage[];
+  };
 
-  // Custom onSubmit that receives the input value (optional - can be handled internally)
+  // Convenience callback that receives the raw input text when submitting
   onSubmit?: (input: string) => void;
 
-  // Popout specific props
-  isOpen?: boolean;
-  onOpenChange?: (open: boolean) => void;
-
-  // Positioning
-  position?: "left" | "right";
-
-  // Layout mode
-  mode?: "overlay" | "inline";
-
-  // Sizing
-  defaultWidth?: number;
-  minWidth?: number;
-  maxWidth?: number;
-  height?: string | number;
-
-  // Styling
-  className?: string;
-  buttonClassName?: string;
-  popoutClassName?: string;
+  // Popout shell (layout, sizing, positioning)
+  popout?: {
+    isOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    position?: "left" | "right";
+    mode?: "overlay" | "inline";
+    // Where the overlay should be positioned relative to: viewport (fixed) or parent (absolute)
+    container?: "viewport" | "parent";
+    width?: { default?: number; min?: number; max?: number };
+    height?: string | number;
+    className?: string; // outer fixed panel
+    contentClassName?: string; // inner content wrapper
+  };
 
   // Toggle button
-  buttonLabel?: string;
-  buttonIcon?: React.ReactNode;
-  showToggleButton?: boolean;
+  button?: {
+    show?: boolean;
+    label?: string;
+    icon?: React.ReactNode;
+    className?: string;
+  };
 }
 
-export function ChatPopout({
-  // Chat configuration props
-  systemPrompt,
-  onToolCall,
-  api,
-  initialMessages,
-  onSubmit,
-  onAttach,
-  placeholder,
-  title,
-  subtitle,
-  avatar,
-  headerStatus,
-  badge,
-  headerActions,
-  headerClassName,
-  messagesClassName,
-  messageClassName,
-  inputClassName,
-  emptyState,
-  enableSuggestions,
-  suggestionsPrompt,
-  suggestionsCount,
-  enableCommands,
-  onCommandExecute,
+export function ChatPopout(props: ChatPopoutProps) {
+  const {
+    chat: providedChat,
+    chatOptions,
+    onSubmit,
+    header,
+    ui,
+    inputProps,
+    suggestions,
+    commands,
+    state,
+    popout,
+    button,
+  } = props;
 
-  // Popout props
-  isOpen: controlledIsOpen,
-  onOpenChange,
-  position = "right",
-  mode = "overlay",
-  defaultWidth = 384,
-  minWidth = 320,
-  maxWidth = 600,
-  height = "100%",
-  className,
-  buttonClassName,
-  popoutClassName,
-  buttonLabel = "Chat",
-  buttonIcon,
-  showToggleButton = true,
-}: ChatPopoutProps) {
+  // Popout shell config with defaults
+  const position = popout?.position ?? "right";
+  const mode = popout?.mode ?? "overlay";
+  const containerTarget = popout?.container ?? "viewport"; // only used in overlay mode
+  const widthConfig = popout?.width ?? {};
+  const defaultWidth = widthConfig.default ?? 384;
+  const minWidth = widthConfig.min ?? 320;
+  const maxWidth = widthConfig.max ?? 600;
+  const height = popout?.height ?? "100%";
+  const popoutClassName = popout?.className;
+  const contentClassName = popout?.contentClassName;
+
+  // Button config with defaults
+  const showToggleButton = button?.show ?? true;
+  const buttonLabel = button?.label ?? "Chat";
+  const buttonIcon = button?.icon;
+  const buttonClassName = button?.className;
+
+  // Open state
   const [internalIsOpen, setInternalIsOpen] = useState(true);
+  const isOpen = popout?.isOpen ?? internalIsOpen;
+  const setIsOpen = popout?.onOpenChange ?? setInternalIsOpen;
+
+  // Sizing/resize state
   const [width, setWidth] = useState(defaultWidth);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Internal input state - prevents parent re-renders on keystroke
+  // Manage our own input value so we can provide onSubmit(input: string)
   const [input, setInput] = useState("");
 
-  // Ref to store suggestions fetch function
-  const triggerSuggestionsRef = useRef<(() => void) | null>(null);
+  // Create or use provided chat hook
+  const chat =
+    providedChat ??
+    (chatOptions
+      ? useAIChat({
+          systemPrompt: chatOptions?.systemPrompt,
+          api: chatOptions?.api,
+          onToolCall: chatOptions?.onToolCall,
+          initialMessages: chatOptions?.initialMessages,
+          onFinish: () => {
+            // Trigger suggestions refresh when assistant finishes - with debouncing
+            if (suggestions?.enabled && triggerSuggestionsRef.current) {
+              const now = Date.now();
+              if (now - lastSuggestionCallTime.current > 100) {
+                lastSuggestionCallTime.current = now;
+                triggerSuggestionsRef.current();
+              }
+            }
+          },
+        })
+      : undefined);
 
-  // Ref to prevent double calls to suggestions
+  // Store suggestions fetch trigger
+  const triggerSuggestionsRef = useRef<(() => void) | null>(null);
   const lastSuggestionCallTime = useRef<number>(0);
 
-  // Internal chat state - prevents parent re-renders on message updates
-  const chat = useAIChat({
-    systemPrompt,
-    api,
-    onToolCall,
-    initialMessages,
-    onFinish: () => {
-      // Trigger suggestions refresh when assistant finishes - with debouncing
-      if (enableSuggestions && triggerSuggestionsRef.current) {
-        const now = Date.now();
-        // Prevent double calls within 100ms
-        if (now - lastSuggestionCallTime.current > 100) {
-          lastSuggestionCallTime.current = now;
-          triggerSuggestionsRef.current();
-        }
-      }
-    },
-  });
-
-  // rAF-coalesced, windowed view of messages to reduce render pressure during streaming
-  const [viewMessages, setViewMessages] = useState<UIMessage[]>(chat.messages);
-  const messagesRafRef = useRef<number | null>(null);
-  const STREAM_WINDOW = 60;
-  const [, startTransition] = useTransition();
-
-  useEffect(() => {
-    if (messagesRafRef.current) cancelAnimationFrame(messagesRafRef.current);
-    messagesRafRef.current = requestAnimationFrame(() => {
-      const msgs = chat.isLoading
-        ? chat.messages.slice(Math.max(0, chat.messages.length - STREAM_WINDOW))
-        : chat.messages;
-      startTransition(() => setViewMessages(msgs));
-      messagesRafRef.current = null;
-    });
-    return () => {
-      if (messagesRafRef.current) {
-        cancelAnimationFrame(messagesRafRef.current);
-        messagesRafRef.current = null;
-      }
-    };
-  }, [chat.messages, chat.isLoading]);
-
+  // Refs for resizing
   const popoutRef = useRef<HTMLDivElement>(null);
   const startXRef = useRef<number>(0);
   const startWidthRef = useRef<number>(0);
 
-  const isOpen = controlledIsOpen ?? internalIsOpen;
-  const setIsOpen = onOpenChange ?? setInternalIsOpen;
-
-  // Use the same open state for both overlay and inline modes
   const effectiveIsOpen = isOpen;
 
-  // Wrapper for onSubmit that handles message sending internally
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
-      if (!input.trim()) return;
-
-      // Send message using internal chat hook
-      chat.sendMessageWithContext(input);
-      setInput(""); // Clear input after submission
-
-      // Optionally notify parent
-      onSubmit?.(input);
+      const text = (input ?? "").toString();
+      if (!text.trim()) return;
+      chat?.sendMessageWithContext(text);
+      setInput("");
+      onSubmit?.(text);
+      // Also call any parent-provided inputProps.onSubmit
+      inputProps?.onSubmit?.(e);
     },
-    [input, chat, onSubmit]
+    [chat, input, onSubmit, inputProps]
   );
 
   // Handle resize drag
@@ -276,6 +228,10 @@ export function ChatPopout({
 
   // Early return for inline mode
   if (mode === "inline") {
+    const resolvedValue = inputProps?.value ?? input;
+    const resolvedOnChange = inputProps?.onChange ?? setInput;
+    const resolvedOnSubmit =
+      inputProps?.onSubmit ?? (chat ? handleSubmit : undefined);
     return (
       <>
         {/* Toggle Button for inline mode */}
@@ -300,7 +256,7 @@ export function ChatPopout({
             "flex h-full bg-background transition-all duration-300 ease-in-out",
             position === "left" && "border-r border-border/90",
             position === "right" && "border-l border-border/90",
-            className
+            popoutClassName
           )}
           style={{
             width: effectiveIsOpen ? `${width}px` : "0px",
@@ -338,53 +294,65 @@ export function ChatPopout({
           {/* Chat Container */}
           <div className="flex-1 min-w-0 h-full">
             <ChatContainer
-              messages={viewMessages}
-              input={input}
-              onInputChange={setInput}
-              onSubmit={handleSubmit}
-              onAttach={onAttach}
-              isLoading={chat.isLoading}
-              status={chat.status}
-              placeholder={placeholder}
-              title={title}
-              subtitle={subtitle}
-              avatar={avatar}
-              headerStatus={headerStatus}
-              badge={badge}
-              headerActions={
-                <>
-                  {headerActions}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsOpen(false)}
-                    className="h-7 w-7"
-                  >
-                    <XIcon className="h-4 w-4" />
-                  </Button>
-                </>
-              }
-              headerClassName={headerClassName}
-              messagesClassName={messagesClassName}
-              messageClassName={messageClassName}
-              inputClassName={inputClassName}
-              emptyState={emptyState}
-              enableSuggestions={enableSuggestions}
-              suggestionsPrompt={suggestionsPrompt}
-              suggestionsCount={suggestionsCount}
-              enableCommands={enableCommands}
-              onCommandExecute={onCommandExecute}
-              onAICommandExecute={(message, toolName, systemPrompt) => {
-                chat.sendAICommandMessage(message, toolName, systemPrompt);
-                setInput(""); // Clear input after sending AI command
+              chat={chat}
+              inputProps={{
+                value: resolvedValue,
+                onChange: resolvedOnChange,
+                onSubmit: resolvedOnSubmit,
+                onAttach: inputProps?.onAttach,
               }}
-              onAssistantFinish={(triggerFetch) => {
-                triggerSuggestionsRef.current = triggerFetch;
+              header={{
+                ...header,
+                actions: (
+                  <>
+                    {header?.actions}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsOpen(false)}
+                      className="h-7 w-7"
+                    >
+                      <XIcon className="h-4 w-4" />
+                    </Button>
+                  </>
+                ),
               }}
-              onSendMessage={(message) => {
-                chat.sendMessageWithContext(message);
+              ui={{
+                placeholder: ui?.placeholder,
+                emptyState: ui?.emptyState,
+                classes: ui?.classes,
+                className: cn("h-full", ui?.className, contentClassName),
               }}
-              className="h-full"
+              suggestions={{
+                enabled: suggestions?.enabled,
+                prompt: suggestions?.prompt,
+                count: suggestions?.count,
+                onAssistantFinish: (triggerFetch) => {
+                  triggerSuggestionsRef.current = triggerFetch;
+                },
+                onSendMessage: (message: string) => {
+                  if (chat) chat.sendMessageWithContext(message);
+                  else suggestions?.onSendMessage?.(message);
+                },
+              }}
+              commands={{
+                enabled: commands?.enabled,
+                onExecute: commands?.onExecute,
+                onAICommandExecute: (message, toolName, systemPrompt) => {
+                  if (chat) {
+                    chat.sendAICommandMessage(message, toolName, systemPrompt);
+                    setInput("");
+                  } else {
+                    commands?.onAICommandExecute?.(
+                      message,
+                      toolName,
+                      systemPrompt
+                    );
+                    setInput("");
+                  }
+                },
+              }}
+              state={state}
             />
           </div>
         </div>
@@ -424,23 +392,31 @@ export function ChatPopout({
       )}
 
       {/* Backdrop */}
-      {effectiveIsOpen && (
-        <div
-          className="fixed inset-0 bg-black/20 z-50 lg:hidden"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
+      {effectiveIsOpen &&
+        (containerTarget === "viewport" ? (
+          <div
+            className="fixed inset-0 bg-black/20 z-50 lg:hidden"
+            onClick={() => setIsOpen(false)}
+          />
+        ) : (
+          <div
+            className="absolute inset-0 bg-black/20 z-50 lg:hidden"
+            onClick={() => setIsOpen(false)}
+          />
+        ))}
 
       {/* Chat Popout */}
       <div
         ref={popoutRef}
         className={cn(
-          "fixed top-0 z-50 bg-background shadow-2xl transition-transform duration-300 ease-in-out",
+          // Position relative to viewport (fixed) or parent (absolute)
+          containerTarget === "viewport" ? "fixed top-0" : "absolute inset-y-0",
+          "z-50 bg-background shadow-2xl transition-transform duration-300 ease-in-out",
           position === "left" &&
             "shadow-[4px_0_24px_rgba(0,0,0,0.12)] border-r border-border/90",
           position === "right" &&
             "shadow-[-4px_0_24px_rgba(0,0,0,0.12)] border-l border-border/90",
-          className
+          popoutClassName
         )}
         style={{
           ...positionStyles[position],
@@ -475,55 +451,68 @@ export function ChatPopout({
         </div>
 
         {/* Chat Container */}
-        <div className={cn("h-full", popoutClassName)}>
+        <div className={cn("h-full", contentClassName)}>
           <ChatContainer
-            messages={viewMessages}
-            input={input}
-            onInputChange={setInput}
-            onSubmit={handleSubmit}
-            onAttach={onAttach}
-            isLoading={chat.isLoading}
-            status={chat.status}
-            placeholder={placeholder}
-            title={title}
-            subtitle={subtitle}
-            avatar={avatar}
-            headerStatus={headerStatus}
-            badge={badge}
-            headerActions={
-              <>
-                {headerActions}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsOpen(false)}
-                  className="h-7 w-7"
-                >
-                  <XIcon className="h-4 w-4" />
-                </Button>
-              </>
-            }
-            headerClassName={headerClassName}
-            messagesClassName={messagesClassName}
-            messageClassName={messageClassName}
-            inputClassName={inputClassName}
-            emptyState={emptyState}
-            enableSuggestions={enableSuggestions}
-            suggestionsPrompt={suggestionsPrompt}
-            suggestionsCount={suggestionsCount}
-            enableCommands={enableCommands}
-            onCommandExecute={onCommandExecute}
-            onAICommandExecute={(message, toolName, systemPrompt) => {
-              chat.sendAICommandMessage(message, toolName, systemPrompt);
-              setInput(""); // Clear input after sending AI command
+            chat={chat}
+            inputProps={{
+              value: inputProps?.value ?? input,
+              onChange: inputProps?.onChange ?? setInput,
+              onSubmit:
+                inputProps?.onSubmit ?? (chat ? handleSubmit : undefined),
+              onAttach: inputProps?.onAttach,
             }}
-            onAssistantFinish={(triggerFetch) => {
-              triggerSuggestionsRef.current = triggerFetch;
+            header={{
+              ...header,
+              actions: (
+                <>
+                  {header?.actions}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsOpen(false)}
+                    className="h-7 w-7"
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </Button>
+                </>
+              ),
             }}
-            onSendMessage={(message) => {
-              chat.sendMessageWithContext(message);
+            ui={{
+              placeholder: ui?.placeholder,
+              emptyState: ui?.emptyState,
+              classes: ui?.classes,
+              className: cn("h-full", ui?.className),
             }}
-            className="h-full"
+            suggestions={{
+              enabled: suggestions?.enabled,
+              prompt: suggestions?.prompt,
+              count: suggestions?.count,
+              onAssistantFinish: (triggerFetch) => {
+                triggerSuggestionsRef.current = triggerFetch;
+              },
+              onSendMessage: (message: string) => {
+                if (chat) chat.sendMessageWithContext(message);
+                else suggestions?.onSendMessage?.(message);
+              },
+            }}
+            commands={{
+              enabled: commands?.enabled,
+              onExecute: commands?.onExecute,
+              onAICommandExecute: (message, toolName, systemPrompt) => {
+                if (chat) {
+                  chat.sendAICommandMessage(message, toolName, systemPrompt);
+                  setInput("");
+                } else {
+                  commands?.onAICommandExecute?.(
+                    message,
+                    toolName,
+                    systemPrompt
+                  );
+                  setInput("");
+                }
+              },
+            }}
+            state={state}
           />
         </div>
       </div>

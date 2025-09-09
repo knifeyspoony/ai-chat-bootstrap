@@ -1,0 +1,147 @@
+---
+title: ChatPopout
+description: Popout chat UI that wraps ChatContainer with built-in state and a resizable overlay/inline panel.
+---
+
+# ChatPopout
+
+A popout chat interface that wraps ChatContainer and manages its own input/messages state via useAIChat. Supports overlay or inline panel modes, left/right positioning, and a resizable width.
+
+> Note: ChatPopout is ideal when you want a drop-in assistant UI without wiring message state manually.
+
+## Import
+
+```tsx
+import { ChatPopout } from "ai-chat-bootstrap";
+```
+
+## Props
+
+```ts
+interface ChatPopoutProps {
+  // Provide an existing chat hook to use, or let the component create one
+  chat?: ReturnType<typeof useAIChat>;
+  chatOptions?: {
+    api?: string;
+    systemPrompt?: string;
+    onToolCall?: (toolCall: unknown) => void;
+    initialMessages?: UIMessage[];
+  };
+
+  // High-level callbacks
+  onSubmit?: (input: string) => void;
+
+  // Header configuration
+  header?: {
+    title?: string;
+    subtitle?: string;
+  avatar?: React.ReactNode;
+  status?: React.ReactNode;
+  badge?: React.ReactNode;
+    actions?: React.ReactNode;
+    className?: string;
+  };
+
+  // UI configuration
+  ui?: {
+    placeholder?: string;
+    emptyState?: React.ReactNode;
+    onAttach?: () => void;
+    classes?: {
+      messages?: string;
+      message?: string;
+      input?: string;
+    };
+  };
+
+  // Suggestions
+  suggestions?: {
+    enabled?: boolean;
+    prompt?: string;
+    count?: number;
+  };
+
+  // Commands
+  commands?: {
+    enabled?: boolean;
+    onExecute?: (command: string, args?: string) => void;
+  };
+
+  // Popout shell (layout, sizing, positioning)
+  popout?: {
+    isOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    position?: "left" | "right";
+    mode?: "overlay" | "inline";
+    width?: { default?: number; min?: number; max?: number };
+    height?: string | number;
+    className?: string; // outer fixed panel
+    contentClassName?: string; // inner content wrapper
+  };
+
+  // Toggle button
+  button?: {
+    show?: boolean;
+    label?: string;
+    icon?: React.ReactNode;
+    className?: string;
+  };
+}
+```
+
+See `ChatContainerProps` in [ChatContainer](/api/components/chat-container).
+
+## Basic usage
+
+```tsx
+export function Page() {
+  return (
+    <ChatPopout
+      chatOptions={{ api: "/api/chat" }}
+      header={{ title: "AI Assistant" }}
+      ui={{ placeholder: "Ask me anything..." }}
+    />
+  );
+}
+```
+
+## Inline mode
+
+```tsx
+<ChatPopout popout={{ mode: "inline", width: { default: 420 } }} />
+```
+
+## Position and sizing
+
+```tsx
+<ChatPopout popout={{ position: "left", width: { default: 480, min: 360, max: 640 } }} />
+```
+
+## Suggestions and commands
+
+```tsx
+<ChatPopout suggestions={{ enabled: true, count: 3 }} commands={{ enabled: true }} />
+```
+
+## Pass an existing chat hook
+
+If you already use the hook elsewhere, pass it directly.
+
+```tsx
+import { useAIChat, ChatPopout } from "ai-chat-bootstrap";
+
+export function Page() {
+  const chat = useAIChat({ api: "/api/chat" });
+  return <ChatPopout chat={chat} header={{ title: "Assistant" }} />;
+}
+```
+
+## Events
+
+- onSubmit: called with the text input when a message is sent
+- onOpenChange: called when the popout is opened/closed
+
+## See also
+
+- [ChatContainer](/api/components/chat-container)
+- Hooks: [useAIChat](/api/hooks/use-ai-chat), [useAIContext](/api/hooks/use-ai-context), [useAIFocus](/api/hooks/use-ai-focus), [useAIFrontendTool](/api/hooks/use-ai-frontend-tool)

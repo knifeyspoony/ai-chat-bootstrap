@@ -1,7 +1,7 @@
 "use client";
 import { Code2Icon, CopyIcon, PlayIcon } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import * as shiki from "shiki";
+import { highlightToHtml } from "../lib/shiki";
 
 interface LiveCodeExampleProps {
   code: string;
@@ -30,16 +30,8 @@ export function LiveCodeExample({
     async function run() {
       try {
         setLoading(true);
-        const highlighter = await shiki.createHighlighter({
-          themes: ["github-dark", "github-light"],
-          langs: [language, "tsx", "typescript", "javascript"],
-        });
+        const out = await highlightToHtml(code, language);
         if (cancelled) return;
-        const out = highlighter.codeToHtml(code, {
-          lang: language,
-          themes: { dark: "github-dark", light: "github-light" },
-          defaultColor: "dark",
-        });
 
         // Extract background color from the generated HTML
         const parser = new DOMParser();

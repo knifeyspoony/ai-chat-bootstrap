@@ -10,9 +10,9 @@ import { cn } from "../../utils";
 export interface ChatHeaderProps {
   title?: string;
   subtitle?: string;
-  avatar?: string;
-  status?: "online" | "offline" | "away" | "busy";
-  badge?: string;
+  avatar?: React.ReactNode; // string URL or custom node
+  status?: React.ReactNode; // union string values or custom node
+  badge?: React.ReactNode; // string or custom node
   className?: string;
   actions?: React.ReactNode;
 }
@@ -55,33 +55,47 @@ export function ChatHeader({
       <div className="flex items-center gap-2 min-w-0 flex-1">
         {avatar && (
           <div className="relative flex-shrink-0">
-            <Avatar className="h-6 w-6">
-              <AvatarImage src={avatar} alt={title || "Chat"} />
-              <AvatarFallback>
-                {title ? title[0].toUpperCase() : "AI"}
-              </AvatarFallback>
-            </Avatar>
-            {status && (
+            {typeof avatar === "string" ? (
+              <Avatar className="h-6 w-6">
+                <AvatarImage src={avatar} alt={title || "Chat"} />
+                <AvatarFallback>
+                  {title ? title[0].toUpperCase() : "AI"}
+                </AvatarFallback>
+              </Avatar>
+            ) : (
+              <div className="h-6 w-6 flex items-center justify-center">
+                {avatar}
+              </div>
+            )}
+            {typeof status === "string" ? (
               <div
                 className={cn(
                   "absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-background",
                   getStatusColor(status)
                 )}
               />
-            )}
+            ) : null}
           </div>
         )}
 
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {title && <h3 className="font-medium text-sm truncate">{title}</h3>}
-          {badge && (
-            <Badge variant="secondary" className="text-xs flex-shrink-0">
-              {badge}
-            </Badge>
-          )}
+          {badge &&
+            (typeof badge === "string" ? (
+              <Badge variant="secondary" className="text-xs flex-shrink-0">
+                {badge}
+              </Badge>
+            ) : (
+              <div className="flex-shrink-0 text-xs">{badge}</div>
+            ))}
           {subtitle && (
             <span className="text-xs text-muted-foreground truncate">
               • {subtitle}
+            </span>
+          )}
+          {status && typeof status !== "string" && (
+            <span className="text-xs text-muted-foreground truncate">
+              {status}
             </span>
           )}
         </div>

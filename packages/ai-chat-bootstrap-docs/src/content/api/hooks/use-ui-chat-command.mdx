@@ -1,0 +1,554 @@
+---
+title: useUIChatCommand
+description: Register UI chat commands that execute directly on the client without involving the AI.
+---
+
+# useUIChatCommand
+
+The `useUIChatCommand` hook allows you to register UI chat commands that execute directly on the client. These commands bypass the LLM and execute immediately when typed, perfect for UI actions, settings changes, and local operations.
+
+## Syntax
+
+```typescript
+interface UIChatCommand {
+  name: string;
+  description: string;
+  parameters: ZodSchema;
+  execute: (params: unknown) => void | Promise<void>;
+}
+
+function useUIChatCommand(command: Omit<UIChatCommand, 'type'>): void
+```
+
+## Parameters
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `name` | `string` | Yes | Unique command identifier (used with `/` prefix) |
+| `description` | `string` | Yes | Clear description for the command |
+| `parameters` | `ZodSchema` | Yes | Zod schema defining the command's parameters |
+| `execute` | `(params: unknown) => void \| Promise<void>` | Yes | Function that executes when the command is called |
+
+## Command Registration
+
+### Basic Example
+
+```tsx
+import { useUIChatCommand } from "ai-chat-bootstrap";
+import { z } from "zod";
+
+function MyCommands() {
+  useUIChatCommand({
+    name: "clear",
+    description: "Clear the chat history",
+    parameters: z.object({}),
+    execute: async () => {
+      await clearChatHistory();
+      console.log("Chat history cleared");
+    }
+  });
+
+  return null;
+}
+```
+
+### Multiple UI Commands
+
+```tsx
+function UICommands() {
+  const [theme, setTheme] = useState("light");
+  const [fontSize, setFontSize] = useState(14);
+  
+  // Theme command
+  useUIChatCommand({
+    name: "theme",
+    description: "Change the application theme",
+    parameters: z.object({
+      mode: z.enum(["light", "dark", "auto"])
+        .describe("Theme mode to apply"),
+    }),
+    execute: async ({ mode }) => {
+      setTheme(mode);
+      document.documentElement.setAttribute("data-theme", mode);
+      localStorage.setItem("theme", mode);
+    }
+  });
+
+  // Font size command
+  useUIChatCommand({
+    name: "fontsize",
+    description: "Change the font size",
+    parameters: z.object({
+      size: z.number().min(10).max(24)
+        .describe("Font size in pixels"),
+    }),
+    execute: async ({ size }) => {
+      setFontSize(size);
+      document.documentElement.style.setProperty("--font-size", `${size}px`);
+      localStorage.setItem("fontSize", String(size));
+    }
+  });
+
+  // Export command
+  useUIChatCommand({
+    name: "export",
+    description: "Export chat history",
+    parameters: z.object({
+      format: z.enum(["json", "markdown", "txt"])
+        .default("json")
+        .describe("Export format"),
+    }),
+    execute: async ({ format }) => {
+      const data = await exportChatHistory(format);
+      downloadFile(data, `chat-export.${format}`);
+    }
+  });
+
+  return null;
+}
+```
+
+## How UI Commands Work
+
+1. **User Input**: User types `/command` with parameters
+2. **Command Parsing**: System parses and validates parameters
+3. **Direct Execution**: Execute function runs immediately
+4. **No AI Involved**: Command bypasses the LLM completely
+5. **Instant Feedback**: UI updates happen synchronously
+
+## Parameter Schemas
+
+### No Parameters
+
+```tsx
+parameters: z.object({})  // Empty object for commands without parameters
+```
+
+### Simple Parameters
+
+```tsx
+parameters: z.object({
+  message: z.string().describe("Message to display"),
+  duration: z.number().default(3000).describe("Duration in milliseconds"),
+})
+```
+
+### Complex Parameters
+
+```tsx
+parameters: z.object({
+  action: z.enum(["save", "load", "delete"]).describe("Action to perform"),
+  
+  target: z.object({
+    type: z.enum(["file", "database", "localStorage"]),
+    name: z.string(),
+    path: z.string().optional(),
+  }).describe("Target for the action"),
+  
+  options: z.object({
+    overwrite: z.boolean().default(false),
+    backup: z.boolean().default(true),
+    compress: z.boolean().default(false),
+  }).optional().describe("Action options"),
+})
+```
+
+## Execute Functions
+
+### Synchronous Execution
+
+```tsx
+execute: (params) => {
+  // Direct state update
+  setState(params.value);
+  
+  // DOM manipulation
+  document.getElementById("target").classList.add("active");
+  
+  // Local storage
+  localStorage.setItem("key", JSON.stringify(params));
+}
+```
+
+### Asynchronous Execution
+
+```tsx
+execute: async (params) => {
+  try {
+    // Show loading state
+    setLoading(true);
+    
+    // Perform async operation
+    const result = await fetchData(params.id);
+    
+    // Update state with result
+    setData(result);
+    
+    // Show success notification
+    toast.success("Operation completed");
+  } catch (error) {
+    // Handle errors
+    console.error("Command failed:", error);
+    toast.error("Operation failed: " + error.message);
+  } finally {
+    setLoading(false);
+  }
+}
+```
+
+### With Side Effects
+
+```tsx
+execute: async (params) => {
+  // Update multiple states
+  setConfig(params.config);
+  setStatus("updated");
+  
+  // Trigger side effects
+  await saveToDatabase(params);
+  eventEmitter.emit("configChanged", params);
+  
+  // Analytics
+  trackEvent("command_executed", {
+    command: "configure",
+    params: params,
+  });
+}
+```
+
+## Complete Integration Example
+
+```tsx
+"use client";
+import React, { useState } from "react";
+import { 
+  ChatContainer, 
+  useAIChat, 
+  useUIChatCommand 
+} from "ai-chat-bootstrap";
+import { z } from "zod";
+
+export function ChatWithUICommands() {
+  const [messages, setMessages] = useState([]);
+  const [theme, setTheme] = useState("light");
+  const [debugMode, setDebugMode] = useState(false);
+
+  // Clear command
+  useUIChatCommand({
+    name: "clear",
+    description: "Clear all chat messages",
+    parameters: z.object({}),
+    execute: async () => {
+      setMessages([]);
+      toast.success("Chat cleared");
+    }
+  });
+
+  // Theme command
+  useUIChatCommand({
+    name: "theme",
+    description: "Change the UI theme",
+    parameters: z.object({
+      mode: z.enum(["light", "dark", "auto"]).describe("Theme mode"),
+    }),
+    execute: async ({ mode }) => {
+      setTheme(mode);
+      document.documentElement.setAttribute("data-theme", mode);
+      localStorage.setItem("theme", mode);
+      toast.success(`Theme changed to ${mode}`);
+    }
+  });
+
+  // Debug command
+  useUIChatCommand({
+    name: "debug",
+    description: "Toggle debug mode",
+    parameters: z.object({
+      enabled: z.boolean().optional().describe("Enable or disable debug mode"),
+    }),
+    execute: async ({ enabled }) => {
+      const newState = enabled !== undefined ? enabled : !debugMode;
+      setDebugMode(newState);
+      console.log(`Debug mode: ${newState ? "ON" : "OFF"}`);
+      
+      if (newState) {
+        // Enable debug features
+        window.__DEBUG__ = true;
+        console.log("Debug information:", {
+          messages: messages.length,
+          theme,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        delete window.__DEBUG__;
+      }
+    }
+  });
+
+  // Settings command
+  useUIChatCommand({
+    name: "settings",
+    description: "Update application settings",
+    parameters: z.object({
+      autoSave: z.boolean().optional().describe("Auto-save messages"),
+      notifications: z.boolean().optional().describe("Enable notifications"),
+      sound: z.boolean().optional().describe("Enable sound effects"),
+    }),
+    execute: async (params) => {
+      const settings = {
+        autoSave: params.autoSave ?? true,
+        notifications: params.notifications ?? true,
+        sound: params.sound ?? false,
+      };
+      
+      localStorage.setItem("settings", JSON.stringify(settings));
+      
+      // Apply settings
+      if (settings.notifications) {
+        await Notification.requestPermission();
+      }
+      
+      toast.success("Settings updated");
+    }
+  });
+
+  const chat = useAIChat({
+    api: "/api/chat",
+    messages,
+    onMessagesChange: setMessages,
+  });
+
+  return (
+    <div className="h-[600px] w-full">
+      <ChatContainer
+        title="Chat with UI Commands"
+        subtitle="Try: /clear, /theme dark, /debug true"
+        messages={chat.messages}
+        input={chat.input}
+        onInputChange={chat.handleInputChange}
+        onSubmit={chat.handleSubmit}
+        isLoading={chat.isLoading}
+        placeholder="Type / to see available commands"
+      />
+      
+      {debugMode && (
+        <div className="mt-4 p-4 bg-muted rounded-lg">
+          <h3 className="font-bold">Debug Info</h3>
+          <pre className="text-xs">
+            {JSON.stringify({
+              messageCount: messages.length,
+              theme,
+              lastUpdate: new Date().toISOString(),
+            }, null, 2)}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## Advanced Examples
+
+### Navigation Command
+
+```tsx
+useUIChatCommand({
+  name: "goto",
+  description: "Navigate to a page",
+  parameters: z.object({
+    page: z.enum(["home", "settings", "profile", "help"])
+      .describe("Page to navigate to"),
+    newTab: z.boolean().default(false).describe("Open in new tab"),
+  }),
+  execute: async ({ page, newTab }) => {
+    const routes = {
+      home: "/",
+      settings: "/settings",
+      profile: "/profile",
+      help: "/help",
+    };
+    
+    if (newTab) {
+      window.open(routes[page], "_blank");
+    } else {
+      router.push(routes[page]);
+    }
+  }
+});
+```
+
+### Data Management Command
+
+```tsx
+useUIChatCommand({
+  name: "data",
+  description: "Manage local data",
+  parameters: z.object({
+    action: z.enum(["save", "load", "delete", "clear"])
+      .describe("Action to perform"),
+    key: z.string().optional().describe("Data key"),
+  }),
+  execute: async ({ action, key }) => {
+    switch (action) {
+      case "save":
+        if (key) {
+          localStorage.setItem(key, JSON.stringify(currentData));
+          toast.success(`Data saved to ${key}`);
+        }
+        break;
+        
+      case "load":
+        if (key) {
+          const data = localStorage.getItem(key);
+          if (data) {
+            setCurrentData(JSON.parse(data));
+            toast.success(`Data loaded from ${key}`);
+          } else {
+            toast.error(`No data found for ${key}`);
+          }
+        }
+        break;
+        
+      case "delete":
+        if (key) {
+          localStorage.removeItem(key);
+          toast.success(`Data deleted for ${key}`);
+        }
+        break;
+        
+      case "clear":
+        localStorage.clear();
+        toast.success("All local data cleared");
+        break;
+    }
+  }
+});
+```
+
+### Batch Operations Command
+
+```tsx
+useUIChatCommand({
+  name: "batch",
+  description: "Perform batch operations",
+  parameters: z.object({
+    operation: z.enum(["select-all", "deselect-all", "invert", "delete-selected"]),
+    filter: z.string().optional().describe("Filter items before operation"),
+  }),
+  execute: async ({ operation, filter }) => {
+    let items = getAllItems();
+    
+    if (filter) {
+      items = items.filter(item => 
+        item.name.toLowerCase().includes(filter.toLowerCase())
+      );
+    }
+    
+    switch (operation) {
+      case "select-all":
+        items.forEach(item => item.selected = true);
+        break;
+      case "deselect-all":
+        items.forEach(item => item.selected = false);
+        break;
+      case "invert":
+        items.forEach(item => item.selected = !item.selected);
+        break;
+      case "delete-selected":
+        const toDelete = items.filter(item => item.selected);
+        await deleteItems(toDelete);
+        break;
+    }
+    
+    updateItems(items);
+  }
+});
+```
+
+## Best Practices
+
+1. **Instant Feedback**: Provide immediate visual feedback for command execution
+2. **Error Handling**: Always handle potential errors gracefully
+3. **Validation**: Use Zod schemas to validate parameters before execution
+4. **State Management**: Keep UI state in sync with command effects
+5. **Documentation**: Provide clear descriptions for all parameters
+6. **Undo Support**: Consider implementing undo for destructive operations
+7. **Accessibility**: Ensure commands don't break keyboard navigation
+8. **Performance**: Avoid heavy computations in synchronous execute functions
+
+## TypeScript Interface
+
+```typescript
+interface UIChatCommand {
+  type: 'ui';
+  name: string;
+  description: string;
+  parameters: z.ZodSchema;
+  execute: (params: unknown) => void | Promise<void>;
+}
+
+type CommandRegistration = Omit<UIChatCommand, 'type'>;
+```
+
+## Common Command Patterns
+
+- **Settings Management**: Change themes, preferences, configurations
+- **Navigation**: Route to different pages or sections
+- **Data Operations**: Clear, export, import, backup data
+- **UI Control**: Toggle panels, modals, debug modes
+- **Shortcuts**: Quick actions for common operations
+- **Admin Functions**: Development and debugging tools
+
+## Difference from AI Commands
+
+| Feature | UI Commands | AI Commands |
+|---------|------------|-------------|
+| Execution | Direct client-side | Through AI/LLM |
+| Speed | Instant | Depends on AI |
+| System Prompts | Not applicable | Supported |
+| Flexibility | Exact behavior | AI interpretation |
+| Tool Usage | Not required | Required |
+| Offline Support | Yes | No |
+
+## Error Handling
+
+```tsx
+execute: async (params) => {
+  try {
+    // Validate state before execution
+    if (!isValidState()) {
+      throw new Error("Invalid state for this operation");
+    }
+    
+    // Perform operation
+    const result = await performOperation(params);
+    
+    // Verify success
+    if (!result.success) {
+      throw new Error(result.error || "Operation failed");
+    }
+    
+    // Update UI
+    updateUI(result.data);
+    toast.success("Command executed successfully");
+    
+  } catch (error) {
+    console.error("Command execution failed:", error);
+    
+    // User-friendly error message
+    const message = error.message || "An unexpected error occurred";
+    toast.error(message);
+    
+    // Optional: Report to error tracking
+    reportError(error, { command: "commandName", params });
+  }
+}
+```
+
+## See Also
+
+- [useAIChatCommand](/api/hooks/use-ai-chat-command) - Register AI commands that use the LLM
+- [Commands Guide](/chat/commands) - Complete guide to using commands
+- [useAIChat](/api/hooks/use-ai-chat) - Main chat hook
+- [useAIFrontendTool](/api/hooks/use-ai-frontend-tool) - Register tools for AI commands

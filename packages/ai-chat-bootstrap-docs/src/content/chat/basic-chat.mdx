@@ -5,6 +5,7 @@ description: The minimal setup for getting started with AI chat interfaces, incl
 
 import { BasicChatExample, BASIC_CHAT_SOURCE, BASIC_CHAT_API_SOURCE } from "../../components/BasicChatExample";
 import { LiveCodeExample } from "../../components/LiveCodeExample";
+import { Api as API } from "../../components/ApiLink";
 
 # Basic Chat
 
@@ -16,7 +17,7 @@ This example shows the **minimal setup** needed for an AI chat interface. The de
 
 ## Frontend Implementation
 
-The frontend uses the `useAIChat` hook to handle all message state, streaming, and API communication:
+The frontend uses the <API name="useAIChat" /> hook to handle all message state, streaming, and API communication:
 
 ```tsx
 import React from "react";
@@ -69,16 +70,22 @@ export async function POST(req: NextRequest) {
 
 ## How it works
 
-1. **Frontend**: The `useAIChat` hook manages message state and automatically posts to `/api/chat`
+1. **Frontend**: The <API name="useAIChat" /> hook manages message state and automatically posts to `/api/chat`
 2. **Backend**: The API route receives messages and streams responses using the Vercel AI SDK
 3. **Streaming**: Responses are streamed back to the frontend and rendered in real-time
 4. **State Management**: All message history and loading states are handled automatically
 
 ## Next steps
 
-- **Add tools**: Enable function calling by passing tools to both `useAIChat` and `streamText`
-- **Add context**: Use `useAIContext` to share app state with the AI
+- **Add tools**: Enable function calling by passing tools to both <API name="useAIChat">useAIChat</API> and `streamText`
+- **Add context**: Use <API name="useAIContext">useAIContext</API> to share app state with the AI
 - **Add suggestions**: Enable contextual suggestions with `enableSuggestions={true}`
 - **Style**: Customize appearance via Tailwind classes or component props
 
-> **Installation**: `pnpm add ai @ai-sdk/openai ai-chat-bootstrap` and add your API key to `.env.local`
+## API Reference
+
+- Hook: [useAIChat](/api/hooks/use-ai-chat)
+
+## Next
+
+Continue to [Popout Chat →](/chat/chat-popout)

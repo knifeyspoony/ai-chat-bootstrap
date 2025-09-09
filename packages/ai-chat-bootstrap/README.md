@@ -85,21 +85,23 @@ Most users should start with Zero‑config; switch to Tailwind‑native only if 
 ## Quick Start
 
 ```tsx
-import { ChatContainer, ChatInput } from "ai-chat-bootstrap";
-import { useChat } from "ai/react";
+import React from "react";
+import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
 
 export function App() {
-  const { messages, input, handleInputChange, handleSubmit } = useChat();
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You are a helpful AI assistant.",
+  });
 
   return (
-    <ChatContainer messages={messages}>
-      {/* Message list auto-renders via ChatMessages component if used */}
-      <ChatInput
-        input={input}
-        handleInputChange={handleInputChange}
-        handleSubmit={handleSubmit}
-      />
-    </ChatContainer>
+    <ChatContainer
+      messages={chat.messages}
+      input={chat.input}
+      onInputChange={chat.handleInputChange}
+      onSubmit={chat.handleSubmit}
+      isLoading={chat.isLoading}
+    />
   );
 }
 ```

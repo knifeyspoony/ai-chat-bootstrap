@@ -161,14 +161,17 @@ export function ChatWithToolsExample() {
       {/* Chat Interface */}
       <div className="h-[420px] w-full">
         <ChatContainer
-          title="AI Assistant with Tools"
-          subtitle="Can control the counter above"
-          messages={messages}
-          input={input}
-          onInputChange={setInput}
-          onSubmit={handleSubmit}
-          isLoading={isLoading}
-          placeholder="Try: 'increment by 3' or 'decrease by 2'"
+          header={{
+            title: "AI Assistant with Tools",
+            subtitle: "Can control the counter above",
+          }}
+          ui={{ placeholder: "Try: 'increment by 3' or 'decrease by 2'" }}
+          state={{ messages, isLoading }}
+          inputProps={{
+            value: input,
+            onChange: setInput,
+            onSubmit: handleSubmit,
+          }}
         />
       </div>
     </div>
@@ -237,14 +240,9 @@ export function ChatWithTools() {
       {/* Chat Interface */}
       <div className="h-[420px] w-full">
         <ChatContainer
-          title="AI Assistant with Tools"
-          subtitle="Can control the counter above"
-          messages={chat.messages}
-          input={chat.input}
-          onInputChange={chat.handleInputChange}
-          onSubmit={chat.handleSubmit}
-          isLoading={chat.isLoading}
-          placeholder="Try: 'increment by 3' or 'decrease by 2'"
+          header={{ title: "AI Assistant with Tools", subtitle: "Can control the counter above" }}
+          ui={{ placeholder: "Try: 'increment by 3' or 'decrease by 2'" }}
+          chat={chat}
         />
       </div>
     </div>

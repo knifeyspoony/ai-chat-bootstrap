@@ -40,8 +40,7 @@ const navbar = (
   <Navbar
     logo={
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <img src={`${process.env.NODE_ENV === 'production' ?
-          +  '/ai-chat-bootstrap' : ''}/acb.png`} alt="AI Chat Bootstrap" style={imageStyle} />
+        <img src={`${process.env.NODE_ENV === 'production' ? '/ai-chat-bootstrap' : ''}/acb.png`} alt="AI Chat Bootstrap" style={imageStyle} />
   <span className={displayFont.className} style={{ fontWeight: 600, fontSize: 16 }}>ai chat bootstrap</span>
       </div>
     }

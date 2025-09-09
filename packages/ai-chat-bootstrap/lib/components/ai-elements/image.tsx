@@ -8,7 +8,6 @@ export type ImageProps = Experimental_GeneratedImage & {
 
 export const Image = ({
   base64,
-  uint8Array,
   mediaType,
   ...props
 }: ImageProps) => (

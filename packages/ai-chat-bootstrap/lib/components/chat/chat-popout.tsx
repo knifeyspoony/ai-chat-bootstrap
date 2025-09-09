@@ -92,27 +92,26 @@ export function ChatPopout(props: ChatPopoutProps) {
   // Manage our own input value so we can provide onSubmit(input: string)
   const [input, setInput] = useState("");
 
-  // Create or use provided chat hook
-  const chat =
-    providedChat ??
-    (chatOptions
-      ? useAIChat({
-          systemPrompt: chatOptions?.systemPrompt,
-          api: chatOptions?.api,
-          onToolCall: chatOptions?.onToolCall,
-          initialMessages: chatOptions?.initialMessages,
-          onFinish: () => {
-            // Trigger suggestions refresh when assistant finishes - with debouncing
-            if (suggestions?.enabled && triggerSuggestionsRef.current) {
-              const now = Date.now();
-              if (now - lastSuggestionCallTime.current > 100) {
-                lastSuggestionCallTime.current = now;
-                triggerSuggestionsRef.current();
-              }
-            }
-          },
-        })
-      : undefined);
+  // Always initialize an internal chat hook (safe, side-effect free until used)
+  const generatedChat = useAIChat({
+    systemPrompt: chatOptions?.systemPrompt,
+    api: chatOptions?.api,
+    onToolCall: chatOptions?.onToolCall,
+    initialMessages: chatOptions?.initialMessages,
+    onFinish: () => {
+      // Trigger suggestions refresh when assistant finishes - with debouncing
+      if (suggestions?.enabled && triggerSuggestionsRef.current) {
+        const now = Date.now();
+        if (now - lastSuggestionCallTime.current > 100) {
+          lastSuggestionCallTime.current = now;
+          triggerSuggestionsRef.current();
+        }
+      }
+    },
+  });
+
+  // Use provided chat if available; otherwise only use generatedChat when chatOptions were passed
+  const chat = providedChat ?? (chatOptions ? generatedChat : undefined);
 
   // Store suggestions fetch trigger
   const triggerSuggestionsRef = useRef<(() => void) | null>(null);

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "pnpm -w --silent run build:lib && next build",
     "build:static": "next build && pagefind --site out --output-path out/_pagefind",
     "start": "next start",
     "lint": "eslint",

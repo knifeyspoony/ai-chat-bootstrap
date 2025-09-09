@@ -8,6 +8,18 @@ Docs: https://knifeyspoony.github.io/ai-chat-bootstrap/
 
 React UI + hooks for building modern AI chat interfaces fast. Built on top of Vercel AI SDK and AI SDK Elements.
 
+## Documentation
+
+- Site: https://knifeyspoony.github.io/ai-chat-bootstrap/
+- Quick Start: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/basic-chat
+- Tools: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/chat-with-tools
+- Tool Result Rendering: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/tool-result-rendering
+- Focus Items: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/focus-items
+- Sharing Context: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/ai-context
+- Commands: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/commands
+- API Reference: https://knifeyspoony.github.io/ai-chat-bootstrap/api
+- Components: https://knifeyspoony.github.io/ai-chat-bootstrap/api/components
+
 ## Install
 
 ```bash
@@ -94,15 +106,7 @@ export function App() {
     systemPrompt: "You are a helpful AI assistant.",
   });
 
-  return (
-    <ChatContainer
-      messages={chat.messages}
-      input={chat.input}
-      onInputChange={chat.handleInputChange}
-      onSubmit={chat.handleSubmit}
-      isLoading={chat.isLoading}
-    />
-  );
+  return <ChatContainer chat={chat} header={{ title: "AI Assistant" }} />;
 }
 ```
 
@@ -123,6 +127,33 @@ export function App() {
 - `ai-chat.css` is an optional precompiled minimal utility slice (no preflight) containing only classes our components use.
 - The Tailwind preset maps the tokens to theme values if you opt into full Tailwind compilation.
 - Override theme by redefining CSS custom properties after importing `tokens.css`.
+
+## ChatContainer props
+
+- chat: result of `useAIChat` (preferred). When provided, the container wires sending and loading automatically.
+- inputProps: control the input manually
+  - value, onChange, onSubmit, onAttach
+- header: title, subtitle, avatar, status, badge, actions, className
+- ui: placeholder, className, classes.{header,messages,message,input}, emptyState
+- suggestions: enabled, prompt, count, onAssistantFinish(triggerFetch), onSendMessage
+- commands: enabled, onExecute(commandName, args?), onAICommandExecute(message, toolName, systemPrompt?)
+- state: messages, isLoading, status (use when not passing `chat`)
+
+Example controlled input:
+
+```tsx
+<ChatContainer chat={chat} inputProps={{ value: input, onChange: setInput }} />
+```
+
+Enable suggestions and commands:
+
+```tsx
+<ChatContainer
+  chat={chat}
+  suggestions={{ enabled: true, count: 3 }}
+  commands={{ enabled: true }}
+/>
+```
 
 ## Tree-shaking
 

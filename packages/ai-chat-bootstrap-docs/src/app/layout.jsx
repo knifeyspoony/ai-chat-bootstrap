@@ -7,8 +7,23 @@ import { getPageMap } from "nextra/page-map";
 import { Space_Grotesk } from "next/font/google";
 
 export const metadata = {
-  // Define your metadata here
-  // For more information on metadata API, see: https://nextjs.org/docs/app/building-your-application/optimizing/metadata
+  title: "AI Chat Bootstrap",
+  description: "React UI primitives + hooks for building modern AI chat interfaces quickly. Overview, install options, theming, and core features.",
+  icons: {
+    icon: [
+      {
+        url: `${process.env.NODE_ENV === 'production' ? '/ai-chat-bootstrap' : ''}/acb.png`,
+        sizes: '32x32',
+        type: 'image/png',
+      },
+      {
+        url: `${process.env.NODE_ENV === 'production' ? '/ai-chat-bootstrap' : ''}/acb.png`,
+        sizes: '16x16',
+        type: 'image/png',
+      },
+    ],
+    apple: `${process.env.NODE_ENV === 'production' ? '/ai-chat-bootstrap' : ''}/acb.png`,
+  },
 };
 
 const imageStyle = {

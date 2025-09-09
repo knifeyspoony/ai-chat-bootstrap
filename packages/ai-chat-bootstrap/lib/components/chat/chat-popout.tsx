@@ -41,6 +41,8 @@ export interface ChatPopoutProps extends ChatContainerProps {
     label?: string;
     icon?: React.ReactNode;
     className?: string;
+    // Where the toggle button should be positioned relative to: viewport (fixed) or parent (absolute)
+    container?: "viewport" | "parent";
   };
 }
 
@@ -76,6 +78,7 @@ export function ChatPopout(props: ChatPopoutProps) {
   const buttonLabel = button?.label ?? "Chat";
   const buttonIcon = button?.icon;
   const buttonClassName = button?.className;
+  const buttonContainer = button?.container ?? "viewport"; // controls button positioning context
 
   // Open state
   const [internalIsOpen, setInternalIsOpen] = useState(true);
@@ -239,7 +242,9 @@ export function ChatPopout(props: ChatPopoutProps) {
           <Button
             onClick={toggleOpen}
             className={cn(
-              "fixed bottom-6 z-40",
+              buttonContainer === "viewport"
+                ? "fixed bottom-6 z-40"
+                : "absolute bottom-6 z-40",
               position === "right" ? "right-6" : "left-6",
               buttonClassName
             )}
@@ -338,19 +343,7 @@ export function ChatPopout(props: ChatPopoutProps) {
               commands={{
                 enabled: commands?.enabled,
                 onExecute: commands?.onExecute,
-                onAICommandExecute: (message, toolName, systemPrompt) => {
-                  if (chat) {
-                    chat.sendAICommandMessage(message, toolName, systemPrompt);
-                    setInput("");
-                  } else {
-                    commands?.onAICommandExecute?.(
-                      message,
-                      toolName,
-                      systemPrompt
-                    );
-                    setInput("");
-                  }
-                },
+                onAICommandExecute: commands?.onAICommandExecute,
               }}
               state={state}
             />
@@ -380,7 +373,9 @@ export function ChatPopout(props: ChatPopoutProps) {
         <Button
           onClick={toggleOpen}
           className={cn(
-            "fixed bottom-6 z-40",
+            buttonContainer === "viewport"
+              ? "fixed bottom-6 z-40"
+              : "absolute bottom-6 z-40",
             position === "right" ? "right-6" : "left-6",
             buttonClassName
           )}
@@ -498,19 +493,7 @@ export function ChatPopout(props: ChatPopoutProps) {
             commands={{
               enabled: commands?.enabled,
               onExecute: commands?.onExecute,
-              onAICommandExecute: (message, toolName, systemPrompt) => {
-                if (chat) {
-                  chat.sendAICommandMessage(message, toolName, systemPrompt);
-                  setInput("");
-                } else {
-                  commands?.onAICommandExecute?.(
-                    message,
-                    toolName,
-                    systemPrompt
-                  );
-                  setInput("");
-                }
-              },
+              onAICommandExecute: commands?.onAICommandExecute,
             }}
             state={state}
           />

@@ -150,6 +150,80 @@ const API_MAP: Record<string, ApiMeta> = {
       },
     ],
   },
+  useAIChatCommand: {
+    name: "useAIChatCommand",
+    route: "/api/hooks/use-ai-chat-command",
+    description:
+      "Register AI chat commands that send targeted messages to the LLM with specific tools and system prompts.",
+    signature: `function useAIChatCommand(command: {
+  name: string;
+  description: string;
+  parameters: ZodSchema;
+  toolName: string;
+  systemPrompt?: string;
+}): void`,
+    params: [
+      {
+        name: "name",
+        type: "string",
+        description: "Unique command identifier (used with / prefix)",
+      },
+      {
+        name: "description",
+        type: "string",
+        description: "Clear description for the command",
+      },
+      {
+        name: "parameters",
+        type: "ZodSchema",
+        description: "Zod schema defining the command's parameters",
+      },
+      {
+        name: "toolName",
+        type: "string",
+        description: "Name of the frontend tool the AI should use",
+      },
+      {
+        name: "systemPrompt",
+        type: "string?",
+        description: "Optional system prompt to customize AI behavior",
+      },
+    ],
+  },
+  useUIChatCommand: {
+    name: "useUIChatCommand",
+    route: "/api/hooks/use-ui-chat-command",
+    description:
+      "Register UI chat commands that execute directly on the client without involving the AI.",
+    signature: `function useUIChatCommand(command: {
+  name: string;
+  description: string;
+  parameters: ZodSchema;
+  execute: (params: unknown) => void | Promise<void>;
+}): void`,
+    params: [
+      {
+        name: "name",
+        type: "string",
+        description: "Unique command identifier (used with / prefix)",
+      },
+      {
+        name: "description",
+        type: "string",
+        description: "Clear description for the command",
+      },
+      {
+        name: "parameters",
+        type: "ZodSchema",
+        description: "Zod schema defining the command's parameters",
+      },
+      {
+        name: "execute",
+        type: "(params: unknown) => void | Promise<void>",
+        description: "Function that executes when the command is called",
+      },
+    ],
+  },
   // Optional: component pages
   ChatContainer: {
     name: "ChatContainer",

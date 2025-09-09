@@ -67,7 +67,7 @@ export function PopoutChatExample({
           isOpen: open,
           onOpenChange: setOpen,
         }}
-        button={{ show: true, label: "Chat" }}
+        button={{ show: true, label: "Chat", container: "parent" }}
       />
     </div>
   );

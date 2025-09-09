@@ -79,19 +79,30 @@ export function getCurrentParameterIndex(
 ): number {
   if (!(schema instanceof z.ZodObject)) return 0;
 
-  // Get the argument part after command name
-  const parts = input.split(" ");
-  if (parts.length <= 1) return 0;
+  // Determine command name and argument text
+  const trimmed = input.startsWith("/") ? input.slice(1) : input;
+  const firstSpace = trimmed.indexOf(" ");
+  if (firstSpace === -1) return 0;
 
-  const argsText = parts.slice(1).join(" ");
-  const cursorInArgs = Math.max(0, cursorPosition - parts[0].length - 1);
+  const argsText = trimmed.slice(firstSpace + 1);
+  const indexAfterCmd = (input.startsWith("/") ? 1 : 0) + firstSpace + 1; // position after the space following the command name
+  const cursorInArgs = Math.max(0, cursorPosition - indexAfterCmd);
 
-  // Count spaces before cursor to determine which parameter we're on
-  const beforeCursor = argsText.substring(0, cursorInArgs);
-  const spaceCount = (beforeCursor.match(/ /g) || []).length;
+  const tokens = tokenizeArgs(argsText);
 
-  const paramKeys = Object.keys(schema.shape);
-  return Math.min(spaceCount, paramKeys.length - 1);
+  // If cursor is inside a token span, return that token's index
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    // treat token span as [start, end) exclusive of end
+    if (cursorInArgs >= t.start && cursorInArgs < t.end) {
+      return clampIndex(i, schema);
+    }
+  }
+
+  // Cursor is in whitespace/comma gap. Determine the index by counting tokens starting before it
+  const numTokensBefore = tokens.filter((t) => t.start < cursorInArgs).length;
+  // If there's trailing whitespace after the last token and cursor is there, it's next param index
+  return clampIndex(numTokensBefore, schema);
 }
 
 /**
@@ -141,8 +152,8 @@ export function hasAllRequiredParams(
     return argsString.trim().length > 0;
   }
 
-  // For multiple parameters, count provided args
-  const args = argsString.split(/[\s,]+/).filter(Boolean);
+  // For multiple parameters, count provided args using quote-aware tokenization
+  const args = tokenizeArgs(argsString);
   return args.length >= requiredParams.length;
 }
 
@@ -168,8 +179,8 @@ export function parseArgsToParams(
       const paramSchema = shape[key] as z.ZodTypeAny;
       return { [key]: parseValue(argsString.trim(), paramSchema) };
     } else {
-      // Multiple parameters - split by spaces/commas
-      const args = argsString.split(/[\s,]+/).filter(Boolean);
+      // Multiple parameters - use quote-aware tokenizer (spaces/commas outside quotes)
+      const args = tokenizeArgs(argsString).map((t) => t.value);
       const result: Record<string, unknown> = {};
 
       keys.forEach((key, index) => {
@@ -219,4 +230,96 @@ function parseValue(value: string, schema: z.ZodTypeAny): unknown {
 
   // Default to string
   return value;
+}
+
+/**
+ * Quote-aware tokenizer for argument strings.
+ * Splits on whitespace or commas that are not inside single or double quotes.
+ * Returns tokens with their unquoted/escaped value and start/end indices in the original args string.
+ */
+function tokenizeArgs(
+  args: string
+): Array<{ value: string; start: number; end: number }> {
+  const tokens: Array<{ value: string; start: number; end: number }> = [];
+  const n = args.length;
+  let i = 0;
+
+  const isDelimiter = (ch: string) =>
+    ch === " " || ch === "\t" || ch === "\n" || ch === ",";
+
+  while (i < n) {
+    // Skip leading delimiters
+    while (i < n && isDelimiter(args[i]!)) i++;
+    if (i >= n) break;
+
+    const tokenStart = i;
+    let buf = "";
+    let inQuote: '"' | "'" | null = null;
+
+    while (i < n) {
+      const ch = args[i]!;
+
+      if (inQuote) {
+        if (ch === "\\") {
+          // Escape next char within quotes
+          if (i + 1 < n) {
+            buf += args[i + 1]!;
+            i += 2;
+            continue;
+          } else {
+            // trailing backslash; treat literally
+            buf += ch;
+            i++;
+            continue;
+          }
+        }
+        if (ch === inQuote) {
+          // end quote
+          inQuote = null;
+          i++;
+          continue;
+        }
+        buf += ch;
+        i++;
+        continue;
+      }
+
+      // Not inside quote
+      if (ch === '"' || ch === "'") {
+        inQuote = ch as '"' | "'";
+        i++;
+        continue;
+      }
+      if (ch === "\\") {
+        // backslash escape outside quotes (e.g., a\ b)
+        if (i + 1 < n) {
+          buf += args[i + 1]!;
+          i += 2;
+          continue;
+        } else {
+          buf += ch;
+          i++;
+          continue;
+        }
+      }
+      if (isDelimiter(ch)) {
+        // token boundary
+        break;
+      }
+
+      buf += ch;
+      i++;
+    }
+
+    const tokenEndExclusive = i; // exclusive index where token ends
+    tokens.push({ value: buf, start: tokenStart, end: tokenEndExclusive });
+  }
+
+  return tokens;
+}
+
+function clampIndex(index: number, schema: z.ZodTypeAny): number {
+  if (!(schema instanceof z.ZodObject)) return 0;
+  const max = Math.max(0, Object.keys(schema.shape).length - 1);
+  return Math.min(Math.max(0, index), max);
 }

@@ -105,6 +105,20 @@ export function ChatContainer(props: ChatContainerProps) {
     },
     [providedOnSubmit, props.chat, inputValue]
   );
+
+  // Default AI command execution: prefer chat hook, else delegate to consumer handler.
+  const handleAICommandExecute = useCallback(
+    (message: string, toolName: string, systemPrompt?: string) => {
+      if (props.chat) {
+        props.chat.sendAICommandMessage(message, toolName, systemPrompt);
+        onChange("");
+      } else {
+        props.commands?.onAICommandExecute?.(message, toolName, systemPrompt);
+        onChange("");
+      }
+    },
+    [props.chat, props.commands?.onAICommandExecute, onChange]
+  );
   // Handle suggestions
   const {
     suggestions,
@@ -180,7 +194,7 @@ export function ChatContainer(props: ChatContainerProps) {
           // Commands props
           enableCommands={props.commands?.enabled}
           onCommandExecute={props.commands?.onExecute}
-          onAICommandExecute={props.commands?.onAICommandExecute}
+          onAICommandExecute={handleAICommandExecute}
         />
       </div>
     </div>

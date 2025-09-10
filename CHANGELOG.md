@@ -4,9 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format loosely follows [Keep a Changelog](https://keepachangelog.com/) and adheres to semantic versioning.
 
-## [Unreleased]
+## [0.2.1] - 2025-09-10
 
 ### Changed
+
+- Added docs!
 
 - Revamped styling distribution: replaced monolithic `dist/styles.css` with granular exports:
   - `tokens.css` (design tokens + minimal globals, no preflight)

@@ -75,8 +75,7 @@ export const useAIToolsStore = create<AIToolsStore>((set, get) => ({
       // validatedParams now matches z.infer<typeof tool.parameters>
       return await tool.execute(validatedParams as any);
     } catch (error) {
-      console.error(`Error executing tool "${name}":`, error);
-      throw error;
+      throw new Error(`Error executing tool "${name}"`);
     }
   },
 

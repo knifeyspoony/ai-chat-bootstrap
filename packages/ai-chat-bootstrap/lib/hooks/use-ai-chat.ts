@@ -116,10 +116,7 @@ export function useAIChat(
         // Add the tool result to the chat stream and still return it
         addToolResultForCall(toolCall, result);
       } catch (error) {
-        console.error("Tool execution error:", error);
-        setError(
-          error instanceof Error ? error.message : "Tool execution failed"
-        );
+        setError("Tool execution failed");
         throw error;
       }
     },
@@ -127,9 +124,8 @@ export function useAIChat(
       // Hook handles loading state internally
       onFinish?.();
     },
-    onError: (error) => {
-      console.error("Chat error:", error);
-      setError(error instanceof Error ? error.message : "Chat error occurred");
+    onError: (_) => {
+      setError("Chat error occurred");
     },
   });
 
@@ -147,9 +143,7 @@ export function useAIChat(
         toolCallId: toolCall.toolCallId,
         output: output,
       });
-    } catch (e) {
-      console.error("addToolResult error:", e);
-    }
+    } catch (_) {}
   }
 
   const sendMessageWithContext = (content: string) => {

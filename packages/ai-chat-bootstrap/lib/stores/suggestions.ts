@@ -44,13 +44,9 @@ export const useSuggestionsStore = create<SuggestionsState>((set) => ({
 
       const data = await response.json();
       set({ suggestions: data.suggestions, isLoading: false });
-    } catch (error) {
-      console.error("Error fetching suggestions:", error);
+    } catch (_) {
       set({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to fetch suggestions",
+        error: "Failed to fetch suggestions",
         isLoading: false,
         suggestions: [],
       });

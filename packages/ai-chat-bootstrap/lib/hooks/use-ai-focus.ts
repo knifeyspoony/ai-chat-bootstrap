@@ -27,10 +27,6 @@ import { useAIFocusStore } from "../stores";
  *     // Remove note from focus
  *     clearFocus(noteId)
  *   }
- *
- *   // These are reactive - only re-render when focus state changes
- *   console.log('Focused IDs:', focusedIds) // ['note-123', 'note-456']
- *   console.log('Focus items:', allFocusItems) // [{ id: 'note-123', type: 'note', ... }, ...]
  * }
  * ```
  */

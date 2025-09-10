@@ -69,12 +69,10 @@ export const useAIChatCommandsStore = create<AIChatCommandsStore>(
       }
 
       try {
-        // Validate parameters using the command's schema
         const validatedParams = command.parameters.parse(params);
         await command.execute(validatedParams);
-      } catch (error) {
-        console.error(`Error executing command "${name}":`, error);
-        throw error;
+      } catch (_) {
+        throw new Error(`Error executing command "${name}"`);
       }
     },
 

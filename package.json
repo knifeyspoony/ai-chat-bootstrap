@@ -1,23 +1,20 @@
 {
   "name": "ai-sdk-chat-workspace",
-  "version": "1.0.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Monorepo for AI SDK Chat library and demo",
   "scripts": {
-    "dev": "pnpm --parallel dev",
-    "build": "pnpm -r build",
-    "rebuild": "pnpm -r clean && pnpm -r build",
+    "build": "pnpm run rebuild",
+    "rebuild": "pnpm rebuild:lib && pnpm rebuild:demo && pnpm rebuild:docs",
+    "rebuild:docs": "pnpm --filter ai-chat-bootstrap-docs clean && pnpm --filter ai-chat-bootstrap-docs build",
     "rebuild:lib": "pnpm --filter ai-chat-bootstrap clean && pnpm --filter ai-chat-bootstrap build",
     "rebuild:demo": "pnpm --filter ai-chat-bootstrap-demo clean && pnpm --filter ai-chat-bootstrap-demo build",
+    "build:docs": "pnpm --filter ai-chat-bootstrap-docs build",
     "build:lib": "pnpm --filter ai-chat-bootstrap build",
     "build:demo": "pnpm --filter ai-chat-bootstrap-demo build",
     "lint": "eslint .",
     "typecheck": "pnpm -r typecheck",
-    "clean": "pnpm -r clean",
-    "release:patch": "pnpm --filter ai-chat-bootstrap version patch && git push && git push --tags",
-    "release:minor": "pnpm --filter ai-chat-bootstrap version minor && git push && git push --tags",
-    "release:major": "pnpm --filter ai-chat-bootstrap version major && git push && git push --tags",
-    "release:prerelease": "pnpm --filter ai-chat-bootstrap version prerelease --preid beta && git push && git push --tags"
+    "clean": "pnpm -r clean"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

@@ -245,8 +245,6 @@ function MessagePart({
             customRendered = toolStoreTool.render(toolPart.output as any);
           } catch (err) {
             customRenderError = err;
-            // eslint-disable-next-line no-console
-            console.warn("Custom tool render failed", err);
           }
         }
 

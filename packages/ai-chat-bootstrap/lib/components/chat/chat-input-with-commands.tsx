@@ -204,10 +204,7 @@ export const ChatInputWithCommands = ({
         setParameterValidationError(null); // Clear any previous errors
       }
     } catch (error) {
-      console.error("Failed to execute command:", error);
-      setError(
-        error instanceof Error ? error.message : "Command execution failed"
-      );
+      setError("Command execution failed");
     }
   };
 
@@ -274,10 +271,7 @@ export const ChatInputWithCommands = ({
             }
           }, 10);
         } catch (error) {
-          console.error("Failed to execute command:", error);
-          setError(
-            error instanceof Error ? error.message : "Command execution failed"
-          );
+          setError("Command execution failed");
         }
         return;
       }

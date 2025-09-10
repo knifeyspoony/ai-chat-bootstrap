@@ -147,19 +147,27 @@ import { streamText, convertToCoreMessages } from "ai";
 import { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { messages, systemPrompt, tools, context, focus } = await req.json();
+  const {
+    messages,
+    systemPrompt,
+    enrichedSystemPrompt,
+    tools,
+    context,
+    focus
+  } = await req.json();
 
   const result = streamText({
     model: openai("gpt-4"),
-    system: systemPrompt || "You are a helpful AI assistant.",
+    system: enrichedSystemPrompt,
     messages: convertToCoreMessages(messages),
-    tools, // Frontend tools are automatically passed here
-    toolChoice: "auto", // Let the AI decide when to use tools
+    tools,
   });
 
   return result.toUIMessageStreamResponse();
 }
 ```
+
+> Note: `useAIChat` automatically sends `enrichedSystemPrompt` with a standardized preamble plus conditional Tools / Context / Focus sections, then appends your original `systemPrompt` (if any). Do not rebuild those sections on the server to avoid duplication.
 
 ## API Reference
 

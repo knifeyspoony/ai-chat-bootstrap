@@ -228,7 +228,7 @@ function ConditionalContext() {
 
 ## Backend Integration
 
-The backend automatically receives context items in the request payload:
+The backend automatically receives context items in the request payload (`enrichedSystemPrompt` embeds context/focus/tool summaries):
 
 ```tsx
 import { openai } from "@ai-sdk/openai";
@@ -236,41 +236,29 @@ import { streamText, convertToCoreMessages } from "ai";
 import { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { messages, systemPrompt, tools, context, focus } = await req.json();
-
-  // Context is automatically passed from frontend
-  // context = [
-  //   {
-  //     id: "user-profile",
-  //     label: "User Profile", 
-  //     description: "Current authenticated user's profile information",
-  //     scope: "session",
-  //     priority: 100,
-  //     data: { userId: "user-123", name: "Alice Johnson", role: "admin", ... }
-  //   }
-  // ]
-
-  // Build context-aware system prompt
-  let contextualPrompt = systemPrompt || "You are a helpful AI assistant.";
-  
-  if (context && context.length > 0) {
-    contextualPrompt += "\n\nYou have access to the following context:";
-    context.forEach((item) => {
-      contextualPrompt += `\n- ${item.label || item.id}: ${item.description}`;
-      contextualPrompt += `\n  Data: ${JSON.stringify(item.data)}`;
-    });
-  }
+  const {
+    messages,
+    systemPrompt,
+    enrichedSystemPrompt,
+    tools,
+    context,
+    focus
+  } = await req.json();
 
   const result = streamText({
     model: openai("gpt-4"),
-    system: contextualPrompt,
+    system: enrichedSystemPrompt,
     messages: convertToCoreMessages(messages),
     tools,
+    // Optionally surface context/focus to provider metadata if your model / infra can leverage it
+    experimental_providerMetadata: { context, focus }
   });
 
   return result.toUIMessageStreamResponse();
 }
 ```
+
+> Note: Do not re-concatenate context data into the system prompt on the server. The client-generated `enrichedSystemPrompt` already contains a standardized preamble and conditional sections (Tools / Context / Focus) plus the original `systemPrompt` (if supplied). Rebuilding would cause duplication and potential truncation.
 
 ## TypeScript Interface
 

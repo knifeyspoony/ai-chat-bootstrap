@@ -60,15 +60,19 @@ Frontend tools execute in the browser and allow the AI to:
 
 ## Getting Started
 
-1. **Install the library**:
-   ```bash
-   npm install ai-chat-bootstrap
-   ```
+1. **Install peers + library**:
+  ```bash
+  npm install ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zod
+  # or pnpm add ... (preferred)
+  ```
 
-2. **Import styles**:
-   ```tsx
-   import 'ai-chat-bootstrap/lib/styles.css';
-   ```
+2. **Import styles (choose ONE mode)**:
+  Zero-config:
+  ```css
+  @import "ai-chat-bootstrap/tokens.css";
+  @import "ai-chat-bootstrap/ai-chat.css";
+  ```
+  Tailwind-native (no ai-chat.css): add preset in tailwind config and include library source in content.
 
 3. **Use the main chat hook**:
    ```tsx
@@ -254,7 +258,16 @@ The library automatically sends structured payloads to your API endpoint:
 ```typescript
 interface ChatRequestPayload {
   messages: UIMessage[];
+  /**
+   * Original system prompt provided by the app (optional).
+   * Its content is appended inside the enrichedSystemPrompt automatically.
+   */
   systemPrompt?: string;
+  /**
+   * Automatically generated enriched system prompt (always sent unless explicitly overridden).
+   * Contains standardized preamble + conditional Tools / Context / Focus sections + appended original systemPrompt.
+   */
+  enrichedSystemPrompt: string;
   tools?: Record<string, ToolDefinition>;
   context?: ContextItem[];
   focus?: FocusItem[];
@@ -269,19 +282,18 @@ import { streamText, convertToCoreMessages } from 'ai';
 import { NextRequest } from 'next/server';
 
 export async function POST(req: NextRequest) {
-  const { messages, systemPrompt, tools, context, focus } = await req.json();
-
-  let prompt = systemPrompt || 'You are a helpful AI assistant.';
+  const {
+    messages,
+    systemPrompt,
+    enrichedSystemPrompt,
+    tools,
+    context,
+    focus
+  } = await req.json();
   
-  if (context?.length > 0) {
-    prompt += '\n\nContext:\n' + context.map(item => 
-      `- ${item.label}: ${JSON.stringify(item.data)}`
-    ).join('\n');
-  }
-
   const result = streamText({
     model: openai('gpt-4'),
-    system: prompt,
+    enrichedSystemPrompt,
     messages: convertToCoreMessages(messages),
     tools,
   });

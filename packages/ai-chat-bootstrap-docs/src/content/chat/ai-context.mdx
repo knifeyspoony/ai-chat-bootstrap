@@ -260,7 +260,7 @@ export function AIContextDemo() {
 
 ## Backend Integration
 
-The backend automatically receives context items in the request payload:
+The backend automatically receives context items in the request payload along with `enrichedSystemPrompt` (which already embeds Tools / Context / Focus summaries and appends your original `systemPrompt` if provided):
 
 ```tsx
 import { openai } from "@ai-sdk/openai";
@@ -268,50 +268,28 @@ import { streamText, convertToCoreMessages } from "ai";
 import { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { messages, systemPrompt, tools, context, focus } = await req.json();
+  const {
+    messages,
+    systemPrompt,
+    enrichedSystemPrompt,
+    tools,
+    context,
+    focus
+  } = await req.json();
 
-  // Context is automatically passed from frontend
-  // context = [
-  //   {
-  //     id: "user-profile",
-  //     label: "User Profile", 
-  //     description: "Current authenticated user's profile information",
-  //     scope: "session",
-  //     priority: 100,
-  //     data: { userId: "user-123", name: "Alice Johnson", role: "admin", ... }
-  //   },
-  //   {
-  //     id: "app-settings",
-  //     label: "App Settings",
-  //     description: "User's application configuration", 
-  //     scope: "session",
-  //     priority: 80,
-  //     data: { theme: "dark", language: "en", ... }
-  //   }
-  // ]
-
-  // Build context-aware system prompt
-  let contextualPrompt = systemPrompt || "You are a helpful AI assistant.";
-  
-  if (context && context.length > 0) {
-    contextualPrompt += "\n\nYou have access to the following context about the user:";
-    context.forEach((item) => {
-      contextualPrompt += `\n- ${item.label || item.id}: ${item.description}`;
-      contextualPrompt += `\n  Data: ${JSON.stringify(item.data)}`;
-    });
-  }
 
   const result = streamText({
     model: openai("gpt-4"),
-    system: contextualPrompt,
+    system: enrichedSystemPrompt,
     messages: convertToCoreMessages(messages),
     tools,
-    toolChoice: "auto",
   });
 
   return result.toUIMessageStreamResponse();
 }
 ```
+
+> Note: Do NOT re-concatenate context data server-side. The client-built `enrichedSystemPrompt` already contains a standardized preamble plus conditional sections (Tools / Context / Focus) and then appends the original `systemPrompt` verbatim.
 
 ## Advanced Usage Patterns
 

@@ -8,10 +8,16 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useAIContextStore, useAIFocusStore, useAIToolsStore } from "../stores";
 import { useChatStore } from "../stores/chat";
+import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
 
 /**
  * Enhanced chat hook that integrates with AI SDK and our Zustand stores.
- * Automatically includes context and handles tool execution.
+ * Automatically includes context, focus, tools and sends an enrichedSystemPrompt.
+ *
+ * Enriched System Prompt Strategy:
+ *  - Always generated on each request (fresh snapshot of context/focus/tools)
+ *  - Can be overridden per-call by providing body.enrichedSystemPrompt when sending a message
+ *  - Original consumer-provided systemPrompt becomes the "originalSystemPrompt" appended in the enrichment
  */
 export function useAIChat(
   options: {
@@ -79,15 +85,32 @@ export function useAIChat(
           .serializeToolsForBackend();
         const currentFocusItems = useAIFocusStore.getState().getAllFocusItems();
         const callerBody = options.body ?? {};
-        // Per-call overrides: if caller provided tools/systemPrompt, prefer them
+
+        // Per-call overrides
         const overrideTools = (callerBody as any).tools as
           | unknown[]
           | undefined;
         const overrideSystemPrompt = (callerBody as any).systemPrompt as
           | string
           | undefined;
+        const overrideEnrichedSystemPrompt = (callerBody as any)
+          .enrichedSystemPrompt as string | undefined;
+
         const toolsToSend = overrideTools ?? currentTools;
         const systemPromptToSend = overrideSystemPrompt ?? systemPrompt;
+
+        // Build enriched system prompt unless explicitly supplied
+        const enrichedSystemPromptToSend =
+          overrideEnrichedSystemPrompt ??
+          buildEnrichedSystemPrompt({
+            originalSystemPrompt: systemPromptToSend,
+            context: currentContext,
+            focus: currentFocusItems,
+            tools: toolsToSend.map((t: any) => ({
+              name: t.name,
+              description: t.description,
+            })),
+          });
 
         return {
           ...options,
@@ -98,6 +121,7 @@ export function useAIChat(
             tools: toolsToSend,
             focus: currentFocusItems, // Send complete focus items
             systemPrompt: systemPromptToSend,
+            enrichedSystemPrompt: enrichedSystemPromptToSend,
           },
         };
       },

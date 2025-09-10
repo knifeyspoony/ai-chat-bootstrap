@@ -302,21 +302,26 @@ export function ChatWithTools() {
 
 ## Backend Integration
 
-The backend automatically receives registered tools and can execute them:
-
 ```tsx
 import { openai } from "@ai-sdk/openai";
 import { streamText, convertToCoreMessages } from "ai";
 
 export async function POST(req: NextRequest) {
-  const { messages, systemPrompt, tools, context, focus } = await req.json();
+  const {
+    messages,
+    systemPrompt,
+    enrichedSystemPrompt,
+    tools,
+    context,
+    focus
+  } = await req.json();
 
   const result = streamText({
     model: openai("gpt-4"),
-    system: systemPrompt || "You are a helpful AI assistant.",
+    system: enrichedSystemPrompt,
     messages: convertToCoreMessages(messages),
-    tools, // Frontend tools are automatically passed here
-    toolChoice: "auto", // Let the AI decide when to use tools
+    tools,
+    toolChoice: "auto",
   });
 
   return result.toUIMessageStreamResponse();

@@ -53,20 +53,22 @@ Create an API route at `app/api/chat/route.ts` (Next.js App Router):
 ```tsx
 import { openai } from "@ai-sdk/openai";
 import { streamText } from "ai";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { messages, systemPrompt } = await req.json();
+  const { messages, systemPrompt, enrichedSystemPrompt } = await req.json();
 
   const result = streamText({
     model: openai("gpt-4"),
-    system: systemPrompt || "You are a helpful AI assistant.",
+    system: enrichedSystemPrompt,
     messages,
   });
 
   return result.toDataStreamResponse();
 }
 ```
+
+> Note: The `useAIChat` hook automatically sends an `enrichedSystemPrompt` containing a standardized preamble plus conditional sections (Tools / Context / Focus) and then appends your `systemPrompt` (if provided). Always prefer `enrichedSystemPrompt` when present and do not rebuild those sections again on the server.
 
 ## How it works
 

@@ -1,7 +1,7 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["./lib/index.ts"], // Entry point
+  entry: ["./lib/index.ts", "./lib/server.ts"], // Entry points (client + server-only)
   format: ["esm", "cjs"], // Dual module format support
   dts: true, // Generate TypeScript declaration files
   outDir: "dist", // Output directory

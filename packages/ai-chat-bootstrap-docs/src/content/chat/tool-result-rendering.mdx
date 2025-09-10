@@ -153,14 +153,20 @@ import { streamText, convertToCoreMessages } from "ai";
 import { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { messages, systemPrompt, tools, context, focus } = await req.json();
+  const {
+    messages,
+    systemPrompt,
+    enrichedSystemPrompt,
+    tools,
+    context,
+    focus
+  } = await req.json();
 
   const result = streamText({
     model: openai("gpt-4"),
-    system: systemPrompt || "You are a helpful AI assistant that can create data visualizations.",
+    system: enrichedSystemPrompt,
     messages: convertToCoreMessages(messages),
-    tools, // Tools with render methods are automatically passed
-    toolChoice: "auto",
+    tools,
   });
 
   return result.toUIMessageStreamResponse();

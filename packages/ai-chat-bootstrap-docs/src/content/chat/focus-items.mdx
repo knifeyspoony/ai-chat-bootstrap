@@ -99,33 +99,27 @@ export function ChatWithFocus() {
 
 ## Backend Integration
 
-Focus items are **automatically included** in chat requests when using `useAIChat`. Access them in your API route:
+Focus items are automatically reflected in the client‑generated `enrichedSystemPrompt`, so you should not rebuild or concatenate them again on the server:
 
 ```tsx
-import { streamText } from 'ai';
+import { streamText, convertToCoreMessages } from 'ai';
 import { openai } from '@ai-sdk/openai';
 
 export async function POST(request: Request) {
-  const { messages, focusItems } = await request.json();
-
-  // Focus items are automatically included by useAIChat
-  const contextualSystemPrompt = `You are a helpful AI assistant.
-  
-${focusItems?.length > 0 ? 
-  `The user has focused on these items:
-${focusItems.map((item: any) => 
-  `- ${item.label}: ${item.description || ''}
-    Data: ${JSON.stringify(item.data, null, 2)}`
-).join('\n')}
-
-Consider this context when providing responses.` : 
-  'The user has no specific items in focus.'
-}`;
+  const {
+    messages,
+    systemPrompt,
+    enrichedSystemPrompt,
+    tools,
+    context,
+    focus
+  } = await request.json();
 
   const result = await streamText({
     model: openai('gpt-4-turbo'),
-    system: contextualSystemPrompt,
-    messages,
+    system: enrichedSystemPrompt,
+    messages: convertToCoreMessages(messages),
+    tools,
   });
 
   return result.toDataStreamResponse();

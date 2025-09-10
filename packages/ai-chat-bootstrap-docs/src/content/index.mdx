@@ -14,14 +14,14 @@ AI Chat Bootstrap provides **React components**, **hooks**, and **design tokens*
 ## Install
 
 ```bash
-pnpm add ai-chat-bootstrap
+pnpm add ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zod
 # or
-npm install ai-chat-bootstrap
-# or
-yarn add ai-chat-bootstrap
+npm install ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zod
 ```
 
-You also need peer deps in your app (React 18+, react-dom 18+). For full AI functionality install the Vercel AI SDK + a model provider (e.g. `@ai-sdk/openai`) in your application layer—not required to use just the UI primitives.
+Required peers: `react`, `react-dom`, `ai`, `@ai-sdk/react`. Add one provider package (e.g. `@ai-sdk/openai`, `@ai-sdk/azure`, etc.). `zod` strongly recommended for tools/commands.
+
+Upgrading from &lt;=0.2.x? Add `ai @ai-sdk/react` explicitly—they're now peers.
 
 ## Styling Options
 

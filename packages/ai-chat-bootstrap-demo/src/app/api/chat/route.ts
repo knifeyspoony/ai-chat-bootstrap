@@ -1,7 +1,9 @@
 import { createAzure } from "@ai-sdk/azure";
-import { jsonSchema } from "@ai-sdk/provider-utils";
-import { convertToModelMessages, streamText, tool } from "ai";
-import type { ChatRequest, SerializedTool } from "ai-chat-bootstrap";
+import { convertToModelMessages, streamText } from "ai";
+import {
+  type ChatRequest,
+  deserializeFrontendTools,
+} from "ai-chat-bootstrap/server";
 
 // Configure Azure OpenAI (users will need to set these env vars)
 const azure = createAzure({
@@ -14,64 +16,25 @@ const model = azure(process.env.AZURE_DEPLOYMENT_ID ?? "gpt-4.1");
 
 export async function POST(req: Request) {
   try {
-    const { messages, context, tools, focus, systemPrompt }: ChatRequest =
+    const { messages, tools, enrichedSystemPrompt }: ChatRequest =
       await req.json();
 
-    // Deserialize tools from frontend
-    const deserializedTools =
-      tools?.reduce(
-        (
-          acc: Record<string, ReturnType<typeof tool>>,
-          serializedTool: SerializedTool
-        ) => {
-          acc[serializedTool.name] = tool({
-            description: serializedTool.description,
-            inputSchema: jsonSchema(
-              serializedTool.inputSchema as Record<string, unknown>
-            ),
-            // Note: execute functions are handled on frontend
-          });
-          return acc;
-        },
-        {} as Record<string, ReturnType<typeof tool>>
-      ) || {};
-
-    // Build system message with context, focus, and tools
-    const systemMessageParts = [
-      "You are a helpful AI assistant integrated with a React application.",
-    ];
-
-    // Add tool information
-    if (Object.keys(deserializedTools).length > 0) {
-      systemMessageParts.push(`\nAvailable Tools:`);
-      Object.entries(deserializedTools).forEach(([name, toolDef]) => {
-        systemMessageParts.push(
-          `- ${name}: ${(toolDef as { description: string }).description}`
-        );
-      });
+    if (!enrichedSystemPrompt) {
+      return new Response(
+        JSON.stringify({ error: "Missing enrichedSystemPrompt in request" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
 
-    // Add context information
-    if (context && Object.keys(context).length > 0) {
-      systemMessageParts.push(`\nCurrent Application Context:`);
-      systemMessageParts.push(JSON.stringify(context, null, 2));
+    const deserializedTools = deserializeFrontendTools(tools);
+
+    // Optional lightweight log length only (avoid logging full prompt in prod)
+    if (process.env.NODE_ENV !== "production") {
+      console.log(
+        `[chat-api] enrichedSystemPrompt length=${enrichedSystemPrompt.length}`
+      );
+      console.log(`[chat-api] enrichedSystemPrompt: ${enrichedSystemPrompt}`);
     }
-
-    // Add focus information
-    if (focus && focus.length > 0) {
-      systemMessageParts.push(`\nFocused Items (full objects):`);
-      systemMessageParts.push(JSON.stringify(focus, null, 2));
-    }
-
-    systemMessageParts.push(
-      `\nYou can use available tools to help users accomplish their tasks and interact with the UI elements they're focusing on. Be helpful and demonstrate the power of AI-app integration.`
-    );
-
-    const defaultSystemMessage = systemMessageParts.join("\n");
-
-    const finalSystemMessage = systemPrompt || defaultSystemMessage;
-
-    console.log(`Final system message: ${finalSystemMessage}`);
 
     // Convert UI messages to model messages format
     const modelMessages = convertToModelMessages(messages, {
@@ -81,7 +44,7 @@ export async function POST(req: Request) {
     const result = await streamText({
       model,
       messages: [
-        { role: "system", content: finalSystemMessage },
+        { role: "system", content: enrichedSystemPrompt },
         ...modelMessages,
       ],
       tools: deserializedTools,

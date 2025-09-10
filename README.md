@@ -29,11 +29,20 @@ This repository contains:
 
 ## Install (Library)
 
+As of 0.3.0 `ai` and `@ai-sdk/react` are peer dependencies (along with React).
+
 ```bash
-pnpm add ai-chat-bootstrap
+pnpm add ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zod
 # or
-npm install ai-chat-bootstrap
+npm install ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zod
 ```
+
+Swap `@ai-sdk/openai` for another provider if needed. `zod` recommended for tools/commands.
+
+Peer warning notes:
+
+- React 19 may trigger warnings from packages that have not yet expanded their peer range beyond 18.
+- zod v4 may trigger a warning from provider utilities expecting v3; functionality is compatible for typical schemas.
 
 Consume styles using one of two modes:
 

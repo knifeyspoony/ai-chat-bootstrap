@@ -1,11 +1,11 @@
 ---
 title: useAIChat
-description: Main hook for managing chat state and AI interactions with automatic context and tool integration.
+description: Main hook for managing chat state and AI interactions with automatic context, focus, tool integration, and automatic system prompt enrichment.
 ---
 
 # useAIChat
 
-The `useAIChat` hook is the main hook for managing chat state and AI interactions. It automatically integrates with context items from `useAIContext`, focus items from `useAIFocus`, and frontend tools from `useAIFrontendTool`.
+The `useAIChat` hook is the main hook for managing chat state and AI interactions. It automatically integrates with context items from `useAIContext`, focus items from `useAIFocus`, frontend tools from `useAIFrontendTool`, and now automatically builds and sends an `enrichedSystemPrompt` that gives models structured awareness of those capabilities.
 
 ## Syntax
 
@@ -21,12 +21,23 @@ interface UseAIChatOptions {
 function useAIChat(options: UseAIChatOptions): UseAIChatReturn
 ```
 
+### System Prompt Enrichment (Automatic)
+
+The ALWAYS generates an `enrichedSystemPrompt` for each request. This enriched prompt:
+
+- Adds a standardized preamble describing that the assistant runs in an enhanced environment (context, focus, tools).
+- Includes conditional sections only when data exists (tools, context, focus).
+- Lists tool names with descriptions (no parameter schemas; those are already sent separately).
+- Appends the original `systemPrompt` you provided (if any) at the end with a clear separator.
+
+Per-call override: you can still override the final string by passing `body.enrichedSystemPrompt` in `sendMessage` (advanced usage). If you only provide `systemPrompt`, enrichment still runs and your original content is appended.
+
 ## Parameters
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
 | `api` | `string` | Yes | API endpoint for chat requests |
-| `systemPrompt` | `string` | No | System prompt for the AI |
+| `systemPrompt` | `string` | No | Application-specific system prompt |
 | `initialMessages` | `UIMessage[]` | No | Initial chat messages |
 | `onFinish` | `(message: UIMessage) => void` | No | Callback when a message is completed |
 | `onError` | `(error: Error) => void` | No | Error callback |
@@ -46,6 +57,14 @@ interface UseAIChatReturn {
   append: (message: UIMessage) => void;
   reload: () => void;
   stop: () => void;
+  // Additional exposed convenience + state:
+  sendMessageWithContext: (text: string) => void;
+  sendAICommandMessage: (text: string, toolName: string, systemPrompt?: string) => void;
+  retryLastMessage: () => void;
+  clearError: () => void;
+  context: ContextItem[];
+  tools: { name: string; description: string; inputSchema: unknown }[];
+  focusItems: FocusItem[];
 }
 ```
 
@@ -123,14 +142,10 @@ const chat = useAIChat({
   api: "/api/chat",
   onFinish: (message) => {
     console.log("AI response completed:", message);
-    
-    // Save to database, analytics, etc.
     saveMessageToHistory(message);
   },
   onError: (error) => {
     console.error("Chat error:", error);
-    
-    // Show user-friendly error message
     toast.error("Sorry, there was an error processing your request.");
   }
 });
@@ -148,8 +163,7 @@ function ChatWithControls() {
       role: "user",
       parts: [{ type: "text", text: "What's the weather like?" }]
     });
-    
-    // Trigger AI response
+
     chat.handleSubmit();
   };
 
@@ -168,7 +182,7 @@ function ChatWithControls() {
         <button onClick={clearChat}>Clear chat</button>
         <button onClick={stopGeneration}>Stop generation</button>
       </div>
-      
+
       <ChatContainer
         messages={chat.messages}
         input={chat.input}
@@ -191,7 +205,6 @@ The `useAIChat` hook automatically integrates with other hooks:
 function ChatWithContext() {
   const [user, setUser] = useState({ name: "Alice", role: "admin" });
 
-  // This context is automatically included in chat requests
   useAIContext("user", user, {
     label: "User Profile",
     description: "Current user information",
@@ -239,7 +252,6 @@ function ChatWithFocus() {
 function ChatWithTools() {
   const [counter, setCounter] = useState(0);
 
-  // This tool is automatically available to the AI
   useAIFrontendTool({
     name: "increment_counter",
     description: "Increment the counter",
@@ -266,49 +278,67 @@ function ChatWithTools() {
 }
 ```
 
+## System Prompt Enrichment Details
+
+The client sends two related fields in the request body:
+
+| Field | Always Present? | Source | Description |
+|-------|------------------|--------|-------------|
+| `systemPrompt` | Optional | Your hook option / per-call override | Original app-specific instructions |
+| `enrichedSystemPrompt` | Yes (generated unless overridden) | Built by `useAIChat` | Structured preamble + conditional sections + appended original `systemPrompt` |
+
+Downstream code should prefer `enrichedSystemPrompt` if provided.
+
+### Override Mechanism
+
+You can override enrichment per-call:
+
+```tsx
+chat.sendMessage(
+  { text: "Analyze document" },
+  {
+    body: {
+      enrichedSystemPrompt: "Custom fully composed system message..."
+    }
+  }
+);
+```
+
 ## Request Payload
 
-The hook automatically sends a structured payload to your API endpoint:
+The hook automatically sends a structured payload:
 
 ```typescript
 interface ChatRequestPayload {
   messages: UIMessage[];
-  systemPrompt?: string;
+  systemPrompt?: string;            // Original (legacy) prompt (optional)
+  enrichedSystemPrompt: string;     // Always provided by the hook
   tools?: Record<string, ToolDefinition>;
   context?: ContextItem[];
   focus?: FocusItem[];
 }
 ```
 
-### Example API Route
+## Example API Route
 
 ```tsx
 import { openai } from "@ai-sdk/openai";
 import { streamText, convertToCoreMessages } from "ai";
 
 export async function POST(req: NextRequest) {
-  const { messages, systemPrompt, tools, context, focus } = await req.json();
+  const {
+    messages,
+    systemPrompt,
+    enrichedSystemPrompt,
+    tools,
+    context,
+    focus
+  } = await req.json();
 
-  // Build context-aware system prompt
-  let enhancedPrompt = systemPrompt || "You are a helpful AI assistant.";
   
-  if (context?.length > 0) {
-    enhancedPrompt += "\n\nContext:\n";
-    context.forEach((item) => {
-      enhancedPrompt += `- ${item.label}: ${JSON.stringify(item.data)}\n`;
-    });
-  }
-  
-  if (focus?.length > 0) {
-    enhancedPrompt += "\n\nFocused items:\n";
-    focus.forEach((item) => {
-      enhancedPrompt += `- ${item.label}: ${JSON.stringify(item.data)}\n`;
-    });
-  }
-
   const result = streamText({
     model: openai("gpt-4"),
-    system: enhancedPrompt,
+    system: enrichedSystemPrompt,
     messages: convertToCoreMessages(messages),
     tools,
     toolChoice: "auto",
@@ -327,16 +357,14 @@ function ChatWithCustomProcessing() {
   const chat = useAIChat({
     api: "/api/chat",
     onFinish: (message) => {
-      // Process completed message
       const textParts = message.parts
         .filter(part => part.type === 'text')
         .map(part => part.text);
-      
-      // Extract and save any code blocks
+
       const codeBlocks = textParts
         .join(' ')
         .match(/```[\s\S]*?```/g) || [];
-      
+
       if (codeBlocks.length > 0) {
         saveCodeBlocks(codeBlocks);
       }
@@ -352,20 +380,18 @@ function ChatWithCustomProcessing() {
 ```tsx
 function ChatWithErrorRecovery() {
   const [retryCount, setRetryCount] = useState(0);
-  
+
   const chat = useAIChat({
     api: "/api/chat",
     onError: (error) => {
       console.error("Chat error:", error);
-      
-      // Automatic retry for network errors
+
       if (error.name === 'NetworkError' && retryCount < 3) {
         setTimeout(() => {
           setRetryCount(prev => prev + 1);
           chat.reload();
-        }, 1000 * (retryCount + 1)); // Exponential backoff
+        }, 1000 * (retryCount + 1));
       } else {
-        // Show error to user
         toast.error(`Failed to get response: ${error.message}`);
       }
     }
@@ -382,28 +408,23 @@ function ChatWithValidation() {
   const chat = useAIChat({
     api: "/api/chat",
     onFinish: (message) => {
-      // Validate message content
       const textContent = message.parts
         .filter(part => part.type === 'text')
         .map(part => part.text)
         .join(' ');
-      
-      // Check for inappropriate content
+
       if (containsInappropriateContent(textContent)) {
-        console.warn("Inappropriate content detected");
-        
-        // Replace with filtered version
         const filteredMessage = {
           ...message,
-          parts: message.parts.map(part => 
-            part.type === 'text' 
-              ? { ...part, text: filterContent(part.text) }
-              : part
-          )
+            parts: message.parts.map(part =>
+              part.type === 'text'
+                ? { ...part, text: filterContent(part.text) }
+                : part
+            )
         };
-        
-        chat.setMessages(prev => 
-          prev.map(msg => 
+
+        chat.setMessages(prev =>
+          prev.map(msg =>
             msg.id === message.id ? filteredMessage : msg
           )
         );
@@ -417,7 +438,7 @@ function ChatWithValidation() {
 
 ## Message Format
 
-The hook works with the Vercel AI SDK `UIMessage` format:
+Works with Vercel AI SDK `UIMessage`:
 
 ```typescript
 interface UIMessage {
@@ -427,12 +448,11 @@ interface UIMessage {
   parts: Array<UIMessagePart>;
 }
 
-type UIMessagePart = 
+type UIMessagePart =
   | { type: 'text'; text: string; state?: 'streaming' | 'done' }
   | { type: 'reasoning'; text: string; state?: 'streaming' | 'done' }
   | { type: 'file'; mediaType: string; filename?: string; url: string }
-  | { type: 'source-url'; sourceId: string; url: string; title?: string }
-  // ... other part types
+  | { type: 'source-url'; sourceId: string; url: string; title?: string };
 ```
 
 ## Performance Considerations
@@ -442,14 +462,13 @@ type UIMessagePart =
 ```tsx
 function ChatWithHistoryLimit() {
   const MAX_MESSAGES = 50;
-  
+
   const chat = useAIChat({
     api: "/api/chat",
-    onFinish: (message) => {
-      // Trim message history to prevent memory issues
+    onFinish: () => {
       if (chat.messages.length > MAX_MESSAGES) {
-        const trimmedMessages = chat.messages.slice(-MAX_MESSAGES);
-        chat.setMessages(trimmedMessages);
+        const trimmed = chat.messages.slice(-MAX_MESSAGES);
+        chat.setMessages(trimmed);
       }
     }
   });
@@ -466,7 +485,7 @@ import { debounce } from 'lodash';
 
 function ChatWithDebouncedInput() {
   const chat = useAIChat({ api: "/api/chat" });
-  
+
   const debouncedSubmit = useMemo(
     () => debounce(chat.handleSubmit, 500),
     [chat.handleSubmit]
@@ -474,8 +493,6 @@ function ChatWithDebouncedInput() {
 
   const handleInputChange = (e) => {
     chat.handleInputChange(e);
-    
-    // Auto-submit after 500ms of no typing
     if (e.target.value.trim()) {
       debouncedSubmit();
     }
@@ -494,7 +511,6 @@ function ChatWithDebouncedInput() {
 ## Error Types
 
 ```typescript
-// Common error types you might encounter
 interface ChatError extends Error {
   name: 'ChatError';
   cause?: unknown;
@@ -515,17 +531,19 @@ interface ValidationError extends Error {
 
 ## Best Practices
 
-1. **Handle Errors Gracefully**: Always implement `onError` for production apps
-2. **Validate Input**: Check message content before sending
-3. **Manage Memory**: Limit message history in long conversations
-4. **Monitor Performance**: Watch for expensive re-renders
-5. **User Feedback**: Show loading states and error messages clearly
-6. **Accessibility**: Ensure keyboard navigation and screen reader support
+1. **Leverage Enrichment**: Always rely on `enrichedSystemPrompt` downstream; it is more informative than a raw prompt.
+2. **Handle Errors Gracefully**: Implement `onError` for production apps.
+3. **Validate Input**: Check user input before sending.
+4. **Manage Memory**: Trim long histories to reduce token usage.
+5. **Performance**: Use stable selectors and avoid unnecessary re-renders.
+6. **Security**: Avoid sending sensitive data in context/focus.
+7. **Observability**: Log resolved system prompts (but redact sensitive parts if any).
+8. **Per-Call Overrides**: Use `body.enrichedSystemPrompt` sparingly—prefer built-in builder unless you have a specialized orchestrator.
 
 ## See Also
 
-- [Basic Chat guide](/chat/basic-chat) - Complete tutorial with live examples
-- [useAIContext](/api/hooks/use-ai-context) - For sharing context
-- [useAIFocus](/api/hooks/use-ai-focus) - For focus items
-- [useAIFrontendTool](/api/hooks/use-ai-frontend-tool) - For frontend tools
-- [ChatContainer](/api/components/chat-container) - UI component for chat interfaces
+- [Basic Chat guide](/chat/basic-chat)
+- [useAIContext](/api/hooks/use-ai-context)
+- [useAIFocus](/api/hooks/use-ai-focus)
+- [useAIFrontendTool](/api/hooks/use-ai-frontend-tool)
+- [ChatContainer](/api/components/chat-container)

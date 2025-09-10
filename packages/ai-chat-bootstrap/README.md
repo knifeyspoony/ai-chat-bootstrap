@@ -22,13 +22,15 @@ React UI + hooks for building modern AI chat interfaces fast. Built on top of Ve
 
 ## Install
 
+You now need to install required peer dependencies explicitly (React, AI SDK core, React bindings, plus whatever model provider you use):
+
 ```bash
-pnpm add ai-chat-bootstrap
+pnpm add ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zod
 # or
-npm install ai-chat-bootstrap
-# or
-yarn add ai-chat-bootstrap
+npm install ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zod
 ```
+
+If you use a different provider, swap `@ai-sdk/openai` for `@ai-sdk/azure`, `@ai-sdk/google`, etc. `zod` is optional unless you define tool / command schemas (recommended).
 
 There are two ways to consume styles:
 
@@ -110,6 +112,37 @@ export function App() {
 }
 ```
 
+## CLI Scaffold (New)
+
+Generate a ready-to-run Next.js app with chat + API route:
+
+```bash
+npx ai-chat-bootstrap@latest init my-chat-app
+```
+
+Tailwind-native mode (no prebuilt utility slice):
+
+```bash
+npx ai-chat-bootstrap@latest init my-chat-app --tailwind-native
+```
+
+What you get:
+
+- Next.js (App Router, TS, Tailwind)
+- Installed peers: react, react-dom, ai, @ai-sdk/react, @ai-sdk/openai, zod, ai-chat-bootstrap
+- `/api/chat` route with streaming example
+- `/chat` page using `ChatContainer`
+- Global CSS updated for chosen style mode
+
+Next steps after scaffold:
+
+```bash
+cd my-chat-app
+npm run dev
+```
+
+Visit http://localhost:3000/chat.
+
 ## Features
 
 - Chat container + message rendering primitives
@@ -161,7 +194,26 @@ Only tokens + your generated utilities ship; unused classes are tree‑shaken by
 
 ## Peer Dependencies
 
-You must provide React 18+ and react-dom 18+.
+Required (must be installed in your app):
+
+- `react` (>=18)
+- `react-dom` (>=18)
+- `ai` (>=5)
+- `@ai-sdk/react` (>=2)
+
+Why peers? Avoid duplicate React / AI SDK instances and let you control exact versions alongside other AI features in your app.
+
+Optional depending on usage:
+
+- A model/provider package: e.g. `@ai-sdk/openai`, `@ai-sdk/azure`, `@ai-sdk/google`, `@ai-sdk/anthropic` (install one or more you call in your API routes)
+- `zod` for tool / command parameter schemas (install if you register tools or commands)
+
+Previously `ai` & `@ai-sdk/react` were bundled as regular dependencies (<=0.2.x). Starting 0.3.0 they are peers—add them to your project if upgrading.
+
+### Peer warning notes
+
+- React 19: Some third-party libs still list peer range up to React 18; pnpm/yarn may show warnings—safe to ignore if functionality works.
+- zod v4: Provider utilities may still peer-depend on zod v3; v4 is largely compatible for schemas you author. If you need to silence warnings, pin zod@^3 for now.
 
 ## License
 

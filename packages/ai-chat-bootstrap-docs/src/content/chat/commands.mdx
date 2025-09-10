@@ -432,14 +432,20 @@ import { openai } from "@ai-sdk/openai";
 import { streamText, convertToCoreMessages } from "ai";
 
 export async function POST(req: NextRequest) {
-  const { messages, systemPrompt, tools } = await req.json();
+  const {
+    messages,
+    systemPrompt,
+    enrichedSystemPrompt,
+    tools,
+    context,
+    focus
+  } = await req.json();
 
   const result = streamText({
     model: openai("gpt-4"),
-    system: systemPrompt || "You are a helpful assistant with access to various tools and commands.",
+    system: enrichedSystemPrompt,
     messages: convertToCoreMessages(messages),
-    tools, // Frontend tools are automatically included
-    toolChoice: "auto",
+    tools,
   });
 
   return result.toUIMessageStreamResponse();

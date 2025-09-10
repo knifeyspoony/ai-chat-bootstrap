@@ -53,6 +53,7 @@ export interface ChatContainerProps {
     enabled?: boolean;
     prompt?: string;
     count?: number;
+    api?: string; // endpoint for suggestions fetching
     onAssistantFinish?: (triggerFetch: () => void) => void;
     onSendMessage?: (message: string) => void;
   };
@@ -127,6 +128,8 @@ export function ChatContainer(props: ChatContainerProps) {
     enabled: props.suggestions?.enabled ?? false,
     prompt: props.suggestions?.prompt,
     messages,
+    numSuggestions: props.suggestions?.count,
+    api: props.suggestions?.api,
     onSuggestionClick: (suggestion) => {
       const send = props.suggestions?.onSendMessage;
       if (send) {

@@ -1,6 +1,6 @@
 {
   "name": "ai-chat-bootstrap",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "React UI + hooks for building modern AI chat interfaces fast. Based on AISDK and AISDK Elements",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -11,6 +11,11 @@
       "require": "./dist/index.js",
       "import": "./dist/index.mjs"
     },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "require": "./dist/server.js",
+      "import": "./dist/server.mjs"
+    },
     "./tokens.css": "./dist/tokens.css",
     "./tailwind.preset": "./dist/tailwind.preset.mjs",
     "./ai-chat.css": "./dist/ai-chat.css",
@@ -18,9 +23,13 @@
   },
   "files": [
     "dist",
+    "bin",
     "README.md",
     "LICENSE"
   ],
+  "bin": {
+    "ai-chat-bootstrap": "bin/cli.js"
+  },
   "scripts": {
     "prebuild": "pnpm clean",
     "build": "node ./scripts/build-css.mjs && tsdown",
@@ -30,11 +39,10 @@
     "clean": "rm -rf dist/",
     "release": "pnpm typecheck && pnpm lint && pnpm build && pnpm publish --access public",
     "prepublishOnly": "pnpm lint && pnpm build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/provider-utils": "^3.0.4",
-    "@ai-sdk/react": "^2.0.18",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -49,7 +57,6 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
-    "ai": "^5.0.18",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "cmdk": "^1.1.1",
@@ -57,7 +64,7 @@
     "highlight.js": "^11.11.1",
     "lucide-react": "^0.263.1",
     "react-markdown": "^10.1.0",
-    "react-syntax-highlighter": "^15.6.3",
+    "react-syntax-highlighter": "^15.6.6",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "shiki": "^3.12.2",
@@ -70,7 +77,9 @@
   },
   "peerDependencies": {
     "react": ">=18",
-    "react-dom": ">=18"
+    "react-dom": ">=18",
+    "ai": ">=5",
+    "@ai-sdk/react": ">=2"
   },
   "devDependencies": {
     "@ai-sdk/azure": "^2.0.16",
@@ -79,6 +88,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "ai": "^5.0.18",
+    "@ai-sdk/react": "^2.0.18",
     "@vitest/browser": "^3.2.4",
     "@vitest/coverage-v8": "^3.2.4",
     "autoprefixer": "^10.4.0",

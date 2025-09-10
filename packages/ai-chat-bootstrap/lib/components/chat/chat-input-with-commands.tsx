@@ -203,7 +203,7 @@ export const ChatInputWithCommands = ({
         setCurrentParameterIndex(0);
         setParameterValidationError(null); // Clear any previous errors
       }
-    } catch (error) {
+    } catch {
       setError("Command execution failed");
     }
   };
@@ -270,7 +270,7 @@ export const ChatInputWithCommands = ({
               (textarea as HTMLTextAreaElement).focus();
             }
           }, 10);
-        } catch (error) {
+        } catch {
           setError("Command execution failed");
         }
         return;

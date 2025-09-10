@@ -124,7 +124,7 @@ export function useAIChat(
       // Hook handles loading state internally
       onFinish?.();
     },
-    onError: (_) => {
+    onError: () => {
       setError("Chat error occurred");
     },
   });
@@ -143,7 +143,7 @@ export function useAIChat(
         toolCallId: toolCall.toolCallId,
         output: output,
       });
-    } catch (_) {}
+    } catch {}
   }
 
   const sendMessageWithContext = (content: string) => {

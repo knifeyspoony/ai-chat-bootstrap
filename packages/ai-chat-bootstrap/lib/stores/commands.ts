@@ -71,7 +71,7 @@ export const useAIChatCommandsStore = create<AIChatCommandsStore>(
       try {
         const validatedParams = command.parameters.parse(params);
         await command.execute(validatedParams);
-      } catch (_) {
+      } catch {
         throw new Error(`Error executing command "${name}"`);
       }
     },

@@ -17,9 +17,18 @@
       "import": "./dist/server.mjs"
     },
     "./tokens.css": "./dist/tokens.css",
+    "./tokens.primitives.css": "./dist/tokens.primitives.css",
+    "./tokens.semantic.css": "./dist/tokens.semantic.css",
+    "./tokens.dark.css": "./dist/tokens.dark.css",
     "./tailwind.preset": "./dist/tailwind.preset.mjs",
+    "./tailwind.plugin": "./dist/tailwind.plugin.mjs",
     "./ai-chat.css": "./dist/ai-chat.css",
-    "./tailwind.css": "./dist/ai-chat.css"
+    "./tailwind.css": "./dist/ai-chat.css",
+    "./variants": {
+      "types": "./dist/variants/index.d.ts",
+      "require": "./dist/variants/index.js",
+      "import": "./dist/variants/index.mjs"
+    }
   },
   "files": [
     "dist",

@@ -1,0 +1,35 @@
+/* Semantic token mapping. Maps primitives -> semantic layer. */
+:root {
+  --radius: var(--pr-radius-base);
+  --background: var(--pr-bg);
+  --foreground: var(--pr-fg);
+  --card: var(--pr-card);
+  --card-foreground: var(--pr-card-fg);
+  --popover: var(--pr-popover);
+  --popover-foreground: var(--pr-popover-fg);
+  --primary: var(--pr-primary);
+  --primary-foreground: var(--pr-primary-fg);
+  --secondary: var(--pr-secondary);
+  --secondary-foreground: var(--pr-secondary-fg);
+  --muted: var(--pr-muted);
+  --muted-foreground: var(--pr-muted-fg);
+  --accent: var(--pr-accent);
+  --accent-foreground: var(--pr-accent-fg);
+  --destructive: var(--pr-destructive);
+  --border: var(--pr-border);
+  --input: var(--pr-input);
+  --ring: var(--pr-ring);
+  --chart-1: var(--pr-chart-1);
+  --chart-2: var(--pr-chart-2);
+  --chart-3: var(--pr-chart-3);
+  --chart-4: var(--pr-chart-4);
+  --chart-5: var(--pr-chart-5);
+  --sidebar: var(--pr-sidebar);
+  --sidebar-foreground: var(--pr-sidebar-fg);
+  --sidebar-primary: var(--pr-sidebar-primary);
+  --sidebar-primary-foreground: var(--pr-sidebar-primary-fg);
+  --sidebar-accent: var(--pr-sidebar-accent);
+  --sidebar-accent-foreground: var(--pr-sidebar-accent-fg);
+  --sidebar-border: var(--pr-sidebar-border);
+  --sidebar-ring: var(--pr-sidebar-ring);
+}

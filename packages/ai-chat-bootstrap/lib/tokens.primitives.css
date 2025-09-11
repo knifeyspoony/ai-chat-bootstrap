@@ -1,0 +1,35 @@
+/* Primitive design tokens (light baseline). Downstream can override or replace. */
+:root {
+  --pr-radius-base: 0.625rem;
+  --pr-bg: oklch(1 0 0);
+  --pr-fg: oklch(0.145 0 0);
+  --pr-card: oklch(1 0 0);
+  --pr-card-fg: oklch(0.145 0 0);
+  --pr-popover: oklch(1 0 0);
+  --pr-popover-fg: oklch(0.145 0 0);
+  --pr-primary: oklch(0.205 0 0);
+  --pr-primary-fg: oklch(0.985 0 0);
+  --pr-secondary: oklch(0.97 0 0);
+  --pr-secondary-fg: oklch(0.205 0 0);
+  --pr-muted: oklch(0.97 0 0);
+  --pr-muted-fg: oklch(0.556 0 0);
+  --pr-accent: oklch(0.97 0 0);
+  --pr-accent-fg: oklch(0.205 0 0);
+  --pr-destructive: oklch(0.577 0.245 27.325);
+  --pr-border: oklch(0.922 0 0);
+  --pr-input: oklch(0.922 0 0);
+  --pr-ring: oklch(0.708 0 0);
+  --pr-chart-1: oklch(0.646 0.222 41.116);
+  --pr-chart-2: oklch(0.6 0.118 184.704);
+  --pr-chart-3: oklch(0.398 0.07 227.392);
+  --pr-chart-4: oklch(0.828 0.189 84.429);
+  --pr-chart-5: oklch(0.769 0.188 70.08);
+  --pr-sidebar: oklch(0.985 0 0);
+  --pr-sidebar-fg: oklch(0.145 0 0);
+  --pr-sidebar-primary: oklch(0.205 0 0);
+  --pr-sidebar-primary-fg: oklch(0.985 0 0);
+  --pr-sidebar-accent: oklch(0.97 0 0);
+  --pr-sidebar-accent-fg: oklch(0.205 0 0);
+  --pr-sidebar-border: oklch(0.922 0 0);
+  --pr-sidebar-ring: oklch(0.708 0 0);
+}

@@ -98,6 +98,7 @@ export const Reasoning = memo(
         value={{ isStreaming, isOpen, setIsOpen, duration }}
       >
         <Collapsible
+          data-acb-part="reasoning"
           className={cn("not-prose mb-4", className)}
           onOpenChange={handleOpenChange}
           open={isOpen}
@@ -118,15 +119,17 @@ export const ReasoningTrigger = memo(
 
     return (
       <CollapsibleTrigger
+        data-acb-part="reasoning-trigger"
         className={cn(
-          "flex items-center gap-2 text-muted-foreground text-sm",
+          "flex items-center gap-2 text-sm",
+          "text-[var(--acb-reasoning-fg)]",
           className
         )}
         {...props}
       >
         {children ?? (
           <>
-            <BrainIcon className="size-4" />
+            <BrainIcon className="size-4 text-[var(--acb-reasoning-icon)]" />
             {isStreaming || duration === 0 ? (
               <p>Thinking...</p>
             ) : (
@@ -156,6 +159,7 @@ export type ReasoningContentProps = ComponentProps<
 export const ReasoningContent = memo(
   ({ className, children, ...props }: ReasoningContentProps) => (
     <CollapsibleContent
+      data-acb-part="reasoning-content"
       className={cn(
         "mt-4 text-sm",
         "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",

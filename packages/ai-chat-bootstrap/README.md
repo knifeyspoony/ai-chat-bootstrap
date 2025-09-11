@@ -144,6 +144,39 @@ npm run dev
 
 Visit http://localhost:3000/chat.
 
+### Local / Development Testing of the CLI
+
+When iterating on the CLI locally (before publishing to npm) you can instruct the scaffold to use a local build of `ai-chat-bootstrap` instead of downloading from the registry.
+
+1. Build the package so `dist/` exists:
+
+```bash
+pnpm --filter ai-chat-bootstrap build
+```
+
+2. From anywhere (e.g. repo root) run the CLI with `--local` pointing at the package directory:
+
+```bash
+node packages/ai-chat-bootstrap/bin/cli.js init demo-local --local packages/ai-chat-bootstrap
+# or via npx after a local `pnpm link --global` (optional)
+```
+
+You can also set an env var:
+
+```bash
+AI_CHAT_BOOTSTRAP_LOCAL=packages/ai-chat-bootstrap node packages/ai-chat-bootstrap/bin/cli.js init demo-local
+```
+
+3. The installer will run `npm install ai-chat-bootstrap@file:/abs/path/...` so changes you rebuild will be reflected when you reinstall.
+
+Notes:
+
+- The path may be absolute or relative (relative is resolved from the scaffold working dir's parent).
+- Re-run the build after code changes to update the local `dist/` consumed by newly scaffolded apps.
+- If install fails with `ENOENT` ensure the path is correct and `dist/` exists.
+
+This avoids publishing every tweak just to validate scaffold behavior.
+
 ## Features
 
 - Chat container + message rendering primitives
@@ -161,6 +194,211 @@ Visit http://localhost:3000/chat.
 - `ai-chat.css` is an optional precompiled minimal utility slice (no preflight) containing only classes our components use.
 - The Tailwind preset maps the tokens to theme values if you opt into full Tailwind compilation.
 - Override theme by redefining CSS custom properties after importing `tokens.css`.
+
+### Layered Tokens
+
+You can opt into granular layers instead of the aggregate `tokens.css`:
+
+```ts
+import "ai-chat-bootstrap/tokens.primitives.css"; // primitive scales
+import "ai-chat-bootstrap/tokens.semantic.css"; // semantic mapping
+import "ai-chat-bootstrap/tokens.dark.css"; // dark overrides (optional)
+import "ai-chat-bootstrap/tokens.css"; // component hooks + globals only
+```
+
+If you import the first three, you may skip the aggregate and copy just the needed hooks into your own stylesheet.
+
+## Theming & Customization
+
+You can override any chat UI styling via CSS variables, data attributes, or the optional Tailwind plugin.
+
+### 1. Quick token override
+
+```css
+.my-chat-scope {
+  --acb-chat-container-bg: oklch(0.98 0.01 250);
+  --acb-chat-header-bg: oklch(0.96 0.02 250);
+  --acb-chat-message-assistant-bg: oklch(0.95 0.03 250);
+  --acb-chat-message-user-bg: oklch(0.62 0.17 275);
+  --acb-chat-message-radius: 1.25rem;
+}
+```
+
+Wrap your chat:
+
+```tsx
+<div className="my-chat-scope">
+  <ChatContainer chat={chat} />
+</div>
+```
+
+### 2. Data attribute targeting
+
+All structural parts expose `data-acb-part`:
+
+```
+[data-acb-part="container"], [data-acb-part="header"], [data-acb-part="message"],
+[data-acb-part="message-content"], [data-acb-part="message-avatar"],
+[data-acb-part="tool"], [data-acb-part="tool-header"], [data-acb-part="tool-output"],
+[data-acb-part="reasoning"], [data-acb-part="code-block"], [data-acb-part="prompt"] ...
+```
+
+Example shadow on user messages:
+
+```css
+.my-chat-scope [data-role="user"] [data-acb-part="message-content"] {
+  box-shadow: 0 0 0 1px oklch(0.8 0 0 / 0.3);
+}
+```
+
+### 3. Tailwind plugin utilities
+
+Add the plugin:
+
+```ts
+// tailwind.config.ts
+import preset from "ai-chat-bootstrap/tailwind.preset";
+import acbPlugin from "ai-chat-bootstrap/tailwind.plugin";
+
+export default {
+  presets: [preset],
+  plugins: [acbPlugin],
+};
+```
+
+Use utilities (they set CSS vars):
+
+```html
+<div
+  class="acb-msg-assistant-bg-blue-50 acb-msg-user-bg-indigo-600 acb-msg-radius-lg"
+>
+  <!-- chat -->
+</div>
+```
+
+All utilities start with `acb-` and map to a CSS variable; color values come from your Tailwind theme.
+
+### 4. Scoped theme switching
+
+```tsx
+<div
+  data-acb-theme="alt"
+  className="[--acb-chat-container-bg:oklch(0.15_0.02_250)] [--acb-chat-header-fg:white]"
+>
+  <ChatContainer chat={chat} />
+</div>
+```
+
+### 5. Strategy Ladder
+
+1. Override semantic design tokens (global feel)
+2. Override component CSS vars (fine tuning)
+3. Target `data-acb-part` for structural styles
+4. Use Tailwind plugin utilities for design system integration
+5. Unstyled mode: add `data-acb-unstyled` on an ancestor or directly on `ChatContainer` to remove base chrome.
+
+### Available CSS Variable Hooks (summary)
+
+Container: `--acb-chat-container-*`
+Header: `--acb-chat-header-*`
+Messages: `--acb-chat-message-*-*`, `--acb-chat-message-radius`
+Input: `--acb-chat-input-*`, `--acb-prompt-*`
+Tools: `--acb-tool-*`
+Reasoning: `--acb-reasoning-*`
+Code: `--acb-code-*`
+Scrollbar: `--acb-scrollbar-*`
+
+> All hooks inherit from base semantic tokens so light/dark just works unless overridden.
+
+## Variant APIs (CVA)
+
+For consumers who prefer composing their own DOM or extending styles, we export class-variance-authority (CVA) helpers. Import the variant builders and merge with your own classes or slot props.
+
+Import:
+
+```ts
+import {
+  messageVariants,
+  promptVariants,
+  toolVariants,
+  chatContainerVariants,
+  codeBlockVariants,
+} from "ai-chat-bootstrap/variants";
+```
+
+### messageVariants
+
+Variants:
+
+- role: `assistant | user | system | tool | reasoning`
+- density: `compact | normal | relaxed`
+- avatar: `show | hide`
+- radius: `none | sm | md | lg | xl`
+
+Example:
+
+```tsx
+<div
+  className={messageVariants({
+    role: "assistant",
+    density: "compact",
+    className: "my-extra-styles",
+  })}
+>
+  ...
+</div>
+```
+
+### promptVariants
+
+- size: `sm | md | lg`
+- state: `default | disabled | error`
+- toolbar: `inside | below | none`
+- density: `compact | normal | relaxed`
+
+### toolVariants
+
+- elevation: `none | sm | md | lg`
+- state: `idle | running | error`
+- chrome: `full | minimal`
+
+### chatContainerVariants
+
+- layout: `bordered | soft | unstyled`
+- density: `compact | normal | relaxed`
+- radius: `none | sm | md | lg | xl`
+- scrollbar: `subtle | contrast | hidden`
+
+### codeBlockVariants
+
+- lines: `show | hide`
+- theme: `auto | light | dark` (forces a theme variant regardless of surrounding context)
+- radius: `none | sm | md | lg | xl`
+
+### chatHeaderVariants
+
+- chrome: `default | minimal | clean`
+- shadow: `none | sm | md`
+- blur: `none | sm | md`
+- padding: `sm | md`
+- radius: `none | md | lg`
+- align: `between | center`
+- border: `none | solid`
+
+### promptInputVariants
+
+- chrome: `full | minimal | outline | unstyled`
+- shadow: `none | sm | md`
+- focusRing: `none | subtle | solid`
+- density: `compact | normal | relaxed`
+- toolbar: `default | floating | hidden`
+- textarea: `soft | flush`
+
+All CVA helpers accept a `className` key to append additional classes.
+
+Why not bake these into components? This keeps runtime weight minimal (no variant prop translation) while still giving downstream users a conventional API shape for composition, especially inside design‑system wrappers or MDX renderers.
+
+If you need additional variant surfaces, open an issue or PR—extending CVA configs is non-breaking.
 
 ## ChatContainer props
 

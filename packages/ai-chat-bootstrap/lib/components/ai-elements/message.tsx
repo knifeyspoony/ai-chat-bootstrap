@@ -28,7 +28,7 @@ export const MessageContent = ({
 }: MessageContentProps) => (
   <div
     className={cn(
-      "flex flex-col gap-2 overflow-hidden rounded-lg px-4 py-3 text-foreground text-sm",
+      "flex flex-col gap-2 overflow-hidden px-4 py-3 text-foreground text-sm",
       "group-[.is-user]:bg-primary group-[.is-user]:text-primary-foreground",
       "group-[.is-assistant]:bg-secondary group-[.is-assistant]:text-foreground",
       "is-user:dark",
@@ -52,13 +52,11 @@ export const MessageAvatar = ({
   ...props
 }: MessageAvatarProps) => (
   <Avatar className={cn("size-8 ring-1 ring-border", className)} {...props}>
-    {typeof src === "string" && <AvatarImage alt="" className="mt-0 mb-0" src={src} />}
+    {typeof src === "string" && (
+      <AvatarImage alt="" className="mt-0 mb-0" src={src} />
+    )}
     <AvatarFallback>
-      {typeof src === "string" ? (
-        name?.slice(0, 2) || "ME"
-      ) : (
-        src
-      )}
+      {typeof src === "string" ? name?.slice(0, 2) || "ME" : src}
     </AvatarFallback>
   </Avatar>
 );

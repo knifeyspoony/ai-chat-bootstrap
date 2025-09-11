@@ -258,8 +258,7 @@ export function ChatPopout(props: ChatPopoutProps) {
           ref={popoutRef}
           className={cn(
             "flex h-full bg-background transition-all duration-300 ease-in-out",
-            position === "left" && "border-r border-border/90",
-            position === "right" && "border-l border-border/90",
+            // side borders removed per request
             popoutClassName
           )}
           style={{
@@ -406,10 +405,8 @@ export function ChatPopout(props: ChatPopoutProps) {
           // Position relative to viewport (fixed) or parent (absolute)
           containerTarget === "viewport" ? "fixed top-0" : "absolute inset-y-0",
           "z-50 bg-background shadow-2xl transition-transform duration-300 ease-in-out",
-          position === "left" &&
-            "shadow-[4px_0_24px_rgba(0,0,0,0.12)] border-r border-border/90",
-          position === "right" &&
-            "shadow-[-4px_0_24px_rgba(0,0,0,0.12)] border-l border-border/90",
+          position === "left" && "shadow-[4px_0_24px_rgba(0,0,0,0.12)]", // removed side border
+          position === "right" && "shadow-[-4px_0_24px_rgba(0,0,0,0.12)]", // removed side border
           popoutClassName
         )}
         style={{

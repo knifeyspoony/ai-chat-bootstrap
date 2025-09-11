@@ -24,10 +24,19 @@ export type PromptInputProps = HTMLAttributes<HTMLFormElement>;
 
 export const PromptInput = ({ className, ...props }: PromptInputProps) => (
   <form
+    data-acb-part="prompt"
     className={cn(
-      "w-full divide-y overflow-hidden rounded-xl border bg-background shadow-sm",
+      "w-full overflow-hidden rounded-xl border shadow-sm",
+      "bg-[var(--acb-prompt-bg)] text-[var(--acb-prompt-fg)] border-[var(--acb-prompt-border)]",
+      // Divider color for child sections (use * selector mapping)
+      "divide-y",
       className
     )}
+    style={{
+      // Provide divider color via currentColor fallback; utilities can still override
+      ["--tw-divide-opacity" as any]: "1",
+      ["--tw-divide-color" as any]: "var(--acb-prompt-divider)",
+    }}
     {...props}
   />
 );
@@ -84,6 +93,7 @@ export const PromptInputTextarea = forwardRef<
 
     return (
       <Textarea
+        data-acb-part="prompt-textarea"
         className={cn(
           "w-full resize-none rounded-none border-none p-3 shadow-none outline-none ring-0",
           "field-sizing-content max-h-[6lh] bg-transparent dark:bg-transparent",
@@ -111,6 +121,7 @@ export const PromptInputToolbar = ({
   ...props
 }: PromptInputToolbarProps) => (
   <div
+    data-acb-part="prompt-toolbar"
     className={cn("flex items-center justify-between p-1", className)}
     {...props}
   />
@@ -123,6 +134,7 @@ export const PromptInputTools = ({
   ...props
 }: PromptInputToolsProps) => (
   <div
+    data-acb-part="prompt-tools"
     className={cn(
       "flex items-center gap-1",
       "[&_button:first-child]:rounded-bl-xl",
@@ -145,6 +157,7 @@ export const PromptInputButton = ({
 
   return (
     <Button
+      data-acb-part="prompt-button"
       className={cn(
         "shrink-0 gap-1.5 rounded-lg",
         variant === "ghost" && "text-muted-foreground",
@@ -183,6 +196,7 @@ export const PromptInputSubmit = ({
 
   return (
     <Button
+      data-acb-part="prompt-submit"
       className={cn("gap-1.5 rounded-lg", className)}
       size={size}
       type="submit"

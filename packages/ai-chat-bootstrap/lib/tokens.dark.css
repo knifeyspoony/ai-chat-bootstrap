@@ -1,0 +1,36 @@
+/* Dark theme primitive overrides (scoped to .dark or data-theme=dark). */
+.dark,
+:root[data-theme="dark"],
+html[data-theme="dark"] {
+  --pr-bg: oklch(0.145 0 0);
+  --pr-fg: oklch(0.985 0 0);
+  --pr-card: oklch(0.205 0 0);
+  --pr-card-fg: oklch(0.985 0 0);
+  --pr-popover: oklch(0.269 0 0);
+  --pr-popover-fg: oklch(0.985 0 0);
+  --pr-primary: oklch(0.922 0 0);
+  --pr-primary-fg: oklch(0.205 0 0);
+  --pr-secondary: oklch(0.269 0 0);
+  --pr-secondary-fg: oklch(0.985 0 0);
+  --pr-muted: oklch(0.269 0 0);
+  --pr-muted-fg: oklch(0.708 0 0);
+  --pr-accent: oklch(0.371 0 0);
+  --pr-accent-fg: oklch(0.985 0 0);
+  --pr-destructive: oklch(0.704 0.191 22.216);
+  --pr-border: oklch(1 0 0 / 10%);
+  --pr-input: oklch(1 0 0 / 15%);
+  --pr-ring: oklch(0.556 0 0);
+  --pr-chart-1: oklch(0.488 0.243 264.376);
+  --pr-chart-2: oklch(0.696 0.17 162.48);
+  --pr-chart-3: oklch(0.769 0.188 70.08);
+  --pr-chart-4: oklch(0.627 0.265 303.9);
+  --pr-chart-5: oklch(0.645 0.246 16.439);
+  --pr-sidebar: oklch(0.205 0 0);
+  --pr-sidebar-fg: oklch(0.985 0 0);
+  --pr-sidebar-primary: oklch(0.488 0.243 264.376);
+  --pr-sidebar-primary-fg: oklch(0.985 0 0);
+  --pr-sidebar-accent: oklch(0.269 0 0);
+  --pr-sidebar-accent-fg: oklch(0.985 0 0);
+  --pr-sidebar-border: oklch(1 0 0 / 10%);
+  --pr-sidebar-ring: oklch(0.439 0 0);
+}

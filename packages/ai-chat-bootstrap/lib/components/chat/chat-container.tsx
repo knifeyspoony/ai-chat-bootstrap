@@ -152,12 +152,25 @@ export function ChatContainer(props: ChatContainerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.suggestions?.onAssistantFinish, props.suggestions?.enabled]); // Remove triggerSuggestionsFetch to prevent re-registration
 
+  // Unstyled mode: if any ancestor or this component has data-acb-unstyled, suppress base chrome classes
+  const isUnstyled =
+    (props as any)["data-acb-unstyled"] === "" ||
+    (props as any)["data-acb-unstyled"] === true;
   return (
     <div
+      data-acb-part="container"
       className={cn(
-        "flex flex-col h-full bg-background overflow-hidden min-w-0 rounded-md border border-secondary",
+        !isUnstyled &&
+          "flex flex-col h-full overflow-hidden min-w-0 rounded-md border bg-[var(--acb-chat-container-bg)] border-[var(--acb-chat-container-border)]",
+        isUnstyled && "flex flex-col h-full overflow-hidden min-w-0",
         props.ui?.className
       )}
+      style={{
+        borderRadius: isUnstyled
+          ? undefined
+          : "var(--acb-chat-container-radius)",
+      }}
+      data-acb-unstyled={isUnstyled ? "" : undefined}
     >
       <ChatHeader
         title={props.header?.title}
@@ -177,7 +190,14 @@ export function ChatContainer(props: ChatContainerProps) {
         emptyState={props.ui?.emptyState}
       />
 
-      <div className="bg-background/50 backdrop-blur-sm p-4 rounded-b-md">
+      <div
+        data-acb-part="input-wrapper"
+        className={cn(
+          !isUnstyled &&
+            "backdrop-blur-sm p-4 rounded-b-md border-t bg-[var(--acb-chat-input-wrapper-bg)] border-[var(--acb-chat-input-wrapper-border)]",
+          isUnstyled && "p-0"
+        )}
+      >
         <ChatInputWithCommands
           value={inputValue}
           onChange={onChange}

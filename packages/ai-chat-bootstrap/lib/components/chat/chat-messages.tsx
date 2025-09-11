@@ -1,5 +1,5 @@
 import { getToolName, type ToolUIPart, type UIMessage } from "ai";
-import { UserIcon } from "lucide-react";
+import { MessageSquare, UserIcon } from "lucide-react";
 import React, { forwardRef, ReactNode, useImperativeHandle } from "react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
 import { CodeBlock } from "../../components/ai-elements/code-block";
@@ -58,10 +58,17 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
     const getTool = useAIToolsStore((s) => s.getTool);
 
     const defaultEmptyState = (
-      <div className="flex items-center justify-center h-full text-center p-8">
-        <div className="text-muted-foreground">
-          <p className="text-lg mb-2">No messages yet</p>
-          <p className="text-sm">Start a conversation below</p>
+      <div className="flex items-center justify-center h-full text-center p-8 animate-in fade-in duration-500">
+        <div className="text-muted-foreground space-y-4">
+          <div className="flex justify-center">
+            <MessageSquare className="h-12 w-12 opacity-60" />
+          </div>
+          <div className="space-y-2">
+            <p className="text-xl font-semibold text-foreground">
+              Ready to chat?
+            </p>
+            <p className="text-sm">Type a message to get started</p>
+          </div>
         </div>
       </div>
     );
@@ -121,9 +128,23 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                     <Message
                       key={message.id ?? index}
                       from={message.role}
-                      className={messageClassName}
+                      data-acb-part="message"
+                      data-role={message.role}
+                      className={cn(
+                        "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-assistant-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-assistant-fg)]",
+                        message.role === "user" &&
+                          "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-user-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-user-fg)]",
+                        message.role === "system" &&
+                          "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-system-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-system-fg)]",
+                        messageClassName
+                      )}
                     >
-                      <MessageContent>
+                      <MessageContent
+                        data-acb-part="message-content"
+                        className={cn(
+                          "rounded-[var(--acb-chat-message-radius)]"
+                        )}
+                      >
                         {message.parts?.map((part, partIndex: number) => (
                           <MessagePart
                             key={partIndex}
@@ -133,9 +154,8 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                           />
                         ))}
                       </MessageContent>
-                      {/* Icon-based avatars (images commented out per request) */}
                       <MessageAvatar
-                        //
+                        data-acb-part="message-avatar"
                         name={isUser ? "You" : "Assistant"}
                         src={
                           isUser
@@ -148,11 +168,23 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                 })}
 
           {isLoading && (
-            <Message from="assistant">
-              <MessageContent>
+            <Message
+              from="assistant"
+              data-acb-part="message"
+              data-role="assistant"
+              className="[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-assistant-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-assistant-fg)]"
+            >
+              <MessageContent
+                data-acb-part="message-content"
+                className="rounded-[var(--acb-chat-message-radius)]"
+              >
                 <Loader />
               </MessageContent>
-              <MessageAvatar name="Assistant" src={assistantAvatar} />
+              <MessageAvatar
+                data-acb-part="message-avatar"
+                name="Assistant"
+                src={assistantAvatar}
+              />
             </Message>
           )}
         </ConversationContent>

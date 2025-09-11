@@ -40,6 +40,8 @@ export default function Page() {
             // No background
             backgroundColor: "transparent",
             objectFit: "cover",
+            width: "auto",
+            height: "auto",
           }}
         />
         <span style={{ display: "inline-block" }}>AI Chat Bootstrap</span>

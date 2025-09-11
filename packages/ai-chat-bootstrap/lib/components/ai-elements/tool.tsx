@@ -23,7 +23,12 @@ export type ToolProps = ComponentProps<typeof Collapsible>;
 
 export const Tool = ({ className, ...props }: ToolProps) => (
   <Collapsible
-    className={cn("not-prose mb-4 w-full rounded-md border", className)}
+    data-acb-part="tool"
+    className={cn(
+      "not-prose mb-4 w-full rounded-md border",
+      "bg-[var(--acb-tool-bg)] border-[var(--acb-tool-border)] rounded-[var(--acb-tool-radius)]",
+      className
+    )}
     {...props}
   />
 );
@@ -64,8 +69,10 @@ export const ToolHeader = ({
   ...props
 }: ToolHeaderProps) => (
   <CollapsibleTrigger
+    data-acb-part="tool-header"
     className={cn(
       "flex w-full items-center justify-between gap-4 p-3",
+      "bg-[var(--acb-tool-header-bg)] text-[var(--acb-tool-header-fg)]",
       className
     )}
     {...props}
@@ -83,6 +90,7 @@ export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
 
 export const ToolContent = ({ className, ...props }: ToolContentProps) => (
   <CollapsibleContent
+    data-acb-part="tool-content"
     className={cn(
       "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
       className
@@ -96,11 +104,20 @@ export type ToolInputProps = ComponentProps<"div"> & {
 };
 
 export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
-  <div className={cn("space-y-2 overflow-hidden p-4", className)} {...props}>
+  <div
+    data-acb-part="tool-input"
+    className={cn("space-y-2 overflow-hidden p-4", className)}
+    {...props}
+  >
     <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
       Parameters
     </h4>
-    <div className="rounded-md bg-muted/50">
+    <div
+      className={cn(
+        "rounded-md",
+        "bg-[var(--acb-tool-input-bg)] text-[var(--acb-tool-input-fg)]"
+      )}
+    >
       <CodeBlock code={JSON.stringify(input, null, 2)} language="json" />
     </div>
   </div>
@@ -122,7 +139,11 @@ export const ToolOutput = ({
   }
 
   return (
-    <div className={cn("space-y-2 p-4", className)} {...props}>
+    <div
+      data-acb-part="tool-output"
+      className={cn("space-y-2 p-4", className)}
+      {...props}
+    >
       <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
         {errorText ? "Error" : "Result"}
       </h4>
@@ -130,8 +151,8 @@ export const ToolOutput = ({
         className={cn(
           "overflow-x-auto rounded-md text-xs [&_table]:w-full",
           errorText
-            ? "bg-destructive/10 text-destructive"
-            : "bg-muted/50 text-foreground"
+            ? "bg-[var(--acb-tool-error-bg)] text-[var(--acb-tool-error-fg)]"
+            : "bg-[var(--acb-tool-output-bg)] text-[var(--acb-tool-output-fg)]"
         )}
       >
         {errorText && <div>{errorText}</div>}

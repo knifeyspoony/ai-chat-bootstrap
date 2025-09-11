@@ -4,8 +4,10 @@ const path = require("node:path");
 const { log, error, warn } = require("./log");
 // Using raw template source files (.ts / .tsx / .md) copied directly.
 
-async function scaffold({ projectName, tailwindNative }) {
-  const dir = path.resolve(process.cwd(), projectName);
+async function scaffold({ projectName, tailwindNative, localPath }) {
+  // Capture directory where the CLI was invoked (before we chdir into scaffolded project)
+  const invocationCwd = process.cwd();
+  const dir = path.resolve(invocationCwd, projectName);
 
   if (fs.existsSync(dir)) {
     const existing = fs.readdirSync(dir).filter((f) => !f.startsWith("."));
@@ -25,17 +27,122 @@ async function scaffold({ projectName, tailwindNative }) {
 
   process.chdir(dir);
 
+  // -------------------- Dependency Installation --------------------
   log("Installing dependencies...");
+  let aiChatSpec = "ai-chat-bootstrap";
+  if (localPath) {
+    // Resolve relative to where the user invoked the CLI (not the new project dir)
+    const resolved = path.isAbsolute(localPath)
+      ? localPath
+      : path.resolve(invocationCwd, localPath);
+    const pkgJson = path.join(resolved, "package.json");
+    if (!fs.existsSync(pkgJson)) {
+      error(
+        `--local path does not contain package.json: ${resolved}\nPass an absolute path or one relative to the directory you ran the CLI from.`
+      );
+      process.exit(1);
+    }
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgJson, "utf8"));
+      if (pkg.name !== "ai-chat-bootstrap") {
+        warn(
+          `Local package name mismatch (expected ai-chat-bootstrap, got ${pkg.name}). Proceeding.`
+        );
+      }
+      const distDir = path.join(resolved, "dist");
+      if (!fs.existsSync(distDir)) {
+        warn(
+          "Local package has no dist/ build. Run 'pnpm --filter ai-chat-bootstrap build' before scaffolding."
+        );
+      }
+    } catch {
+      warn("Could not inspect local package.json");
+    }
+    // Create a packed tarball so npm copies instead of symlinking (avoids Turbopack leaving project root)
+    log("Packing local ai-chat-bootstrap (npm pack)...");
+    let tarballPath;
+    try {
+      const out = execSync("npm pack --silent", { cwd: resolved });
+      const fileName = out.toString().trim().split(/\n/).pop().trim();
+      tarballPath = path.join(resolved, fileName);
+      if (!fs.existsSync(tarballPath)) {
+        error(`npm pack did not produce expected tarball: ${tarballPath}`);
+        process.exit(1);
+      }
+      aiChatSpec = tarballPath; // install via absolute path to tgz
+      log(`Using packed tarball: ${aiChatSpec}`);
+    } catch (e) {
+      error(`Failed to pack local package: ${e.message}`);
+      process.exit(1);
+    }
+    // Clean up tarball after install later
+    process.on("exit", () => {
+      try {
+        if (tarballPath && fs.existsSync(tarballPath))
+          fs.unlinkSync(tarballPath);
+      } catch {}
+    });
+  }
   const deps = [
-    "ai-chat-bootstrap",
+    aiChatSpec,
     "ai",
     "@ai-sdk/react",
     "@ai-sdk/openai",
     "zod",
-    // Animation utilities used in scaffolded globals.css
     "tw-animate-css",
   ];
-  execSync(`npm install ${deps.join(" ")}`, { stdio: "inherit" });
+  try {
+    execSync(`npm install ${deps.join(" ")}`, { stdio: "inherit" });
+    // Sanity check: ensure the package is now resolvable in node_modules
+    if (
+      !fs.existsSync(
+        path.join("node_modules", "ai-chat-bootstrap", "package.json")
+      )
+    ) {
+      warn(
+        "ai-chat-bootstrap not found in node_modules after install. If using --local, npm may have failed silently; check the above output."
+      );
+      // Ensure no symlink remains (defensive): some package managers could still link; replace with physical copy.
+      const pkgDir = path.join("node_modules", "ai-chat-bootstrap");
+      try {
+        const stat = fs.lstatSync(pkgDir);
+        if (stat.isSymbolicLink()) {
+          const real = fs.realpathSync(pkgDir);
+          log(
+            "Replacing symlinked ai-chat-bootstrap with physical copy (local install)"
+          );
+          const tmp = pkgDir + "__tmp_copy";
+          fs.mkdirSync(tmp, { recursive: true });
+          // Recursive copy excluding node_modules
+          const copyRecursive = (src, dest) => {
+            const entries = fs.readdirSync(src);
+            for (const entry of entries) {
+              if (entry === "node_modules") continue;
+              const s = path.join(src, entry);
+              const d = path.join(dest, entry);
+              const st = fs.statSync(s);
+              if (st.isDirectory()) {
+                fs.mkdirSync(d, { recursive: true });
+                copyRecursive(s, d);
+              } else if (st.isFile()) {
+                fs.copyFileSync(s, d);
+              }
+            }
+          };
+          copyRecursive(real, tmp);
+          fs.rmSync(pkgDir, { recursive: true, force: true });
+          fs.renameSync(tmp, pkgDir);
+        }
+      } catch (e) {
+        warn("Could not verify/replace local package symlink: " + e.message);
+      }
+    }
+  } catch (e) {
+    error(
+      "Dependency install failed. If using --local ensure the path is correct and the package is built (pnpm build)."
+    );
+    throw e;
+  }
 
   // API + home page templates
   log("Copying templates (API routes + home page)");
@@ -61,18 +168,26 @@ async function scaffold({ projectName, tailwindNative }) {
   // Assets (logo / icon)
   try {
     const assetsDir = path.join(tmplDir, "assets");
+    const publicDir = path.join("public");
+    fs.mkdirSync(publicDir, { recursive: true });
     if (fs.existsSync(assetsDir)) {
-      const publicDir = path.join("public");
-      fs.mkdirSync(publicDir, { recursive: true });
       const files = fs.readdirSync(assetsDir);
-      files.forEach((f) => {
+      for (const f of files) {
         const src = path.join(assetsDir, f);
         const dest = path.join(publicDir, f);
-        if (fs.statSync(src).isFile()) {
-          fs.copyFileSync(src, dest);
-        }
-      });
-      log(`Copied ${files.length} asset(s) to public/`);
+        try {
+          if (fs.statSync(src).isFile()) {
+            fs.copyFileSync(src, dest);
+          }
+        } catch {}
+      }
+      log("Copied scaffold assets to public/");
+    } else {
+      warn("Assets directory missing in templates (no logo copied)");
+    }
+    const logoPath = path.join(publicDir, "acb.png");
+    if (!fs.existsSync(logoPath)) {
+      warn("acb.png not found in scaffold assets (will 404 until added)");
     }
   } catch (e) {
     warn("Could not copy assets: " + e.message);

@@ -30,8 +30,10 @@ export function ChatHeader({
 
   return (
     <div
+      data-acb-part="header"
       className={cn(
-        "flex items-center justify-between px-4 py-2 bg-background/80 backdrop-blur-sm rounded-t-md border-b border-secondary",
+        "flex items-center justify-between px-4 py-3 rounded-t-md border-b backdrop-blur-sm shadow-sm",
+        "bg-[var(--acb-chat-header-bg)] text-[var(--acb-chat-header-fg)] border-[var(--acb-chat-header-border)]",
         className
       )}
     >
@@ -39,14 +41,14 @@ export function ChatHeader({
         {avatar && (
           <div className="relative flex-shrink-0">
             {typeof avatar === "string" ? (
-              <Avatar className="h-6 w-6">
+              <Avatar className="h-8 w-8">
                 <AvatarImage src={avatar} alt={title || "Chat"} />
                 <AvatarFallback>
                   {title ? title[0].toUpperCase() : "AI"}
                 </AvatarFallback>
               </Avatar>
             ) : (
-              <div className="h-6 w-6 flex items-center justify-center">
+              <div className="h-8 w-8 flex items-center justify-center">
                 {avatar}
               </div>
             )}
@@ -54,7 +56,7 @@ export function ChatHeader({
         )}
 
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          {title && <h3 className="font-medium text-sm truncate">{title}</h3>}
+          {title && <h3 className="font-semibold text-base truncate">{title}</h3>}
           {badge &&
             (typeof badge === "string" ? (
               <Badge variant="secondary" className="text-xs flex-shrink-0">

@@ -24,3 +24,6 @@ export type {
   SuggestionsResponse,
   SuggestionsSchemaType,
 } from "./types/chat";
+
+// Optional: Variant helpers (CVA) for consumers wanting pure class composition
+export * from "./variants";

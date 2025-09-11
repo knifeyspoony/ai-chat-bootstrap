@@ -1,107 +1,143 @@
-/* Design tokens & minimal globals for ai-chat-bootstrap.
-   Import this BEFORE your Tailwind layers in the app (e.g. in globals.css).
+/* Aggregated tokens (legacy single import).
+   Now layered: primitives -> semantic -> dark -> component hooks & globals.
+   Consumers can alternatively import the specific layers:
+     import 'ai-chat-bootstrap/tokens.primitives.css'
+     import 'ai-chat-bootstrap/tokens.semantic.css'
+     import 'ai-chat-bootstrap/tokens.dark.css' // optional
+     import 'ai-chat-bootstrap/tokens.css'      // for hooks & globals
 */
 
+@import "./tokens.primitives.css";
+@import "./tokens.semantic.css";
+@import "./tokens.dark.css";
+
+/* Component & feature hook variables (single source). */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --acb-chat-container-bg: var(--background);
+  --acb-chat-container-border: var(--secondary);
+  --acb-chat-container-radius: var(--radius);
+  --acb-chat-header-bg: var(--background);
+  --acb-chat-header-fg: var(--foreground);
+  --acb-chat-header-border: var(--secondary);
+  --acb-chat-messages-bg: transparent;
+  --acb-chat-message-user-bg: var(--primary);
+  --acb-chat-message-user-fg: var(--primary-foreground);
+  --acb-chat-message-assistant-bg: var(--muted);
+  --acb-chat-message-assistant-fg: var(--muted-foreground);
+  --acb-chat-message-system-bg: var(--accent);
+  --acb-chat-message-system-fg: var(--accent-foreground);
+  --acb-chat-message-radius: var(--radius);
+  --acb-chat-input-wrapper-bg: oklch(from var(--background) l c h / 0.5);
+  --acb-chat-input-wrapper-border: var(--secondary);
+  --acb-chat-input-bg: var(--background);
+  --acb-chat-input-border: var(--input);
+  --acb-chat-input-fg: var(--foreground);
+  --acb-chat-input-toolbar-bg: var(--background);
+  --acb-chat-input-toolbar-border: var(--border);
+  --acb-scrollbar-track: var(--border);
+  --acb-scrollbar-thumb: color-mix(
+    in oklab,
+    var(--foreground) 25%,
+    var(--border)
+  );
+  --acb-scrollbar-thumb-hover: color-mix(
+    in oklab,
+    var(--foreground) 35%,
+    var(--border)
+  );
+  --acb-tool-bg: var(--card);
+  --acb-tool-border: var(--border);
+  --acb-tool-radius: var(--radius);
+  --acb-tool-header-bg: var(--muted);
+  --acb-tool-header-fg: var(--muted-foreground);
+  --acb-tool-input-bg: var(--muted);
+  --acb-tool-input-fg: var(--foreground);
+  --acb-tool-output-bg: var(--accent);
+  --acb-tool-output-fg: var(--accent-foreground);
+  --acb-tool-error-bg: color-mix(
+    in oklab,
+    var(--destructive) 15%,
+    var(--background)
+  );
+  --acb-tool-error-fg: var(--destructive);
+  --acb-reasoning-fg: var(--muted-foreground);
+  --acb-reasoning-icon: var(--muted-foreground);
+  --acb-code-bg: var(--background);
+  --acb-code-fg: var(--foreground);
+  --acb-code-border: var(--border);
+  --acb-code-radius: calc(var(--radius) - 2px);
+  --acb-code-line-number-fg: var(--muted-foreground);
+  --acb-prompt-border: var(--acb-chat-input-border);
+  --acb-prompt-bg: var(--acb-chat-input-bg);
+  --acb-prompt-fg: var(--acb-chat-input-fg);
+  --acb-prompt-divider: var(--acb-chat-input-border);
 }
 
+/* Dark-only hook adjustments (semantic + primitives already switch). */
 .dark,
 :root[data-theme="dark"],
 html[data-theme="dark"] {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.269 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.371 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.439 0 0);
+  --acb-chat-header-bg: var(--card);
+  --acb-chat-input-wrapper-bg: oklch(from var(--background) l c h / 0.5);
+  --acb-chat-message-assistant-bg: var(--muted);
+  --acb-scrollbar-track: var(--secondary);
+  --acb-scrollbar-thumb: color-mix(
+    in oklab,
+    var(--foreground) 20%,
+    var(--secondary)
+  );
+  --acb-scrollbar-thumb-hover: color-mix(
+    in oklab,
+    var(--foreground) 30%,
+    var(--secondary)
+  );
+  --acb-tool-header-bg: color-mix(in oklab, var(--muted) 60%, black);
+  --acb-tool-input-bg: color-mix(in oklab, var(--muted) 55%, black);
+  --acb-tool-output-bg: color-mix(in oklab, var(--accent) 55%, black);
+  --acb-code-bg: var(--card);
 }
 
-/* Minimal global tweaks (avoid redefining tailwind layers) */
-pre {
-  overflow-x: auto;
-}
-pre code {
-  display: block;
-  width: max-content;
-  min-width: 100%;
-}
-.shiki {
-  overflow-x: auto;
-}
-.shiki pre {
-  overflow-x: auto;
-}
-.shiki code {
-  display: block;
-  width: max-content;
-  min-width: 100%;
+:root[data-theme="dark"] .acb-scrollbar::-webkit-scrollbar-track,
+.dark .acb-scrollbar::-webkit-scrollbar-track,
+html[data-theme="dark"] .acb-scrollbar::-webkit-scrollbar-track {
+  background: var(--acb-scrollbar-track); /* darker track */
 }
 
-/* Copy button visibility logic remains utility-friendly, unscoped to avoid specificity wars */
-/* Updated: visibility now managed via group/code utility; fallback selectors kept minimal */
-.group\/code [data-slot="code-copy"],
-.group\/code .code-copy-button {
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
+:root[data-theme="dark"] .acb-scrollbar::-webkit-scrollbar-thumb,
+.dark .acb-scrollbar::-webkit-scrollbar-thumb,
+html[data-theme="dark"] .acb-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--acb-scrollbar-thumb);
+  border: 2px solid var(--acb-scrollbar-track);
 }
-.group\/code:hover [data-slot="code-copy"],
-.group\/code:hover .code-copy-button {
-  opacity: 1;
+
+:root[data-theme="dark"] .acb-scrollbar:hover::-webkit-scrollbar-thumb,
+.dark .acb-scrollbar:hover::-webkit-scrollbar-thumb,
+html[data-theme="dark"] .acb-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: var(--acb-scrollbar-thumb-hover);
+}
+
+/* Light/base scrollbar styling (so variables apply in both themes) */
+.acb-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--acb-scrollbar-thumb) var(--acb-scrollbar-track);
+}
+.acb-scrollbar::-webkit-scrollbar {
+  width: var(--acb-scrollbar-size, 10px);
+  height: var(--acb-scrollbar-size, 10px);
+}
+.acb-scrollbar::-webkit-scrollbar-track {
+  background: var(--acb-scrollbar-track);
+}
+.acb-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--acb-scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid var(--acb-scrollbar-track);
+}
+.acb-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: var(--acb-scrollbar-thumb-hover);
+}
+
+/* Typography globals */
+body {
+  font-family: var(--font-family);
 }

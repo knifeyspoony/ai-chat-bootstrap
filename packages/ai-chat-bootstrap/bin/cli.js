@@ -6,9 +6,26 @@ const { error } = require("./core/log");
 const args = process.argv.slice(2);
 const cmd = args[0];
 
+// Simple flag parsing (very small surface; avoid extra deps)
+function getFlagValue(flagNames) {
+  for (let i = 0; i < args.length; i++) {
+    if (flagNames.includes(args[i])) {
+      // support --flag=value syntax
+      const eq = args[i].indexOf("=");
+      if (eq !== -1) return args[i].slice(eq + 1) || undefined;
+      return args[i + 1] && !args[i + 1].startsWith("-") ? args[i + 1] : true;
+    }
+  }
+  return undefined;
+}
+
+const localPath =
+  getFlagValue(["--local", "--local-path"]) ||
+  process.env.AI_CHAT_BOOTSTRAP_LOCAL;
+
 function printHelp() {
   console.log(
-    `ai-chat-bootstrap CLI\n\nUsage:\n  npx ai-chat-bootstrap init [project-name] [--tailwind-native]\n\nCommands:\n  init   Scaffold a Next.js project with chat + suggestions + API routes\n\nOptions:\n  --tailwind-native  Use Tailwind preset instead of precompiled ai-chat.css\n  -h, --help         Show help\n`
+    `ai-chat-bootstrap CLI\n\nUsage:\n  npx ai-chat-bootstrap init [project-name] [--tailwind-native] [--local [/abs/path]]\n\nCommands:\n  init   Scaffold a Next.js project with chat + suggestions + API routes\n\nOptions:\n  --tailwind-native   Use Tailwind preset instead of precompiled ai-chat.css\n  --local [path]      Install from a local ai-chat-bootstrap package directory (dev testing). If no path provided, uses AI_CHAT_BOOTSTRAP_LOCAL env var.\n  -h, --help          Show help\n`
   );
 }
 
@@ -24,7 +41,7 @@ async function main() {
   }
   const projectName = args[1] || "ai-chat-app";
   const tailwindNative = args.includes("--tailwind-native");
-  await scaffold({ projectName, tailwindNative });
+  await scaffold({ projectName, tailwindNative, localPath });
 }
 
 main().catch((e) => {

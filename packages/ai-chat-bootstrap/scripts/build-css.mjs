@@ -16,26 +16,34 @@ if (!existsSync(distDir)) {
   mkdirSync(distDir, { recursive: true });
 }
 
-// Copy tokens.css into dist (no compiled utilities shipped)
-const inputTokens = join(packageRoot, "lib", "tokens.css");
-const outputTokens = join(packageRoot, "dist", "tokens.css");
+// Copy token layers
+const tokenFiles = [
+  "tokens.css",
+  "tokens.primitives.css",
+  "tokens.semantic.css",
+  "tokens.dark.css",
+];
 
-function copyTokens() {
+function copyTokenFile(file) {
+  const input = join(packageRoot, "lib", file);
+  const output = join(packageRoot, "dist", file);
   try {
-    copyFileSync(inputTokens, outputTokens);
-    console.log("✅ tokens.css copied");
+    copyFileSync(input, output);
+    console.log(`✅ ${file} copied`);
   } catch (e) {
-    console.error("❌ Failed to copy tokens.css", e.message);
+    console.error(`❌ Failed to copy ${file}`, e.message);
     if (!isWatch) process.exit(1);
   }
 }
 
-console.log("Publishing tokens.css for ai-chat-bootstrap...");
-copyTokens();
+console.log("Publishing token layers for ai-chat-bootstrap...");
+tokenFiles.forEach(copyTokenFile);
 
-// Also copy tailwind preset
+// Also copy tailwind preset & plugin
 const inputPreset = join(packageRoot, "lib", "tailwind.preset.mjs");
 const outputPreset = join(packageRoot, "dist", "tailwind.preset.mjs");
+const inputPlugin = join(packageRoot, "lib", "tailwind.plugin.mjs");
+const outputPlugin = join(packageRoot, "dist", "tailwind.plugin.mjs");
 function copyPreset() {
   try {
     copyFileSync(inputPreset, outputPreset);
@@ -45,7 +53,17 @@ function copyPreset() {
     if (!isWatch) process.exit(1);
   }
 }
+function copyPlugin() {
+  try {
+    copyFileSync(inputPlugin, outputPlugin);
+    console.log("✅ tailwind.plugin.mjs copied");
+  } catch (e) {
+    console.error("❌ Failed to copy tailwind.plugin.mjs", e.message);
+    if (!isWatch) process.exit(1);
+  }
+}
 copyPreset();
+copyPlugin();
 
 // Build a minimal compiled CSS (no preflight) using Tailwind against our source.
 // This yields ai-chat.css that consumers can import directly for zero-config.
@@ -54,7 +72,15 @@ console.log("Building ai-chat.css (Tailwind minimal layer)...");
 const buildInput = join(packageRoot, "scripts", "build-input.css");
 const outFile = join(distDir, "ai-chat.css");
 // Create a temporary config that mirrors tailwind.build.config.cjs but uses the built preset.
-const cfg = `module.exports = {\n  presets: [require('./tailwind.preset.mjs').default],\n  corePlugins: { preflight: false },\n  content: ['./lib/**/*.{ts,tsx,js,jsx}'],\n  theme: { extend: {} },\n  plugins: []\n}`;
+// Use ABSOLUTE glob because config resides in dist/ while sources are in ../lib
+// Include css files in content so Tailwind watch restarts on token / hook changes
+const contentGlob = join(
+  packageRoot,
+  "lib",
+  "**/*.{ts,tsx,js,jsx,css}"
+).replace(/\\/g, "/");
+const cfg = `module.exports = {\n  presets: [require('./tailwind.preset.mjs').default],\n  corePlugins: { preflight: false },\n  content: ['${contentGlob}'],\n  theme: { extend: {} },\n  plugins: []\n}`;
+console.log("[ai-chat-bootstrap] Tailwind content glob =>", contentGlob);
 const tempConfigPath = join(distDir, "_temp.tailwind.config.cjs");
 writeFileSync(tempConfigPath, cfg);
 
@@ -73,11 +99,14 @@ function buildOnce() {
 
 if (isWatch) {
   // Copy assets on change
-  watch(inputTokens, { persistent: true }, (eventType) => {
-    if (eventType === "change") {
-      console.log("↻ tokens.css changed; copying...");
-      copyTokens();
-    }
+  tokenFiles.forEach((file) => {
+    const input = join(packageRoot, "lib", file);
+    watch(input, { persistent: true }, (eventType) => {
+      if (eventType === "change") {
+        console.log(`↻ ${file} changed; copying...`);
+        copyTokenFile(file);
+      }
+    });
   });
   watch(inputPreset, { persistent: true }, (eventType) => {
     if (eventType === "change") {
@@ -85,6 +114,31 @@ if (isWatch) {
       copyPreset();
     }
   });
+  watch(inputPlugin, { persistent: true }, (eventType) => {
+    if (eventType === "change") {
+      console.log("↻ tailwind.plugin.mjs changed; copying...");
+      copyPlugin();
+    }
+  });
+
+  // Additionally watch any other CSS under lib (component level). When changed, touch temp config to
+  // nudge Tailwind (some editors may not trigger JIT if only variable values change).
+  watch(
+    join(packageRoot, "lib"),
+    { recursive: true },
+    (eventType, filename) => {
+      if (!filename) return;
+      if (filename.endsWith(".css") && !tokenFiles.includes(filename)) {
+        console.log(
+          `↻ CSS changed (${filename}); ensuring Tailwind rebuild...`
+        );
+        try {
+          // Touch the temp config so Tailwind notices a mtime change if it missed file watch.
+          writeFileSync(tempConfigPath, cfg);
+        } catch {}
+      }
+    }
+  );
 
   // Run tailwind in watch mode so CSS rebuilds when lib source changes
   const args = [

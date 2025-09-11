@@ -34,8 +34,10 @@ export const CodeBlock = ({
 }: CodeBlockProps) => (
   <CodeBlockContext.Provider value={{ code }}>
     <div
+      data-acb-part="code-block"
       className={cn(
-        "relative w-full overflow-hidden rounded-md border bg-background text-foreground",
+        "relative w-full overflow-hidden rounded-md border",
+        "bg-[var(--acb-code-bg)] text-[var(--acb-code-fg)] border-[var(--acb-code-border)] rounded-[var(--acb-code-radius)]",
         className
       )}
       {...props}
@@ -50,12 +52,12 @@ export const CodeBlock = ({
             margin: 0,
             padding: "1rem",
             fontSize: "0.875rem",
-            background: "hsl(var(--background))",
-            color: "hsl(var(--foreground))",
+            background: "var(--acb-code-bg)",
+            color: "var(--acb-code-fg)",
           }}
           language={language}
           lineNumberStyle={{
-            color: "hsl(var(--muted-foreground))",
+            color: "var(--acb-code-line-number-fg)",
             paddingRight: "1rem",
             minWidth: "2.5rem",
           }}
@@ -73,12 +75,12 @@ export const CodeBlock = ({
             margin: 0,
             padding: "1rem",
             fontSize: "0.875rem",
-            background: "hsl(var(--background))",
-            color: "hsl(var(--foreground))",
+            background: "var(--acb-code-bg)",
+            color: "var(--acb-code-fg)",
           }}
           language={language}
           lineNumberStyle={{
-            color: "hsl(var(--muted-foreground))",
+            color: "var(--acb-code-line-number-fg)",
             paddingRight: "1rem",
             minWidth: "2.5rem",
           }}

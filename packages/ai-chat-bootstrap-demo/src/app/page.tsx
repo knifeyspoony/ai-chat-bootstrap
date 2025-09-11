@@ -48,14 +48,60 @@ export default function Home() {
   const [selectedSystemPrompt, setSelectedSystemPrompt] =
     useState<string>("default");
   const [chatMode, setChatMode] = useState<"overlay" | "inline">("inline");
-  const [altTheme, setAltTheme] = useState(false);
+  // theme: light | dark | system | alt
+  const [theme, setTheme] = useState<string>(() => {
+    if (typeof window === "undefined") return "system";
+    try {
+      return localStorage.getItem("acb-theme") || "system";
+    } catch {
+      return "system";
+    }
+  });
 
-  // Alt theme effect
+  // Theme side effects
   React.useEffect(() => {
+    try {
+      localStorage.setItem("acb-theme", theme);
+    } catch {}
     const body = document.body;
-    if (altTheme) body.classList.add("demo-alt");
-    else body.classList.remove("demo-alt");
-  }, [altTheme]);
+    const rootHtml = document.documentElement;
+    // reset classes first
+    body.classList.remove("demo-alt");
+    rootHtml.classList.remove("dark");
+
+    const applySystem = () => {
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches;
+      if (prefersDark) rootHtml.classList.add("dark");
+    };
+
+    switch (theme) {
+      case "light":
+        // nothing (ensures no dark class)
+        break;
+      case "dark":
+        rootHtml.classList.add("dark");
+        break;
+      case "alt":
+        // alt builds on dark palette for contrast
+        rootHtml.classList.add("dark");
+        body.classList.add("demo-alt");
+        break;
+      case "system":
+      default:
+        applySystem();
+        break;
+    }
+
+    // listen for system changes if on system
+    if (theme === "system") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      const handler = () => applySystem();
+      mq.addEventListener("change", handler);
+      return () => mq.removeEventListener("change", handler);
+    }
+  }, [theme]);
 
   // AI integration - all AI logic is handled by the custom hook
   const {
@@ -385,26 +431,18 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="font-medium">Alt Theme:</span>
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                "text-sm",
-                !altTheme ? "text-primary font-medium" : "text-muted-foreground"
-              )}
-            >
-              Default
-            </span>
-            <Switch checked={altTheme} onCheckedChange={setAltTheme} />
-            <span
-              className={cn(
-                "text-sm",
-                altTheme ? "text-primary font-medium" : "text-muted-foreground"
-              )}
-            >
-              Alt
-            </span>
-          </div>
+          <span className="font-medium">Theme:</span>
+          <Select value={theme} onValueChange={setTheme}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="light">Light</SelectItem>
+              <SelectItem value="dark">Dark</SelectItem>
+              <SelectItem value="system">System</SelectItem>
+              <SelectItem value="alt">Alt</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

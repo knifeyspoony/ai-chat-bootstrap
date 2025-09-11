@@ -45,10 +45,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
+        className={`${geistSans.variable} ${geistMono.variable} antialiased pre-theme`}
       >
+        <script
+          // Inline script to prevent theme flash. Runs immediately.
+          dangerouslySetInnerHTML={{
+            __html: `(() => {try { const stored = localStorage.getItem('acb-theme') || 'system'; const html = document.documentElement; const body = document.body; const apply = (th) => { html.classList.remove('dark'); body.classList.remove('demo-alt'); if (th === 'dark') { html.classList.add('dark'); } else if (th === 'alt') { html.classList.add('dark'); body.classList.add('demo-alt'); } else if (th === 'system') { if (window.matchMedia('(prefers-color-scheme: dark)').matches) html.classList.add('dark'); } }; apply(stored); body.classList.remove('pre-theme'); if (stored === 'system') { const mq = window.matchMedia('(prefers-color-scheme: dark)'); mq.addEventListener('change', () => apply('system')); } } catch(e) { document.body && document.body.classList.remove('pre-theme'); } })();`,
+          }}
+        />
         {children}
       </body>
     </html>

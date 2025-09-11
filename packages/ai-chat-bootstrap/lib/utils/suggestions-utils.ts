@@ -1,14 +1,10 @@
 import type { ContextItem, FocusItem } from "../types/chat";
-import { compressLines, estimateTokens } from "./token-utils";
 
 export interface BuildEnrichedSuggestionsPromptParams {
   originalSystemPrompt?: string;
   context?: ContextItem[];
   focus?: FocusItem[];
   tools?: { name: string; description?: string }[];
-  maxTokens?: number;
-  hardMaxTokens?: number;
-  maxListItems?: number;
   numSuggestions?: number;
 }
 
@@ -25,9 +21,6 @@ export function buildEnrichedSuggestionsPrompt(
     context = [],
     focus = [],
     tools = [],
-    maxTokens = 12000,
-    hardMaxTokens = 24000,
-    maxListItems = 50,
     numSuggestions = 3,
   } = params;
 
@@ -52,17 +45,9 @@ export function buildEnrichedSuggestionsPrompt(
     lines.push(
       "## Tools\nThe following callable helpers may be relevant to assist the user. Invoke only when they clearly help advance the task.\n"
     );
-    const toolItems = tools.slice(0, maxListItems);
-    toolItems.forEach((t) => {
-      lines.push(`- **${t.name}**: ${sanitizeOneLine(t.description)}`);
+    tools.forEach((t) => {
+      lines.push(`- **${t.name}**: ${t.description ?? ""}`);
     });
-    if (tools.length > toolItems.length) {
-      lines.push(
-        `- (+${
-          tools.length - toolItems.length
-        } more tools not listed to conserve space)`
-      );
-    }
     lines.push("");
   }
 
@@ -70,23 +55,18 @@ export function buildEnrichedSuggestionsPrompt(
     lines.push(
       "## Context\nThe application has supplied contextual items that may inform intent, constraints, domain specifics, or user/environment state. Treat them as background grounding signals when interpreting the user's messages.\n"
     );
-    const contextItems = sortedContext.slice(0, maxListItems);
-    contextItems.forEach((c) => {
+    sortedContext.forEach((c) => {
       const label = c.label || c.id;
-      const desc = sanitizeOneLine(c.description) || "";
+      const desc = c.description ?? "";
+      const dataStr = c.data
+        ? `\nData: ${JSON.stringify(c.data, null, 2)}`
+        : "";
       lines.push(
         `- **${label}**${desc ? ": " + desc : ""}${
           c.priority !== undefined ? ` (priority ${c.priority})` : ""
-        }`
+        }${dataStr}`
       );
     });
-    if (sortedContext.length > contextItems.length) {
-      lines.push(
-        `- (+${
-          sortedContext.length - contextItems.length
-        } more context items truncated)`
-      );
-    }
     lines.push("");
   }
 
@@ -94,17 +74,14 @@ export function buildEnrichedSuggestionsPrompt(
     lines.push(
       "## Focus\nThe user currently has specific items selected / highlighted that may be highly relevant to the immediate task. Prioritize alignment with these when crafting suggestions.\n"
     );
-    const focusItems = focus.slice(0, maxListItems);
-    focusItems.forEach((f) => {
+    focus.forEach((f) => {
       const label = f.label || f.id;
-      const desc = sanitizeOneLine(f.description) || "";
-      lines.push(`- **${label}**${desc ? ": " + desc : ""}`);
+      const desc = f.description ?? "";
+      const dataStr = f.data
+        ? `\nData: ${JSON.stringify(f.data, null, 2)}`
+        : "";
+      lines.push(`- **${label}**${desc ? ": " + desc : ""}${dataStr}`);
     });
-    if (focus.length > focusItems.length) {
-      lines.push(
-        `- (+${focus.length - focusItems.length} more focus items truncated)`
-      );
-    }
     lines.push("");
   }
 
@@ -117,81 +94,5 @@ export function buildEnrichedSuggestionsPrompt(
     );
   }
 
-  let result = lines.join("\n");
-  let tokens = estimateTokens(result);
-  if (tokens > maxTokens) {
-    const rebuild = () => result.split(/\n/);
-    let arr = rebuild();
-
-    const shrinkSection = (header: string, minKeep = 6) => {
-      const startIdx = arr.findIndex((l) => l.startsWith(header));
-      if (startIdx === -1) return;
-      let endIdx = arr.length;
-      for (let i = startIdx + 1; i < arr.length; i++) {
-        if (/^##\s+/.test(arr[i])) {
-          endIdx = i;
-          break;
-        }
-      }
-      const section = arr.slice(startIdx, endIdx);
-      const bulletStart = section.findIndex((l) => l.startsWith("- "));
-      if (bulletStart === -1) return;
-      const bullets = section
-        .slice(bulletStart)
-        .filter((l) => l.startsWith("- "));
-      if (bullets.length <= minKeep + 4) return;
-      const compressed = compressLines({
-        lines: bullets,
-        keepHead: minKeep,
-        keepTail: 2,
-      });
-      arr = [
-        ...arr.slice(0, startIdx),
-        ...section.slice(0, bulletStart),
-        ...compressed,
-        ...arr.slice(endIdx),
-      ];
-    };
-
-    shrinkSection("## Context", 12);
-    result = arr.join("\n");
-    tokens = estimateTokens(result);
-    if (tokens > maxTokens) {
-      arr = rebuild();
-      shrinkSection("## Tools", 8);
-      result = arr.join("\n");
-      tokens = estimateTokens(result);
-    }
-    if (tokens > maxTokens) {
-      arr = rebuild();
-      shrinkSection("## Focus", 8);
-      result = arr.join("\n");
-      tokens = estimateTokens(result);
-    }
-    if (tokens > hardMaxTokens) {
-      const ratio = hardMaxTokens / tokens;
-      const targetChars = Math.floor(result.length * ratio) - 20;
-      if (originalSystemPrompt) {
-        const headChars = Math.floor(targetChars * 0.5);
-        const tailChars = targetChars - headChars;
-        result = `${result.slice(
-          0,
-          headChars
-        )}\n...\n[Hard truncated]\n...\n${result.slice(-tailChars)}`;
-      } else {
-        result = result.slice(0, targetChars) + "\n...[Hard truncated]";
-      }
-    }
-  }
-
-  return result;
-}
-
-function sanitizeOneLine(value?: string): string {
-  if (!value) return "";
-  return value
-    .replace(/\s+/g, " ")
-    .replace(/[\r\n]/g, " ")
-    .trim()
-    .slice(0, 400);
+  return lines.join("\n");
 }

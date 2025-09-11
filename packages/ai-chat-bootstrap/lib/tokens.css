@@ -70,7 +70,6 @@
   --acb-prompt-border: var(--acb-chat-input-border);
   --acb-prompt-bg: var(--acb-chat-input-bg);
   --acb-prompt-fg: var(--acb-chat-input-fg);
-  --acb-prompt-divider: var(--acb-chat-input-border);
 }
 
 /* Dark-only hook adjustments (semantic + primitives already switch). */

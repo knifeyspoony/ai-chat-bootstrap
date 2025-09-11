@@ -35,7 +35,8 @@ export const PromptInput = ({ className, ...props }: PromptInputProps) => (
     style={{
       // Provide divider color via currentColor fallback; utilities can still override
       ["--tw-divide-opacity" as any]: "1",
-      ["--tw-divide-color" as any]: "var(--acb-prompt-divider)",
+      // Use the same border color token directly per request
+      ["--tw-divide-color" as any]: "var(--acb-prompt-border)",
     }}
     {...props}
   />

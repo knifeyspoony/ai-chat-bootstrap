@@ -1,6 +1,11 @@
 import { getToolName, type ToolUIPart, type UIMessage } from "ai";
 import { MessageSquare, UserIcon } from "lucide-react";
-import React, { forwardRef, ReactNode, useImperativeHandle } from "react";
+import React, {
+  forwardRef,
+  ReactNode,
+  useImperativeHandle,
+  useMemo,
+} from "react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
 import { CodeBlock } from "../../components/ai-elements/code-block";
 import {
@@ -36,6 +41,12 @@ export interface ChatMessagesProps {
   className?: string;
   messageClassName?: string;
   emptyState?: React.ReactNode;
+  /** Optional extra inline content appended after rendered messages (e.g. suggestions) */
+  inlineExtra?: React.ReactNode;
+  /** Show floating suggestions toggle button */
+  suggestionsAvailable?: boolean;
+  suggestionsExpanded?: boolean;
+  onToggleSuggestions?: () => void;
 }
 
 export interface ChatMessagesHandle {
@@ -52,6 +63,10 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
       emptyState,
       assistantAvatar = "/acb.png",
       userAvatar,
+      inlineExtra,
+      suggestionsAvailable,
+      suggestionsExpanded,
+      onToggleSuggestions,
     },
     ref
   ) => {
@@ -73,101 +88,51 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
       </div>
     );
 
+    // Memoize filtered messages so unchanged array reference skips work in render phase
+    const filteredMessages = useMemo(() => {
+      return messages.filter((message) => {
+        if (message.role === "assistant") {
+          const hasContent = message.parts?.some(
+            (part) =>
+              (part.type === "text" && part.text?.trim()) ||
+              (part.type === "reasoning" && part.text?.trim()) ||
+              part.type?.startsWith("tool-") ||
+              part.type?.startsWith("data-") ||
+              part.type === "file" ||
+              part.type === "source-url" ||
+              part.type === "source-document"
+          );
+          return hasContent;
+        }
+        return true;
+      });
+    }, [messages]);
+
+    const lastMessage = messages[messages.length - 1];
+
     return (
       <Conversation className={cn("flex-1 text-left", className)}>
         <ConversationContent>
-          {messages.length === 0
+          {filteredMessages.length === 0
             ? emptyState || defaultEmptyState
-            : messages
-                .filter((message) => {
-                  // Filter out empty assistant messages (likely from cancelled requests)
-                  if (message.role === "assistant") {
-                    const hasContent = message.parts?.some(
-                      (part) =>
-                        (part.type === "text" && part.text?.trim()) ||
-                        (part.type === "reasoning" && part.text?.trim()) ||
-                        part.type?.startsWith("tool-") ||
-                        part.type?.startsWith("data-") ||
-                        part.type === "file" ||
-                        part.type === "source-url" ||
-                        part.type === "source-document"
-                    );
-                    return hasContent;
-                  }
-                  return true;
-                })
-                .map((message, index) => {
-                  const isUser = message.role === "user";
-                  const isSystem = message.role === "system";
-                  const isLast = index === messages.length - 1;
-                  const isStreamingLast =
-                    isLoading && isLast && message.role === "assistant";
-
-                  if (isSystem) {
-                    const firstPart = message.parts?.[0];
-                    const systemText =
-                      firstPart && "text" in firstPart
-                        ? firstPart.text
-                        : "System message";
-                    return (
-                      <div
-                        key={message.id ?? index}
-                        className={cn(
-                          "flex justify-center px-6 py-4 w-full",
-                          messageClassName
-                        )}
-                      >
-                        <Badge variant="outline" className="text-xs">
-                          {systemText}
-                        </Badge>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <Message
-                      key={message.id ?? index}
-                      from={message.role}
-                      data-acb-part="message"
-                      data-role={message.role}
-                      className={cn(
-                        "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-assistant-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-assistant-fg)]",
-                        message.role === "user" &&
-                          "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-user-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-user-fg)]",
-                        message.role === "system" &&
-                          "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-system-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-system-fg)]",
-                        messageClassName
-                      )}
-                    >
-                      <MessageContent
-                        data-acb-part="message-content"
-                        className={cn(
-                          "rounded-[var(--acb-chat-message-radius)]"
-                        )}
-                      >
-                        {message.parts?.map((part, partIndex: number) => (
-                          <MessagePart
-                            key={partIndex}
-                            part={part}
-                            streaming={isStreamingLast}
-                            getTool={getTool}
-                          />
-                        ))}
-                      </MessageContent>
-                      <MessageAvatar
-                        data-acb-part="message-avatar"
-                        name={isUser ? "You" : "Assistant"}
-                        src={
-                          isUser
-                            ? userAvatar || <UserIcon size={24} />
-                            : assistantAvatar
-                        }
-                      />
-                    </Message>
-                  );
-                })}
-
-          {isLoading && (
+            : filteredMessages.map((message, index) => {
+                const isStreamingLast =
+                  isLoading &&
+                  message === lastMessage &&
+                  message.role === "assistant";
+                return (
+                  <ChatMessageItem
+                    key={message.id ?? index}
+                    message={message}
+                    isStreaming={isStreamingLast}
+                    assistantAvatar={assistantAvatar}
+                    userAvatar={userAvatar}
+                    messageClassName={messageClassName}
+                    getTool={getTool}
+                  />
+                );
+              })}
+          {isLoading && !lastMessage && (
             <Message
               from="assistant"
               data-acb-part="message"
@@ -187,8 +152,46 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
               />
             </Message>
           )}
+          {inlineExtra}
         </ConversationContent>
         <ConversationScrollButton />
+        {suggestionsAvailable && (
+          <button
+            type="button"
+            onClick={onToggleSuggestions}
+            title={
+              suggestionsExpanded ? "Hide suggestions" : "Show suggestions"
+            }
+            className={cn(
+              "absolute z-20 rounded-full shadow-sm border bg-background/90 backdrop-blur-sm transition-colors",
+              "bottom-4 right-4 h-10 w-10 flex items-center justify-center",
+              suggestionsExpanded && "ring-2 ring-primary/50",
+              "hover:bg-accent hover:text-accent-foreground"
+            )}
+            data-testid="magic-ai-floating-button"
+          >
+            {/* Inline SVG sparkles icon to avoid extra import churn */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 3v4" />
+              <path d="M12 17v4" />
+              <path d="M3 12h4" />
+              <path d="M17 12h4" />
+              <path d="M18.36 5.64l-2.83 2.83" />
+              <path d="M8.47 15.53l-2.83 2.83" />
+              <path d="M5.64 5.64l2.83 2.83" />
+              <path d="M15.53 15.53l2.83 2.83" />
+            </svg>
+          </button>
+        )}
         <StickToBottomConnector ref={ref} />
       </Conversation>
     );
@@ -218,6 +221,91 @@ const StickToBottomConnector = forwardRef<ChatMessagesHandle>(
 ChatMessages.displayName = "ChatMessages";
 
 type AnyUIPart = UIMessage["parts"][number];
+
+interface ChatMessageItemProps {
+  message: UIMessage;
+  isStreaming: boolean;
+  assistantAvatar?: string;
+  userAvatar?: string;
+  messageClassName?: string;
+  getTool: (name: string) => AnyFrontendTool | undefined;
+}
+
+const ChatMessageItem = React.memo(function ChatMessageItem({
+  message,
+  isStreaming,
+  assistantAvatar,
+  userAvatar,
+  messageClassName,
+  getTool,
+}: ChatMessageItemProps) {
+  const isUser = message.role === "user";
+  const isSystem = message.role === "system";
+
+  if (isSystem) {
+    const firstPart = message.parts?.[0];
+    const systemText =
+      firstPart && "text" in firstPart ? firstPart.text : "System message";
+    return (
+      <div
+        className={cn("flex justify-center px-6 py-4 w-full", messageClassName)}
+      >
+        <Badge variant="outline" className="text-xs">
+          {systemText}
+        </Badge>
+      </div>
+    );
+  }
+
+  return (
+    <Message
+      from={message.role}
+      data-acb-part="message"
+      data-role={message.role}
+      className={cn(
+        "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-assistant-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-assistant-fg)]",
+        message.role === "user" &&
+          "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-user-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-user-fg)]",
+        message.role === "system" &&
+          "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-system-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-system-fg)]",
+        messageClassName
+      )}
+    >
+      <MessageContent
+        data-acb-part="message-content"
+        className={cn("rounded-[var(--acb-chat-message-radius)]")}
+      >
+        {message.parts?.map((part, partIndex: number) => (
+          <MessagePart
+            key={partIndex}
+            part={part}
+            streaming={isStreaming}
+            getTool={getTool}
+          />
+        ))}
+      </MessageContent>
+      <MessageAvatar
+        data-acb-part="message-avatar"
+        name={isUser ? "You" : "Assistant"}
+        src={isUser ? userAvatar || <UserIcon size={24} /> : assistantAvatar}
+      />
+    </Message>
+  );
+},
+areEqualChatMessageItem);
+
+function areEqualChatMessageItem(
+  prev: Readonly<ChatMessageItemProps>,
+  next: Readonly<ChatMessageItemProps>
+) {
+  return (
+    prev.message === next.message &&
+    prev.isStreaming === next.isStreaming &&
+    prev.assistantAvatar === next.assistantAvatar &&
+    prev.userAvatar === next.userAvatar &&
+    prev.messageClassName === next.messageClassName
+  );
+}
 
 function MessagePart({
   part,

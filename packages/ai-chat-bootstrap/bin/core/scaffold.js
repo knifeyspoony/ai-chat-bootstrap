@@ -2,11 +2,7 @@ const { execSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { log, error, warn } = require("./log");
-const {
-  apiRouteTemplate,
-  suggestionsRouteTemplate,
-  chatPageTemplate,
-} = require("./templates");
+// Using raw template source files (.ts / .tsx / .md) copied directly.
 
 async function scaffold({ projectName, tailwindNative }) {
   const dir = path.resolve(process.cwd(), projectName);
@@ -36,40 +32,161 @@ async function scaffold({ projectName, tailwindNative }) {
     "@ai-sdk/react",
     "@ai-sdk/openai",
     "zod",
+    // Animation utilities used in scaffolded globals.css
+    "tw-animate-css",
   ];
   execSync(`npm install ${deps.join(" ")}`, { stdio: "inherit" });
 
-  // API routes
-  log("Creating API routes");
+  // API + home page templates
+  log("Copying templates (API routes + home page)");
+  const tmplDir = path.join(__dirname, "templates");
   const apiChatDir = path.join("src", "app", "api", "chat");
   const apiSugDir = path.join("src", "app", "api", "suggestions");
   fs.mkdirSync(apiChatDir, { recursive: true });
   fs.mkdirSync(apiSugDir, { recursive: true });
-  fs.writeFileSync(path.join(apiChatDir, "route.ts"), apiRouteTemplate());
+  fs.writeFileSync(
+    path.join(apiChatDir, "route.ts"),
+    fs.readFileSync(path.join(tmplDir, "api-chat-route.ts"), "utf8")
+  );
   fs.writeFileSync(
     path.join(apiSugDir, "route.ts"),
-    suggestionsRouteTemplate()
+    fs.readFileSync(path.join(tmplDir, "api-suggestions-route.ts"), "utf8")
+  );
+  const homePagePath = path.join("src", "app", "page.tsx");
+  fs.writeFileSync(
+    homePagePath,
+    fs.readFileSync(path.join(tmplDir, "home-page.tsx"), "utf8")
   );
 
-  // Page
-  log("Adding chat page");
-  const chatPageDir = path.join("src", "app", "chat");
-  fs.mkdirSync(chatPageDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(chatPageDir, "page.tsx"),
-    chatPageTemplate(tailwindNative)
-  );
+  // Assets (logo / icon)
+  try {
+    const assetsDir = path.join(tmplDir, "assets");
+    if (fs.existsSync(assetsDir)) {
+      const publicDir = path.join("public");
+      fs.mkdirSync(publicDir, { recursive: true });
+      const files = fs.readdirSync(assetsDir);
+      files.forEach((f) => {
+        const src = path.join(assetsDir, f);
+        const dest = path.join(publicDir, f);
+        if (fs.statSync(src).isFile()) {
+          fs.copyFileSync(src, dest);
+        }
+      });
+      log(`Copied ${files.length} asset(s) to public/`);
+    }
+  } catch (e) {
+    warn("Could not copy assets: " + e.message);
+  }
+
+  // Inject favicon (metadata icons) into layout.tsx
+  try {
+    const layoutPath = path.join("src", "app", "layout.tsx");
+    if (fs.existsSync(layoutPath)) {
+      let layout = fs.readFileSync(layoutPath, "utf8");
+      // Ensure dark class + data-theme applied server-side to avoid light-mode flash
+      if (
+        !/className=\"[^\"]*dark/.test(layout) &&
+        /<html[^>]*>/.test(layout)
+      ) {
+        layout = layout.replace(/<html(.*?)>/, (m, attrs) => {
+          if (/data-theme=/.test(m))
+            return m.includes("className=")
+              ? m
+              : m.replace("<html", '<html className="dark"');
+          if (/className=/.test(m)) {
+            return m.replace(
+              /className=\"(.*?)\"/,
+              (mm, cls) => `className="${cls} dark" data-theme=\"dark\"`
+            );
+          }
+          return `<html${attrs} className="dark" data-theme="dark">`;
+        });
+      }
+      const hasIcons = /icons\s*:/m.test(layout);
+      const hasMetadata = /export const metadata/.test(layout);
+      if (hasMetadata && !hasIcons) {
+        // Attempt to augment existing metadata object
+        layout = layout.replace(/export const metadata([^=]*)=\s*\{/, (m) => {
+          return (
+            m +
+            "\n  icons: { icon: '/acb.png', shortcut: '/acb.png', apple: '/acb.png' },"
+          );
+        });
+      } else if (!hasMetadata) {
+        if (!/import type { Metadata } from 'next'/.test(layout)) {
+          layout = "import type { Metadata } from 'next';\n" + layout;
+        }
+        layout +=
+          "\nexport const metadata: Metadata = { icons: { icon: '/acb.png', shortcut: '/acb.png', apple: '/acb.png' } };\n";
+      }
+      fs.writeFileSync(layoutPath, layout);
+      log("Injected favicon metadata (acb.png)");
+    }
+  } catch (e) {
+    warn("Could not inject favicon metadata: " + e.message);
+  }
 
   // Styles
   log("Injecting style imports");
   const globalCssPath = path.join("src", "app", "globals.css");
   try {
     const existing = fs.readFileSync(globalCssPath, "utf8");
-    if (!existing.includes("ai-chat-bootstrap/tokens.css")) {
-      const extra = `\n/* ai-chat-bootstrap */\n@import "ai-chat-bootstrap/tokens.css";\n${
-        tailwindNative ? "" : '@import "ai-chat-bootstrap/ai-chat.css";\n'
-      }`;
-      fs.writeFileSync(globalCssPath, existing + extra);
+    const hasTokens = existing.includes("ai-chat-bootstrap/tokens.css");
+    const hasSlice = existing.includes("ai-chat-bootstrap/ai-chat.css");
+    const hasStreamdownSource = existing.includes("streamdown/dist/index.js");
+    const hasLibSource = existing.includes("ai-chat-bootstrap/dist/index.js");
+
+    if (
+      hasTokens &&
+      (tailwindNative || hasSlice) &&
+      hasStreamdownSource &&
+      hasLibSource
+    ) {
+      // Already satisfied; do nothing.
+    } else {
+      // Build the ordered block we want to enforce.
+      // Desired order inside globals.css:
+      // 1. Existing tailwindcss / other imports (left intact)
+      // 2. tw-animate (if present already)
+      // 3. ai-chat-bootstrap tokens
+      // 4. optional ai-chat.css slice (non tailwindNative)
+      // 5. @source directives
+      const lines = existing.split(/\n/);
+      // Find insertion index: after the last contiguous top import line ("@import \"") cluster.
+      let insertIdx = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i].trim();
+        if (l.startsWith("@import")) {
+          insertIdx = i + 1;
+          continue;
+        }
+        // stop at first non-import (blank lines are allowed inside cluster)
+        if (l.length && !l.startsWith("@import")) break;
+      }
+      const blockParts = [];
+      if (!hasTokens)
+        blockParts.push('@import "ai-chat-bootstrap/tokens.css";');
+      if (!tailwindNative && !hasSlice)
+        blockParts.push('@import "ai-chat-bootstrap/ai-chat.css";');
+      if (!hasStreamdownSource)
+        blockParts.push(
+          '@source "../../node_modules/streamdown/dist/index.js";'
+        );
+      if (!hasLibSource)
+        blockParts.push(
+          '@source "../../node_modules/ai-chat-bootstrap/dist/index.js";'
+        );
+      if (blockParts.length) {
+        // Avoid duplicate blank lines.
+        const insertion = [
+          "/* ai-chat-bootstrap (scaffold injected) */",
+          ...blockParts,
+          "",
+        ].join("\n");
+        lines.splice(insertIdx, 0, insertion);
+        fs.writeFileSync(globalCssPath, lines.join("\n"));
+        log("Injected ai-chat-bootstrap imports + sources into globals.css");
+      }
     }
   } catch {
     warn("Could not modify globals.css (file not found)");
@@ -99,9 +216,28 @@ async function scaffold({ projectName, tailwindNative }) {
     fs.writeFileSync(envPath, "OPENAI_API_KEY=your-key-here\n");
   }
 
+  // README augmentation
+  log("Updating README");
+  const readmePath = "README.md";
+  try {
+    const addition = fs.readFileSync(
+      path.join(__dirname, "templates", "readme-addition.md"),
+      "utf8"
+    );
+    let base = fs.existsSync(readmePath)
+      ? fs.readFileSync(readmePath, "utf8")
+      : `# ${projectName}\n`;
+    if (!base.includes("AI Chat Bootstrap Enhancements")) {
+      base += "\n" + addition + "\n";
+      fs.writeFileSync(readmePath, base);
+    }
+  } catch {
+    warn("Could not update README");
+  }
+
   log("Scaffold complete. Next steps:");
   console.log(
-    `\n  cd ${projectName}\n  npm run dev\n\n  Open http://localhost:3000/chat\n`
+    `\n  cd ${projectName}\n  npm run dev\n\n  Open http://localhost:3000/\n`
   );
 }
 

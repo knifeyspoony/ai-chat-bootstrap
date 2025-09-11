@@ -44,6 +44,7 @@ Import the design tokens _before_ other layers so CSS variables are defined earl
 @import "tailwindcss"; /* (optional) your existing base/util layers */
 @import "tw-animate-css"; /* (optional) any other libs */
 @import "ai-chat-bootstrap/ai-chat.css"; /* minimal namespaced utility slice */
+@source "../node_modules/streamdown/dist/index.js"; /* this is a streamdown requirement */
 ```
 
 That's it—no need to scan our source or safelist classes. The generated `ai-chat.css` only contains the utilities actually used by the library (preflight disabled, curated so they won't stomp your own config).

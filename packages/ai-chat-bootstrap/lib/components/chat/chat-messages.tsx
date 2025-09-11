@@ -67,7 +67,7 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
     );
 
     return (
-      <Conversation className={cn("flex-1", className)}>
+      <Conversation className={cn("flex-1 text-left", className)}>
         <ConversationContent>
           {messages.length === 0
             ? emptyState || defaultEmptyState

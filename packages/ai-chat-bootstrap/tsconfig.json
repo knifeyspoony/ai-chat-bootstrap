@@ -20,7 +20,8 @@
     "baseUrl": ".",
   },
   "include": [
-    "lib/**/*"
+    "lib/**/*",
+    "bin/core/templates/**/*"
   ],
   "exclude": [
     "node_modules",

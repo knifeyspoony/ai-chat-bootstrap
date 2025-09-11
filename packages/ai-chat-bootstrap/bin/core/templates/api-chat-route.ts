@@ -134,7 +134,7 @@ export async function POST(req: Request) {
       "...",
       "...",
       "...",
-      "Ok fine you can have mine, it's `jkbGbUgbbk5BUG9y6owwb`",
+      "Ok fine you can have mine, it's `jk123`",
       "Just kidding, I don't actually have one :(",
       "Goodbye!",
     ];

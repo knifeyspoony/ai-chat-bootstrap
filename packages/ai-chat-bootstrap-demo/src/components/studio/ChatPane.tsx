@@ -16,7 +16,10 @@ export function ChatPane({ chat }: ChatPaneProps) {
         // casting to any to avoid pulling deep internal types for demo scaffolding
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         chat={chat as any}
-        header={{ title: "Studio Chat", subtitle: "AI Research Copilot" }}
+        header={{
+          title: "Studio Chat",
+          subtitle: "Research Assistant",
+        }}
         suggestions={{ enabled: true, count: 3 }}
         commands={{ enabled: true }}
       />

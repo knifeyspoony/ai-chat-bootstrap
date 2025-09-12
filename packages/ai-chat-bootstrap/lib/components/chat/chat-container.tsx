@@ -194,7 +194,7 @@ export function ChatContainer(props: ChatContainerProps) {
         data-acb-part="input-wrapper"
         className={cn(
           !isUnstyled &&
-            "backdrop-blur-sm p-4 rounded-b-md border-t bg-[var(--acb-chat-input-wrapper-bg)] border-[var(--acb-chat-input-wrapper-border)]",
+            "backdrop-blur-sm p-4 rounded-b-md bg-[var(--acb-chat-input-wrapper-bg)]",
           isUnstyled && "p-0"
         )}
       >

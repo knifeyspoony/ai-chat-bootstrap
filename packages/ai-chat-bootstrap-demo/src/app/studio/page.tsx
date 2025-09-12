@@ -4,16 +4,13 @@ import { ChatPane } from "@/components/studio/ChatPane";
 import { SourcesPanel } from "@/components/studio/SourcesPanel";
 import { StudioLayout } from "@/components/studio/StudioLayout";
 import { StudioPanel } from "@/components/studio/StudioPanel";
+import { useStudioTools } from "@/hooks/use-studio-tools";
 import { useNotesStore } from "@/stores/notes-store";
 import { useSourcesStore } from "@/stores/sources-store";
 import { useAIChat, useAIContext } from "ai-chat-bootstrap";
 import { useMemo } from "react";
 
-interface ChatRefLike {
-  messages: unknown[];
-}
-
-function ContextBridge({ chat }: { chat: ChatRefLike }) {
+function ContextBridge() {
   const notesRecord = useNotesStore((s) => s.notes);
   const sourcesRecord = useSourcesStore((s) => s.sources);
   const userSources = useMemo(
@@ -59,13 +56,17 @@ function ContextBridge({ chat }: { chat: ChatRefLike }) {
 export default function StudioPage() {
   const chat = useAIChat({
     api: "/api/chat",
-    systemPrompt: "You are an AI research copilot. Use context + focus items.",
+    systemPrompt:
+      "You are an in‑app research assistant. Help the user investigate their topic using (a) provided source context, (b) current focus items, (c) available tools, and (d) the user's questions. Answer briefly—tight bullets or short paragraphs—avoiding filler. Prioritize information grounded in the supplied sources; cite source titles or shorthand identifiers when helpful. If something is unknown or not in sources, say so plainly. Suggest a tool call only when it clearly advances the research goal. Capture any durable, meaningful new finding or synthesis as a succinct note (prefix with 'Note:' when proposing it). Do not repeat prior answers unless adding new value. Never invent sources.",
   });
+
+  // Register studio tools (notes CRUD) via dedicated hook
+  useStudioTools();
 
   return (
     <>
       {/* ContextBridge should not occupy a visual panel; keep outside layout */}
-      <ContextBridge chat={chat} />
+      <ContextBridge />
       <StudioLayout>
         <SourcesPanel />
         <ChatPane chat={chat} />

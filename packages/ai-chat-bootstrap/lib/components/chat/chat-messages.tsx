@@ -41,12 +41,6 @@ export interface ChatMessagesProps {
   className?: string;
   messageClassName?: string;
   emptyState?: React.ReactNode;
-  /** Optional extra inline content appended after rendered messages (e.g. suggestions) */
-  inlineExtra?: React.ReactNode;
-  /** Show floating suggestions toggle button */
-  suggestionsAvailable?: boolean;
-  suggestionsExpanded?: boolean;
-  onToggleSuggestions?: () => void;
 }
 
 export interface ChatMessagesHandle {
@@ -63,10 +57,6 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
       emptyState,
       assistantAvatar = "/acb.png",
       userAvatar,
-      inlineExtra,
-      suggestionsAvailable,
-      suggestionsExpanded,
-      onToggleSuggestions,
     },
     ref
   ) => {
@@ -82,7 +72,7 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
             <p className="text-xl font-semibold text-foreground">
               Ready to chat?
             </p>
-            <p className="text-sm">Type a message to get started</p>
+            <p className="text-sm">Send a message to get started</p>
           </div>
         </div>
       </div>
@@ -152,46 +142,8 @@ export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
               />
             </Message>
           )}
-          {inlineExtra}
         </ConversationContent>
         <ConversationScrollButton />
-        {suggestionsAvailable && (
-          <button
-            type="button"
-            onClick={onToggleSuggestions}
-            title={
-              suggestionsExpanded ? "Hide suggestions" : "Show suggestions"
-            }
-            className={cn(
-              "absolute z-20 rounded-full shadow-sm border bg-background/90 backdrop-blur-sm transition-colors",
-              "bottom-4 right-4 h-10 w-10 flex items-center justify-center",
-              suggestionsExpanded && "ring-2 ring-primary/50",
-              "hover:bg-accent hover:text-accent-foreground"
-            )}
-            data-testid="magic-ai-floating-button"
-          >
-            {/* Inline SVG sparkles icon to avoid extra import churn */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 3v4" />
-              <path d="M12 17v4" />
-              <path d="M3 12h4" />
-              <path d="M17 12h4" />
-              <path d="M18.36 5.64l-2.83 2.83" />
-              <path d="M8.47 15.53l-2.83 2.83" />
-              <path d="M5.64 5.64l2.83 2.83" />
-              <path d="M15.53 15.53l2.83 2.83" />
-            </svg>
-          </button>
-        )}
         <StickToBottomConnector ref={ref} />
       </Conversation>
     );

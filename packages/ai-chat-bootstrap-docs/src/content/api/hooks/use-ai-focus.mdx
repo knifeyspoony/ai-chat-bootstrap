@@ -345,3 +345,142 @@ interface UseAIFocusReturn {
 - [Focus Items guide](/chat/focus-items) - Complete tutorial with live examples
 - [useAIContext](/api/hooks/use-ai-context) - For automatic context sharing
 - [useAIChat](/api/hooks/use-ai-chat) - Main chat hook
+
+---
+
+# useAIFocusItem (Reactive Focus)
+
+`useAIFocusItem` is a companion hook that provides a **reactive** way to keep a focus item synchronized with changing data (title/content/etc.) while it is focused. It feels similar to `useAIContext`, but remains explicitly user‑curated: the item only stays in focus while you choose to keep it there.
+
+## When to Use
+
+| Use Case | Prefer |
+|----------|--------|
+| User explicitly selects an item once and wants a stable snapshot | `setFocus` (manual) |
+| Item content changes as the user edits and AI should see latest | `useAIFocusItem` |
+| Need historical reproducibility of the exact original data | Manual snapshot |
+| Low‑friction always-fresh focus for an open editor | `useAIFocusItem` |
+| Performance sensitive; avoid rapid updates | Debounced `useAIFocusItem` or manual |
+
+## API
+
+```ts
+useAIFocusItem(
+  id: string,
+  build: () => Omit<FocusItem, 'id'> | null | undefined,
+  deps?: unknown[]
+): void
+```
+
+### Parameters
+
+| Name | Type | Description |
+|------|------|-------------|
+| `id` | `string` | Stable focus item identifier |
+| `build` | `() => Omit<FocusItem,'id'> \| null` | Function returning the latest focus payload; return `null` to remove focus |
+| `deps` | `unknown[]` | Dependency array that triggers re-evaluation of `build` |
+
+### Behavior
+* Runs on mount and whenever any dependency changes.
+* If `build()` returns an object → `setFocus(id, {...})` is called.
+* If `build()` returns `null` / `undefined` → `clearFocus(id)` is called.
+* Does **NOT** automatically clear on unmount (so navigating between list + editor does not implicitly drop focus). Explicitly return `null` or call `clearFocus` when you want to remove it.
+
+## Basic Example
+
+```tsx
+import { useAIFocusItem } from 'ai-chat-bootstrap';
+
+function SourceEditor({ source, isFocused }: { source: Source; isFocused: boolean }) {
+  useAIFocusItem(
+    source.id,
+    () => {
+      if (!isFocused) return null; // remove from focus when toggle off
+      return {
+        label: source.title || '(Untitled)',
+        data: {
+          type: 'source',
+          excerpt: source.body.slice(0, 500),
+          origin: source.origin,
+        }
+      };
+    },
+    [isFocused, source.title, source.body, source.origin]
+  );
+
+  return <Editor value={source.body} /* ... */ />;
+}
+```
+
+## Integrating with a Toggle (Checkbox)
+
+```tsx
+function FocusableRow({ source }: { source: Source }) {
+  const { focusItemsRecord } = useAIFocus();
+  const [manual, setManual] = React.useState(!!focusItemsRecord[source.id]);
+
+  useAIFocusItem(
+    source.id,
+    () => (manual ? {
+      label: source.title || '(Untitled)',
+      data: { type: 'source', excerpt: source.body.slice(0, 500) }
+    } : null),
+    [manual, source.title, source.body]
+  );
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="truncate flex-1">{source.title || '(Untitled)'}</span>
+      <Checkbox checked={manual} onCheckedChange={c => setManual(!!c)} />
+    </div>
+  );
+}
+```
+
+## Debouncing Updates (Optional)
+
+If the underlying data changes very rapidly (e.g. on each keystroke) you may want to debounce the dependencies upstream:
+
+```tsx
+const debouncedBody = useDebouncedValue(source.body, 250);
+useAIFocusItem(
+  source.id,
+  () => ({
+    label: source.title || '(Untitled)',
+    data: { type: 'source', excerpt: debouncedBody.slice(0, 500) }
+  }),
+  [source.title, debouncedBody]
+);
+```
+
+## Migration Guidance
+
+| Old Pattern | New Reactive Equivalent |
+|-------------|-------------------------|
+| `setFocus(id, item)` after each edit | One `useAIFocusItem` with `deps` |
+| Clear on component unmount | Return `null` when condition false |
+| Manual re-sync button | Remove; reactive keeps it fresh |
+
+## Best Practices
+1. Keep `deps` minimal; pass only values that influence the built focus payload.
+2. Return `null` early for cheap pruning if not focused.
+3. Avoid recreating large objects unnecessarily—derive only the fields the model needs.
+4. For auditability, snapshot `allFocusItems` at send time if you need an immutable record.
+
+## Anti-Patterns
+| Anti-Pattern | Why | Fix |
+|--------------|-----|-----|
+| Rebuilding huge payloads every keystroke | Performance churn | Debounce or narrow data |
+| Returning new objects when nothing semantically changed | Noise | Add a shallow hash check |
+| Depending on unstable inline functions in `deps` | Infinite updates risk | Memoize helpers |
+
+## Combining Snapshot + Reactive
+You can mix both approaches: use `useAIFocusItem` during active editing, then at the moment of “commit” (e.g. sending a chat) copy current focus items into a per-message snapshot for traceability.
+
+```ts
+const { allFocusItems } = useAIFocus();
+sendMessage({ focus: [...allFocusItems] }); // immutable snapshot
+```
+
+## Summary
+`useAIFocusItem` reduces boilerplate and keeps focused data fresh while preserving deliberate user control. Use it when freshness matters; fall back to manual `setFocus` for intentional snapshot semantics or strict reproducibility.

@@ -45,9 +45,9 @@ export function StudioLayout({ children }: { children: React.ReactNode }) {
   }
   const sizes: Sizes = useMemo(() => {
     if (leftCollapsed && rightCollapsed)
-      return { left: 4, center: 92, right: 4 }; // both collapsed
-    if (leftCollapsed) return { left: 5, center: 65, right: 30 }; // left collapsed keeps studio wide
-    if (rightCollapsed) return { left: 20, center: 70, right: 10 }; // studio collapsed
+      return { left: 3, center: 94, right: 3 }; // both collapsed
+    if (leftCollapsed) return { left: 3, center: 72, right: 25 }; // left collapsed keeps studio wide
+    if (rightCollapsed) return { left: 25, center: 72, right: 3 }; // studio collapsed
     // default: equal side panels
     return { left: 20, center: 60, right: 20 };
   }, [leftCollapsed, rightCollapsed]);
@@ -63,13 +63,14 @@ export function StudioLayout({ children }: { children: React.ReactNode }) {
       <ResizablePanelGroup
         key={layoutKey}
         direction="horizontal"
-        className="h-full w-full gap-2"
+        className="h-full w-full gap-1"
       >
         {/* Left Panel */}
         <ResizablePanel
           defaultSize={sizes.left}
-          minSize={4}
-          maxSize={40}
+          minSize={leftCollapsed ? 3 : 20}
+          // When collapsed, lock the panel size so user can't drag to expand via handle
+          maxSize={leftCollapsed ? 3 : 40}
           className="overflow-hidden"
         >
           <SidePanel
@@ -88,12 +89,17 @@ export function StudioLayout({ children }: { children: React.ReactNode }) {
         </ResizablePanel>
         <ResizableHandle
           withHandle
-          className="bg-transparent after:hidden w-2 mx-0"
+          // Disable pointer events (dragging) when the left panel is collapsed
+          tabIndex={leftCollapsed ? -1 : 0}
+          aria-disabled={leftCollapsed}
+          className={`bg-transparent after:hidden w-2 mx-0 ${
+            leftCollapsed ? "pointer-events-none opacity-40" : ""
+          }`}
         />
         {/* Center Chat Panel (always expanded, flexible) */}
         <ResizablePanel
           defaultSize={sizes.center}
-          minSize={30}
+          minSize={50}
           className="overflow-hidden"
         >
           <div className="flex h-full flex-col rounded-xl border bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/40 shadow-sm overflow-hidden">
@@ -102,13 +108,19 @@ export function StudioLayout({ children }: { children: React.ReactNode }) {
         </ResizablePanel>
         <ResizableHandle
           withHandle
-          className="bg-transparent after:hidden w-2 mx-0"
+          // Disable pointer events (dragging) when the right panel is collapsed
+          tabIndex={rightCollapsed ? -1 : 0}
+          aria-disabled={rightCollapsed}
+          className={`bg-transparent after:hidden w-2 mx-0 ${
+            rightCollapsed ? "pointer-events-none opacity-40" : ""
+          }`}
         />
         {/* Right Panel */}
         <ResizablePanel
           defaultSize={sizes.right}
-          minSize={8}
-          maxSize={50}
+          minSize={rightCollapsed ? 3 : 20}
+          // When collapsed, lock the panel size so user can't drag to expand via handle
+          maxSize={rightCollapsed ? 3 : 40}
           className="overflow-hidden"
         >
           <SidePanel

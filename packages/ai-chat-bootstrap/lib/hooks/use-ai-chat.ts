@@ -4,10 +4,15 @@ import {
   lastAssistantMessageIsCompleteWithToolCalls,
   UIMessage,
 } from "ai";
-import { useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useAIContextStore, useAIFocusStore, useAIToolsStore } from "../stores";
-import { useChatStore } from "../stores/chat";
+import {
+  useAIContextStore,
+  useAIFocusStore,
+  useAIToolsStore,
+  useChatThreadsStore,
+} from "../stores";
+import { useChatStore } from "../stores/";
 import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
 
 /**
@@ -26,6 +31,20 @@ export function useAIChat(
     onToolCall?: (toolCall: unknown) => void;
     onFinish?: () => void;
     initialMessages?: UIMessage[];
+    threadId?: string; // optional thread integration
+    /** Optional scope partition key for sharding threads (e.g. notebook/document id). */
+    scopeKey?: string;
+    /**
+     * If a threadId is provided and no thread exists in the store (and cannot be loaded
+     * from persistence), automatically create a new thread with that id.
+     * Defaults to true.
+     */
+    autoCreateThread?: boolean;
+    /**
+     * Emit a console.warn() when a supplied threadId could not be found/loaded.
+     * Defaults to false.
+     */
+    warnOnMissingThread?: boolean;
   } = {}
 ) {
   const {
@@ -34,20 +53,119 @@ export function useAIChat(
     onToolCall,
     onFinish,
     initialMessages,
+    threadId,
+    scopeKey,
+    autoCreateThread = true,
+    warnOnMissingThread = false,
   } = options;
 
   // Get raw store data with stable selectors - these return the same reference when unchanged
-  const contextItemsMap = useAIContextStore(
-    useShallow((state) => state.contextItems)
-  );
+  const contextItemsMap = useAIContextStore(useShallow((state) => state.items));
   const toolsMap = useAIToolsStore(useShallow((state) => state.tools));
   const focusItemsMap = useAIFocusStore(
     useShallow((state) => state.focusItems)
   );
   const executeTool = useAIToolsStore((state) => state.executeTool);
   const setError = useChatStore((state) => state.setError);
+  const setActiveThread = useChatThreadsStore((state) => state.setActiveThread);
 
-  // Note: Removed chat store sync to prevent infinite re-renders
+  // Direct reference to the zustand store object (not a hook call) for imperative ops
+  const threadStore = useChatThreadsStore; // NOTE: used in effects below (getState())
+
+  // Apply scopeKey (if provided) and load threads for that scope the first time or when scope changes.
+  useEffect(() => {
+    if (!scopeKey) return;
+    try {
+      const state = threadStore.getState();
+      const scopeChanged = state.scopeKey !== scopeKey;
+      if (scopeChanged) {
+        state.setScopeKey(scopeKey);
+        state.loadThreadMetas(scopeKey).catch(() => {});
+      } else if (!state.isLoaded) {
+        state.loadThreadMetas(scopeKey).catch(() => {});
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [scopeKey, threadStore]);
+
+  // Load initial thread messages synchronously if already present in memory
+  const existingThreadMessages: UIMessage[] | undefined = (() => {
+    if (threadId) {
+      try {
+        const state = useChatThreadsStore.getState();
+        const t = state.getThreadIfLoaded?.(threadId);
+        return t?.messages;
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
+  })();
+
+  // If a threadId is provided but not yet in memory, attempt to load it from persistence.
+  // If still missing, optionally create it (allowing pre-seeding a stable id from app state).
+  React.useEffect(() => {
+    if (!threadId) return;
+    try {
+      const state = threadStore.getState();
+      if (state.getThreadIfLoaded?.(threadId)) return; // already loaded
+      // Attempt persistence load
+      state
+        .loadThread(threadId)
+        .then((loaded) => {
+          if (loaded) {
+            // Set messages in hook if they differ (covers first mount where existingThreadMessages was undefined)
+            const storeMsgs = loaded.messages as UIMessage[];
+            const differs =
+              chatHook.messages.length !== storeMsgs.length ||
+              chatHook.messages.some((m, i) => storeMsgs[i]?.id !== m.id);
+            if (differs) chatHook.setMessages(storeMsgs);
+            // Also ensure active thread is this one if none selected
+            if (state.activeThreadId !== threadId) {
+              state.setActiveThread(threadId);
+            }
+            return;
+          }
+          // Not loaded
+          if (warnOnMissingThread) {
+            console.warn(
+              `[acb][useAIChat] threadId "${threadId}" not found; ${
+                autoCreateThread ? "creating new thread" : "no auto-create"
+              }`
+            );
+          }
+          if (autoCreateThread) {
+            // create a thread with the supplied id (stable external id)
+            state.createThread({ id: threadId, scopeKey });
+            state.setActiveThread(threadId);
+            // chatHook messages already reflect initialMessages (if any)
+            if (initialMessages && initialMessages.length > 0) {
+              state.updateThreadMessages(
+                threadId,
+                initialMessages as UIMessage[]
+              );
+            }
+          }
+        })
+        .catch(() => {
+          if (warnOnMissingThread) {
+            console.warn(
+              `[acb][useAIChat] failed loading threadId "${threadId}" from persistence`
+            );
+          }
+          const s2 = threadStore.getState();
+          if (autoCreateThread && !s2.threads.get(threadId)) {
+            s2.createThread({ id: threadId, scopeKey });
+            s2.setActiveThread(threadId);
+          }
+        });
+    } catch {
+      /* ignore */
+    }
+    // We intentionally exclude dependencies that would retrigger this unnecessarily
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadId, autoCreateThread, warnOnMissingThread, scopeKey]);
 
   // Get focus items - they're already serializable
   const focusItems = useMemo(() => {
@@ -77,9 +195,9 @@ export function useAIChat(
   const transport = useMemo(() => {
     return new DefaultChatTransport({
       api,
-      prepareSendMessagesRequest: (options) => {
+      prepareSendMessagesRequest: async (options) => {
         // Get fresh store data for each request - called only when sending messages
-        const currentContext = useAIContextStore.getState().serialize();
+        const currentContext = await useAIContextStore.getState().serialize();
         const currentTools = useAIToolsStore
           .getState()
           .serializeToolsForBackend();
@@ -128,10 +246,12 @@ export function useAIChat(
     });
   }, [api, systemPrompt]);
 
+  const [draftInput, setDraftInput] = useState("");
+
   const chatHook = useChat({
     transport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
-    messages: initialMessages,
+    messages: existingThreadMessages ?? initialMessages,
     onToolCall: async ({ toolCall }) => {
       try {
         // Execute frontend tool if available
@@ -147,11 +267,72 @@ export function useAIChat(
     onFinish: () => {
       // Hook handles loading state internally
       onFinish?.();
+      // Persist updated messages into thread (if any)
+      if (threadId && threadStore) {
+        try {
+          const state = threadStore.getState();
+          if (state.threads.get(threadId)) {
+            state.updateThreadMessages(
+              threadId,
+              chatHook.messages as UIMessage[]
+            );
+          }
+        } catch {}
+      }
     },
     onError: () => {
       setError("Chat error occurred");
     },
   });
+
+  // Keep track of last thread id AND per-thread input drafts
+  const lastThreadIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!threadStore) return;
+    if (threadId === lastThreadIdRef.current) return;
+    const prev = lastThreadIdRef.current;
+    lastThreadIdRef.current = threadId;
+    // Unload previous (optional optimization)
+    if (prev) {
+      try {
+        const st = threadStore.getState();
+        // Keep it loaded if we might come back? For now, unload to save memory.
+        st.unloadThread?.(prev);
+      } catch {}
+    }
+    if (threadId) {
+      // Ensure loaded
+      try {
+        const st = threadStore.getState();
+        if (!st.getThreadIfLoaded?.(threadId)) {
+          st.loadThread(threadId)
+            .then((t) => {
+              if (!t) return;
+              const storeMsgs = t.messages as UIMessage[];
+              const existing = chatHook.messages;
+              const differs =
+                existing.length !== storeMsgs.length ||
+                existing.some((m, i) => storeMsgs[i]?.id !== m.id);
+              if (differs) chatHook.setMessages(storeMsgs);
+            })
+            .catch(() => {});
+        } else {
+          const t = st.getThreadIfLoaded(threadId);
+          if (t) {
+            const storeMsgs = t.messages as UIMessage[];
+            const existing = chatHook.messages;
+            const differs =
+              existing.length !== storeMsgs.length ||
+              existing.some((m, i) => storeMsgs[i]?.id !== m.id);
+            if (differs) chatHook.setMessages(storeMsgs);
+          }
+        }
+      } catch {}
+    } else {
+      // no active thread
+      chatHook.setMessages([]);
+    }
+  }, [threadId, chatHook]);
 
   // Note: Removed chat store sync - causes infinite re-renders
   // The chat hook manages its own state internally
@@ -173,6 +354,51 @@ export function useAIChat(
   const sendMessageWithContext = (content: string) => {
     setError(null);
     chatHook.sendMessage({ text: content });
+    if (threadId && threadStore) {
+      // schedule microtask after message appended by hook
+      queueMicrotask(() => {
+        try {
+          const state = threadStore.getState();
+          if (state.threads.get(threadId)) {
+            state.updateThreadMessages(
+              threadId,
+              chatHook.messages as UIMessage[]
+            );
+            // Auto-title (improved): if no title yet AND we have at least 2 messages (user + assistant)
+            const t = state.threads.get(threadId);
+            if (t && !t.title) {
+              const userCount = chatHook.messages.filter(
+                (m) => m.role === "user"
+              ).length;
+              const assistantCount = chatHook.messages.filter(
+                (m) => m.role === "assistant"
+              ).length;
+              if (
+                userCount > 0 &&
+                (assistantCount > 0 || chatHook.messages.length > 3)
+              ) {
+                // Fire-and-forget fetch to backend title endpoint
+                const payload = { messages: chatHook.messages.slice(0, 8) };
+                fetch("/api/thread-title", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload),
+                })
+                  .then(async (r) => {
+                    if (!r.ok) return;
+                    const data: { title?: string } = await r.json();
+                    if (data.title && !state.threads.get(threadId)?.title) {
+                      // Guard again (user could have renamed meanwhile)
+                      state.renameThread(threadId, data.title);
+                    }
+                  })
+                  .catch(() => {});
+              }
+            }
+          }
+        } catch {}
+      });
+    }
   };
 
   // Send AI command message with specific tool filtering
@@ -197,6 +423,19 @@ export function useAIChat(
         },
       }
     );
+    if (threadId && threadStore) {
+      queueMicrotask(() => {
+        try {
+          const state = threadStore.getState();
+          if (state.threads.get(threadId)) {
+            state.updateThreadMessages(
+              threadId,
+              chatHook.messages as UIMessage[]
+            );
+          }
+        } catch {}
+      });
+    }
   };
 
   // Retry last message with error recovery
@@ -216,8 +455,86 @@ export function useAIChat(
     setError(null);
   };
 
+  // --- Internal autosave logic ---
+  const lastSavedSignatureRef = useRef<string | undefined>(undefined);
+
+  function computeSignature(msgs: UIMessage[]): string {
+    // Use length + last 5 ids for cheap change detection
+    const tailIds = msgs
+      .slice(-5)
+      .map((m) => m.id)
+      .join("|");
+    return `${msgs.length}:${tailIds}`;
+  }
+
+  function persistMessagesIfChanged(reason: string) {
+    if (!threadId) return;
+    try {
+      const store = threadStore.getState();
+      const loaded = store.getThreadIfLoaded?.(threadId);
+      if (!loaded) return; // only persist hydrated threads
+      const msgs = chatHook.messages as UIMessage[];
+      const sig = computeSignature(msgs);
+      if (sig === lastSavedSignatureRef.current) return;
+      store.updateThreadMessages(threadId, msgs);
+      lastSavedSignatureRef.current = sig;
+      // Optionally debug: console.debug('[acb][autosave]', reason, sig)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // Persist whenever messages settle and we are idle (not streaming/submitting)
+  useEffect(() => {
+    if (!threadId) return;
+    if (chatHook.status === "streaming" || chatHook.status === "submitted")
+      return;
+    persistMessagesIfChanged("idle");
+  }, [threadId, chatHook.status, chatHook.messages]);
+
+  // Periodic re-title attempt (e.g., after more context) if still untitled.
+  useEffect(() => {
+    if (!threadId) return;
+    const store = threadStore.getState();
+    const t = store.threads.get(threadId);
+    if (!t || t.title) return; // already titled or missing
+    if (chatHook.messages.length < 4) return; // need some substance
+    const handle = setTimeout(() => {
+      // Double-check still untitled
+      const current = threadStore.getState().threads.get(threadId);
+      if (!current || current.title) return;
+      fetch("/api/thread-title", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: chatHook.messages.slice(0, 12) }),
+      })
+        .then(async (r) => {
+          if (!r.ok) return;
+          const data: { title?: string } = await r.json();
+          if (
+            data.title &&
+            !threadStore.getState().threads.get(threadId)?.title
+          ) {
+            threadStore.getState().renameThread(threadId, data.title);
+          }
+        })
+        .catch(() => {});
+    }, 4000); // wait a few seconds after latest change
+    return () => clearTimeout(handle);
+  }, [threadId, chatHook.messages]);
+
+  // Persist on unmount
+  useEffect(() => {
+    return () => {
+      persistMessagesIfChanged("unmount");
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return {
     ...chatHook,
+    input: draftInput,
+    setInput: setDraftInput,
     sendMessageWithContext,
     sendAICommandMessage,
     retryLastMessage,

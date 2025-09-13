@@ -5,6 +5,7 @@ export { ChatInput } from "../../components/chat/chat-input";
 export { ChatInputWithCommands } from "../../components/chat/chat-input-with-commands";
 export { ChatMessages } from "../../components/chat/chat-messages";
 export { ChatPopout } from "../../components/chat/chat-popout";
+export { ChatThreadsButton } from "../../components/chat/chat-threads-button";
 
 // AI Elements components (re-exported for convenience)
 export * from "../../components/ai-elements/code-block";

@@ -13,6 +13,27 @@ import type { useAIChat } from "../../hooks";
 import { ChatHeader } from "./chat-header";
 type ChatHook = ReturnType<typeof useAIChat>;
 
+// Lightweight wrapper to lazy load the threads dropdown only when needed
+const ThreadsDropdownWrapper: React.FC<{
+  scopeKey?: string;
+  onSelectThread?: (id: string) => void;
+}> = ({ scopeKey, onSelectThread }) => {
+  // dynamic import inside component (sync require acceptable in bundlers)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { ChatThreadsButton } = require("./chat-threads-button");
+    return (
+      <ChatThreadsButton
+        scopeKey={scopeKey}
+        onSelectThread={onSelectThread}
+        className="ml-1"
+      />
+    );
+  } catch {
+    return null;
+  }
+};
+
 export interface ChatContainerProps {
   // Preferred: pass chat hook result
   chat?: ChatHook;
@@ -67,6 +88,14 @@ export interface ChatContainerProps {
       toolName: string,
       systemPrompt?: string
     ) => void;
+  };
+
+  // Threads group (optional)
+  threads?: {
+    enabled?: boolean;
+    scopeKey?: string;
+    threadId?: string; // externally controlled active thread id
+    onThreadChange?: (threadId: string) => void;
   };
 
   // Explicit state overrides if not using chat
@@ -177,7 +206,20 @@ export function ChatContainer(props: ChatContainerProps) {
         subtitle={props.header?.subtitle}
         avatar={props.header?.avatar}
         badge={props.header?.badge}
-        actions={props.header?.actions}
+        actions={
+          <>
+            {props.threads?.enabled && (
+              <React.Suspense fallback={null}>
+                {/* Lazy import to avoid bundle impact if unused */}
+                <ThreadsDropdownWrapper
+                  scopeKey={props.threads?.scopeKey}
+                  onSelectThread={props.threads?.onThreadChange}
+                />
+              </React.Suspense>
+            )}
+            {props.header?.actions}
+          </>
+        }
         className={props.header?.className ?? props.ui?.classes?.header}
       />
 

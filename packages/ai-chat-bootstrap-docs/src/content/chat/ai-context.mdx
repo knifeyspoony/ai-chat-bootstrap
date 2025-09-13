@@ -27,7 +27,7 @@ Context sharing creates a bridge between your React state and the AI model:
 
 ## Basic Usage
 
-The <API name="useAIContext">useAIContext</API> hook takes three parameters:
+The <API name="useAIContext">useAIContext</API> hook accepts an options object:
 
 ```tsx
 import { useAIContext } from "ai-chat-bootstrap";
@@ -40,69 +40,17 @@ function UserProfile() {
   });
 
   // Share user profile with AI
-  useAIContext(
-    "user-profile",        // Unique identifier
-    user,                  // Data to share
-    {
-      label: "User Profile",
-      description: "Current user's profile information",
-      scope: "session",
-      priority: 100,
-    }
-  );
+  useAIContext({
+    description: "User Profile",
+    value: user,
+    priority: 100,
+  });
 
   return <div>...</div>;
 }
 ```
 
-## Context Scopes
-
-Context scopes determine how long context items persist:
-
-### Session Scope
-Persists across conversations until the component unmounts:
-
-```tsx
-useAIContext(
-  "user-settings",
-  { theme: "dark", language: "en" },
-  {
-    scope: "session",
-    priority: 90,
-    description: "User's app preferences and settings"
-  }
-);
-```
-
-### Conversation Scope
-Lasts for the current chat conversation:
-
-```tsx
-useAIContext(
-  "current-task",
-  { taskId: "task-123", status: "in-progress" },
-  {
-    scope: "conversation", 
-    priority: 70,
-    description: "Currently active task information"
-  }
-);
-```
-
-### Message Scope
-Single-message context (rarely used):
-
-```tsx
-useAIContext(
-  "form-data",
-  currentFormState,
-  {
-    scope: "message",
-    priority: 50,
-    description: "Current form state for this specific query"
-  }
-);
-```
+## Examples
 
 ## Priority System
 
@@ -110,13 +58,13 @@ Higher priority context items are sent first to the AI:
 
 ```tsx
 // High priority - critical user info
-useAIContext("user-auth", authData, { priority: 100 });
+useAIContext({ description: "User Auth", value: authData, priority: 100 });
 
 // Medium priority - app state  
-useAIContext("app-settings", settings, { priority: 80 });
+useAIContext({ description: "App Settings", value: settings, priority: 80 });
 
 // Low priority - metadata
-useAIContext("session-info", sessionData, { priority: 60 });
+useAIContext({ description: "Session Info", value: sessionData, priority: 60 });
 ```
 
 ## Complete Implementation Example
@@ -154,38 +102,23 @@ export function AIContextDemo() {
   }), []);
 
   // Share context with AI - updates automatically when state changes
-  useAIContext(
-    "user-profile",
-    userProfile,
-    {
-      label: "User Profile",
-      description: "Current authenticated user's profile information",
-      scope: "session",
-      priority: 100,
-    }
-  );
+  useAIContext({
+    description: "User Profile",
+    value: userProfile,
+    priority: 100,
+  });
 
-  useAIContext(
-    "app-settings", 
-    settings,
-    {
-      label: "App Settings",
-      description: "User's application configuration and preferences", 
-      scope: "session",
-      priority: 80,
-    }
-  );
+  useAIContext({
+    description: "App Settings",
+    value: settings,
+    priority: 80,
+  });
 
-  useAIContext(
-    "session-info",
-    sessionInfo, 
-    {
-      label: "Session Info",
-      description: "Current browser session metadata",
-      scope: "session", 
-      priority: 60,
-    }
-  );
+  useAIContext({
+    description: "Session Info",
+    value: sessionInfo,
+    priority: 60,
+  });
 
   const chat = useAIChat({
     api: "/api/chat",
@@ -302,21 +235,16 @@ function TaskManager() {
   const [currentTask, setCurrentTask] = useState(null);
   
   // Context updates automatically when task changes
-  useAIContext(
-    "active-task",
-    currentTask ? {
+  useAIContext({
+    description: "Active Task",
+    value: currentTask ? {
       id: currentTask.id,
       title: currentTask.title,
       status: currentTask.status,
       dueDate: currentTask.dueDate,
     } : { message: "No active task" },
-    {
-      label: "Active Task",
-      description: "Currently selected or active task information",
-      scope: "conversation",
-      priority: 90,
-    }
-  );
+    priority: 90,
+  });
 
   return <div>...</div>;
 }
@@ -333,30 +261,26 @@ function Dashboard() {
   const [notifications, setNotifications] = useState(notificationsData);
 
   // User context
-  useAIContext("user", user, {
-    label: "User",
-    priority: 100,
-    scope: "session"
-  });
+  useAIContext({ description: "User", value: user, priority: 100 });
 
   // Projects context  
-  useAIContext("projects", { 
-    activeProjects: projects.filter(p => p.status === 'active'),
-    totalCount: projects.length 
-  }, {
-    label: "Projects", 
+  useAIContext({
+    description: "Projects",
+    value: {
+      activeProjects: projects.filter(p => p.status === 'active'),
+      totalCount: projects.length,
+    },
     priority: 80,
-    scope: "session"
   });
 
   // Notifications context
-  useAIContext("notifications", {
-    unreadCount: notifications.filter(n => !n.read).length,
-    latestNotification: notifications[0]
-  }, {
-    label: "Notifications",
-    priority: 60, 
-    scope: "conversation"
+  useAIContext({
+    description: "Notifications",
+    value: {
+      unreadCount: notifications.filter(n => !n.read).length,
+      latestNotification: notifications[0],
+    },
+    priority: 60,
   });
 
   return <div>...</div>;
@@ -373,22 +297,15 @@ function ConditionalContext() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Only share user context when authenticated
-  useAIContext(
-    "authenticated-user",
-    isAuthenticated && user ? {
+  useAIContext({
+    description: "User Authentication",
+    value: isAuthenticated && user ? {
       id: user.id,
       name: user.name,
       permissions: user.permissions,
     } : { authenticated: false },
-    {
-      label: "User Authentication",
-      description: isAuthenticated 
-        ? "Authenticated user information and permissions"
-        : "User is not authenticated",
-      scope: "session",
-      priority: 100,
-    }
-  );
+    priority: 100,
+  });
 
   return <div>...</div>;
 }
@@ -422,20 +339,20 @@ Keep context data serializable and structured:
 
 ```tsx
 // ✅ Good - Clean, serializable data
-useAIContext("user", {
+useAIContext({ description: "User", value: {
   id: user.id,
   name: user.name,
   role: user.role,
   lastActive: user.lastActiveDate.toISOString(),
-});
+}, });
 
 // ❌ Avoid - Functions, DOM nodes, complex objects  
-useAIContext("user", {
+useAIContext({ description: "User", value: {
   ...user,
   onClick: handleClick,        // Function - not serializable
   element: domRef.current,     // DOM node - not serializable
   complexObject: someClass,    // Complex object - may not serialize
-});
+}});
 ```
 
 ### Performance Optimization
@@ -455,11 +372,7 @@ function ExpensiveContext() {
     lastUpdated: new Date().toISOString(),
   }), [rawData]);
 
-  useAIContext("processed-data", processedContext, {
-    label: "Processed Data",
-    scope: "conversation",
-    priority: 70,
-  });
+  useAIContext({ description: "Processed Data", value: processedContext, priority: 70 });
 
   return <div>...</div>;
 }
@@ -471,19 +384,19 @@ Never share sensitive data in context:
 
 ```tsx
 // ✅ Safe - Only share necessary, non-sensitive data
-useAIContext("user-profile", {
+useAIContext({ description: "User Profile", value: {
   displayName: user.displayName,
   role: user.role,
   preferences: user.preferences,
-});
+}});
 
 // ❌ Unsafe - Don't share sensitive information
-useAIContext("user-auth", {
+useAIContext({ description: "User Auth", value: {
   password: user.password,           // Never share passwords
   apiKeys: user.apiKeys,            // Never share API keys
   socialSecurity: user.ssn,         // Never share PII
   creditCard: user.paymentInfo,     // Never share payment info
-});
+}});
 ```
 
 ## Common Use Cases
@@ -492,73 +405,48 @@ useAIContext("user-auth", {
 Share authenticated user information for personalized responses:
 
 ```tsx
-useAIContext("user", userProfile, {
-  label: "User Profile",
-  description: "Current user's profile and preferences",
-  scope: "session",
-  priority: 100,
-});
+useAIContext({ description: "User Profile", value: userProfile, priority: 100 });
 ```
 
 ### Application Settings
 Share app configuration to tailor AI responses:
 
 ```tsx  
-useAIContext("settings", appSettings, {
-  label: "App Settings", 
-  description: "User's application preferences and configuration",
-  scope: "session",
-  priority: 90,
-});
+useAIContext({ description: "App Settings", value: appSettings, priority: 90 });
 ```
 
 ### Current Page Context
 Share information about the current page or view:
 
 ```tsx
-useAIContext("page-context", {
+useAIContext({ description: "Page Context", value: {
   route: router.pathname,
   params: router.query,
   title: document.title,
-}, {
-  label: "Page Context",
-  description: "Current page and navigation state",
-  scope: "conversation", 
-  priority: 70,
-});
+}, priority: 70 });
 ```
 
 ### Form State
 Share current form data for context-aware assistance:
 
 ```tsx
-useAIContext("form-state", {
+useAIContext({ description: "Form State", value: {
   formType: "user-registration",
   completedFields: Object.keys(formData).filter(key => formData[key]),
   validationErrors: errors,
-}, {
-  label: "Form State",
-  description: "Current form completion and validation state", 
-  scope: "conversation",
-  priority: 80,
-});
+}, priority: 80 });
 ```
 
 ### Shopping Cart Context
 Share e-commerce state for purchase assistance:
 
 ```tsx
-useAIContext("cart", {
+useAIContext({ description: "Shopping Cart", value: {
   items: cart.items,
   totalItems: cart.items.length,
   totalValue: cart.total,
   currency: "USD",
-}, {
-  label: "Shopping Cart",
-  description: "Current shopping cart contents and totals",
-  scope: "session",
-  priority: 85,
-});
+}, priority: 85 });
 ```
 
 ## How Context Flows

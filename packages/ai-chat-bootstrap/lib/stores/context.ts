@@ -17,11 +17,11 @@ export const useAIContextStore = create<AIContextStore>((set, get) => ({
   setContextItem: (item: ContextItem) => {
     const normalized: ContextItem = {
       id: item.id,
-      data: item.data,
-      label: item.label,
+      text: item.text,
       description: item.description,
-      scope: item.scope,
       priority: item.priority,
+      categories: item.categories,
+      parentId: item.parentId,
     };
     set((state) => ({
       contextItems: new Map(state.contextItems).set(item.id, normalized),

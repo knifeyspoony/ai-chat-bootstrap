@@ -26,7 +26,7 @@ function ContextBridge() {
     }),
     [userSources]
   );
-  useAIContext("Sources", userSourcesMemo);
+  useAIContext({ description: "Sources", value: userSourcesMemo });
 
   // Stable key only changes if a shared note's title or body changes or the set changes.
   const sharedNotesMemo = useMemo(() => {
@@ -42,14 +42,11 @@ function ContextBridge() {
       items: items.map(({ title, body }) => ({ title, body })),
     };
   }, [notesRecord]);
-  useAIContext("Notes", sharedNotesMemo);
+  useAIContext({ description: "Notes", value: sharedNotesMemo });
 
   // Project meta rarely changes; static memo
   const projectMeta = useMemo(() => ({ name: "Studio Demo", version: 1 }), []);
-  useAIContext("projectMeta", projectMeta, {
-    label: "Project Meta",
-    priority: 2,
-  });
+  useAIContext({ description: "Project Meta", value: projectMeta, priority: 2 });
   return null;
 }
 

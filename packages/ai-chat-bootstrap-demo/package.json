@@ -29,7 +29,7 @@
     "ai-chat-bootstrap": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.263.1",
+    "lucide-react": "^0.544.0",
     "nanoid": "^5.0.7",
     "next": "15.5.0",
     "next-themes": "^0.4.6",

@@ -19,11 +19,11 @@ export interface FocusItem {
  */
 export interface ContextItem {
   id: string;
-  data: Record<string, unknown>;
-  label?: string;
-  description?: string;
-  scope?: "session" | "conversation" | "message";
+  text: string; // fully-converted readable context line
+  description?: string; // original human label/description
   priority?: number; // higher = more important (consumer may sort / trim)
+  categories?: string[];
+  parentId?: string;
 }
 
 /**

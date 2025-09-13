@@ -206,22 +206,12 @@ function ContextStatusDisplay() {
             className="text-xs bg-background/50 rounded p-2 space-y-1"
           >
             <div className="flex justify-between items-center">
-              <span className="font-medium">{item.label || item.id}</span>
+              <span className="font-medium">{item.description}</span>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-1 bg-primary/20 text-primary rounded text-xs">
-                  {item.scope || "session"}
-                </span>
                 <span className="text-muted-foreground">
                   P{item.priority || 0}
                 </span>
               </div>
-            </div>
-            {item.description && (
-              <div className="text-muted-foreground">{item.description}</div>
-            )}
-            <div className="font-mono text-xs text-muted-foreground">
-              {JSON.stringify(item.data, null, 0).substring(0, 100)}
-              {JSON.stringify(item.data).length > 100 && "..."}
             </div>
           </div>
         ))}
@@ -270,38 +260,23 @@ export function AIContextExample() {
   );
 
   // Share context with AI using useAIContext
-  // Cast to Record<string, unknown> for hook requirement (values are plain serializable fields)
-  useAIContext(
-    "user-profile",
-    userProfile as unknown as Record<string, unknown>,
-    {
-      label: "User Profile",
-      description:
-        "Current authenticated user's profile information and preferences",
-      scope: "session",
-      priority: 100,
-    }
-  );
-
-  useAIContext("app-settings", settings as unknown as Record<string, unknown>, {
-    label: "App Settings",
-    description: "User's application configuration and preferences",
-    scope: "session",
-    priority: 80,
+  useAIContext({
+    description: "User Profile",
+    value: userProfile,
+    priority: 100,
   });
-
-  useAIContext("session-info", sessionInfo, {
-    label: "Session Info",
-    description: "Current browser session metadata",
-    scope: "session",
+  useAIContext({ description: "App Settings", value: settings, priority: 80 });
+  useAIContext({
+    description: "Session Info",
+    value: sessionInfo,
     priority: 60,
   });
 
   // Dynamic conversation context
-  useAIContext(
-    "widget-state",
+  useAIContext({
+    description: "Widget State",
     // Memoize shared data so the effect in useAIContext does not run every render
-    React.useMemo(
+    value: React.useMemo(
       () => ({
         totalInteractions: messages.length,
         // Update timestamp only when messages length changes (avoid per-render churn)
@@ -310,13 +285,8 @@ export function AIContextExample() {
       }),
       [messages.length]
     ),
-    {
-      label: "Widget State",
-      description: "Current state of the demo widgets and interactions",
-      scope: "conversation",
-      priority: 40,
-    }
-  );
+    priority: 40,
+  });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -356,7 +326,7 @@ export function AIContextExample() {
         responseText += `I have access to ${
           contextItems.length
         } context items: ${contextItems
-          .map((item) => item.label || item.id)
+          .map((item) => item.text || item.id)
           .join(
             ", "
           )}. This helps me understand your current state and preferences.`;
@@ -441,38 +411,9 @@ export function AIContextDemo() {
   }), []);
 
   // Share context with AI - updates automatically when state changes
-  useAIContext(
-    "user-profile",
-    userProfile,
-    {
-      label: "User Profile",
-      description: "Current authenticated user's profile information",
-      scope: "session",
-      priority: 100,
-    }
-  );
-
-  useAIContext(
-    "app-settings", 
-    settings,
-    {
-      label: "App Settings",
-      description: "User's application configuration and preferences", 
-      scope: "session",
-      priority: 80,
-    }
-  );
-
-  useAIContext(
-    "session-info",
-    sessionInfo, 
-    {
-      label: "Session Info",
-      description: "Current browser session metadata",
-      scope: "session", 
-      priority: 60,
-    }
-  );
+  useAIContext({ description: "User Profile", value: userProfile, priority: 100 });
+  useAIContext({ description: "App Settings", value: settings, priority: 80 });
+  useAIContext({ description: "Session Info", value: sessionInfo, priority: 60 });
 
   const chat = useAIChat({
     api: "/api/chat",
@@ -545,50 +486,27 @@ export function AIContextDemo() {
 }`;
 
 // Source code for the backend API route
-export const AI_CONTEXT_API_SOURCE = `import { openai } from "@ai-sdk/openai";
-import { streamText, convertToCoreMessages } from "ai";
-import { NextRequest } from "next/server";
+export const AI_CONTEXT_API_SOURCE = `import { openai } from \"@ai-sdk/openai\";
+import { streamText, convertToCoreMessages } from \"ai\";
+import { NextRequest } from \"next/server\";
 
 export async function POST(req: NextRequest) {
-  const { messages, systemPrompt, tools, context, focus } = await req.json();
+  const { messages, systemPrompt, enrichedSystemPrompt, tools, context, focus } = await req.json();
 
-  // Context is automatically passed from frontend
+  // Context is automatically passed from frontend as text lines for transparency
+  // Example:
   // context = [
-  //   {
-  //     id: "user-profile",
-  //     label: "User Profile", 
-  //     description: "Current authenticated user's profile information",
-  //     scope: "session",
-  //     priority: 100,
-  //     data: { userId: "user-123", name: "Alice Johnson", role: "admin", ... }
-  //   },
-  //   {
-  //     id: "app-settings",
-  //     label: "App Settings",
-  //     description: "User's application configuration", 
-  //     scope: "session",
-  //     priority: 80,
-  //     data: { theme: "dark", language: "en", ... }
-  //   }
+  //   { id: \"user-profile\", text: \"User Profile: {\\\"name\\\":\\\"Alice\\\",...}\", priority: 100 },
+  //   { id: \"app-settings\", text: \"App Settings: {\\\"theme\\\":\\\"dark\\\",...}\", priority: 80 }
   // ]
 
-  // Build context-aware system prompt
-  let contextualPrompt = systemPrompt || "You are a helpful AI assistant.";
-  
-  if (context && context.length > 0) {
-    contextualPrompt += "\\n\\nYou have access to the following context about the user:";
-    context.forEach((item) => {
-      contextualPrompt += \`\\n- \${item.label || item.id}: \${item.description}\`;
-      contextualPrompt += \`\\n  Data: \${JSON.stringify(item.data)}\`;
-    });
-  }
-
   const result = streamText({
-    model: openai("gpt-4"),
-    system: contextualPrompt,
+    model: openai(\"gpt-4\"),
+    // Prefer the enriched system prompt prepared by the frontend
+    system: enrichedSystemPrompt || systemPrompt,
     messages: convertToCoreMessages(messages),
     tools,
-    toolChoice: "auto",
+    toolChoice: \"auto\",
   });
 
   return result.toUIMessageStreamResponse();

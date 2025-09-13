@@ -104,8 +104,8 @@ Context sharing:
 
 ```tsx
 import { useAIContext } from "ai-chat-bootstrap";
-useAIContext("counter", counter);
-useAIContext("userProfile", { name: user.name, role: user.role });
+useAIContext({ description: "Counter", value: counter });
+useAIContext({ description: "User Profile", value: { name: user.name, role: user.role } });
 ```
 
 Frontend tool:

@@ -60,7 +60,9 @@ export function useAIChat(
   } = options;
 
   // Get raw store data with stable selectors - these return the same reference when unchanged
-  const contextItemsMap = useAIContextStore(useShallow((state) => state.items));
+  const contextItemsMap = useAIContextStore(
+    useShallow((state) => state.contextItems)
+  );
   const toolsMap = useAIToolsStore(useShallow((state) => state.tools));
   const focusItemsMap = useAIFocusStore(
     useShallow((state) => state.focusItems)

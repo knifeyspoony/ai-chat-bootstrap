@@ -138,6 +138,81 @@ export function ChatPopout(props: ChatPopoutProps) {
     [chat, input, onSubmit, inputProps]
   );
 
+  // Resolve input handlers/values once and reuse in both modes
+  const resolvedValue = inputProps?.value ?? input;
+  const resolvedOnChange = inputProps?.onChange ?? setInput;
+  const resolvedOnSubmit = inputProps?.onSubmit ?? (chat ? handleSubmit : undefined);
+
+  // Reusable toggle button element (used in both modes)
+  const ToggleButton =
+    showToggleButton && !effectiveIsOpen ? (
+      <Button
+        onClick={() => setIsOpen(true)}
+        className={cn(
+          buttonContainer === "viewport"
+            ? "fixed bottom-6 z-40"
+            : "absolute bottom-6 z-40",
+          position === "right" ? "right-6" : "left-6",
+          buttonClassName
+        )}
+        size="lg"
+      >
+        {buttonIcon || <MessageCircleIcon className="h-5 w-5 mr-2" />}
+        {buttonLabel}
+      </Button>
+    ) : null;
+
+  // Helper to build shared ChatContainer props with minimal duplication
+  const getChatContainerProps = (includeContentClassInUI: boolean): ChatContainerProps => ({
+    chat,
+    inputProps: {
+      value: resolvedValue,
+      onChange: resolvedOnChange,
+      onSubmit: resolvedOnSubmit,
+      onAttach: inputProps?.onAttach,
+    },
+    header: {
+      ...header,
+      actions: (
+        <>
+          {header?.actions}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsOpen(false)}
+            className="h-7 w-7"
+          >
+            <XIcon className="h-4 w-4" />
+          </Button>
+        </>
+      ),
+    },
+    ui: {
+      placeholder: ui?.placeholder,
+      emptyState: ui?.emptyState,
+      classes: ui?.classes,
+      className: cn("h-full", ui?.className, includeContentClassInUI ? contentClassName : undefined),
+    },
+    suggestions: {
+      enabled: suggestions?.enabled,
+      prompt: suggestions?.prompt,
+      count: suggestions?.count,
+      onAssistantFinish: (triggerFetch) => {
+        triggerSuggestionsRef.current = triggerFetch;
+      },
+      onSendMessage: (message: string) => {
+        if (chat) chat.sendMessageWithContext(message);
+        else suggestions?.onSendMessage?.(message);
+      },
+    },
+    commands: {
+      enabled: commands?.enabled,
+      onExecute: commands?.onExecute,
+      onAICommandExecute: commands?.onAICommandExecute,
+    },
+    state,
+  });
+
   // Handle resize drag
   const handleMove = useCallback(
     (clientX: number) => {
@@ -224,35 +299,14 @@ export function ChatPopout(props: ChatPopoutProps) {
     };
   }, [handleMouseMove, handleEnd, handleTouchMove]);
 
-  const toggleOpen = () => {
-    setIsOpen(!isOpen);
-  };
+  // toggling handled inline where needed via setIsOpen(true/false)
 
   // Early return for inline mode
   if (mode === "inline") {
-    const resolvedValue = inputProps?.value ?? input;
-    const resolvedOnChange = inputProps?.onChange ?? setInput;
-    const resolvedOnSubmit =
-      inputProps?.onSubmit ?? (chat ? handleSubmit : undefined);
     return (
       <>
         {/* Toggle Button for inline mode */}
-        {showToggleButton && !effectiveIsOpen && (
-          <Button
-            onClick={toggleOpen}
-            className={cn(
-              buttonContainer === "viewport"
-                ? "fixed bottom-6 z-40"
-                : "absolute bottom-6 z-40",
-              position === "right" ? "right-6" : "left-6",
-              buttonClassName
-            )}
-            size="lg"
-          >
-            {buttonIcon || <MessageCircleIcon className="h-5 w-5 mr-2" />}
-            {buttonLabel}
-          </Button>
-        )}
+        {ToggleButton}
 
         <div
           ref={popoutRef}
@@ -296,55 +350,7 @@ export function ChatPopout(props: ChatPopoutProps) {
 
           {/* Chat Container */}
           <div className="flex-1 min-w-0 h-full">
-            <ChatContainer
-              chat={chat}
-              inputProps={{
-                value: resolvedValue,
-                onChange: resolvedOnChange,
-                onSubmit: resolvedOnSubmit,
-                onAttach: inputProps?.onAttach,
-              }}
-              header={{
-                ...header,
-                actions: (
-                  <>
-                    {header?.actions}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsOpen(false)}
-                      className="h-7 w-7"
-                    >
-                      <XIcon className="h-4 w-4" />
-                    </Button>
-                  </>
-                ),
-              }}
-              ui={{
-                placeholder: ui?.placeholder,
-                emptyState: ui?.emptyState,
-                classes: ui?.classes,
-                className: cn("h-full", ui?.className, contentClassName),
-              }}
-              suggestions={{
-                enabled: suggestions?.enabled,
-                prompt: suggestions?.prompt,
-                count: suggestions?.count,
-                onAssistantFinish: (triggerFetch) => {
-                  triggerSuggestionsRef.current = triggerFetch;
-                },
-                onSendMessage: (message: string) => {
-                  if (chat) chat.sendMessageWithContext(message);
-                  else suggestions?.onSendMessage?.(message);
-                },
-              }}
-              commands={{
-                enabled: commands?.enabled,
-                onExecute: commands?.onExecute,
-                onAICommandExecute: commands?.onAICommandExecute,
-              }}
-              state={state}
-            />
+            <ChatContainer {...getChatContainerProps(true)} />
           </div>
         </div>
       </>
@@ -367,22 +373,7 @@ export function ChatPopout(props: ChatPopoutProps) {
   return (
     <>
       {/* Toggle Button */}
-      {showToggleButton && !effectiveIsOpen && (
-        <Button
-          onClick={toggleOpen}
-          className={cn(
-            buttonContainer === "viewport"
-              ? "fixed bottom-6 z-40"
-              : "absolute bottom-6 z-40",
-            position === "right" ? "right-6" : "left-6",
-            buttonClassName
-          )}
-          size="lg"
-        >
-          {buttonIcon || <MessageCircleIcon className="h-5 w-5 mr-2" />}
-          {buttonLabel}
-        </Button>
-      )}
+      {ToggleButton}
 
       {/* Backdrop */}
       {effectiveIsOpen &&
@@ -443,56 +434,7 @@ export function ChatPopout(props: ChatPopoutProps) {
 
         {/* Chat Container */}
         <div className={cn("h-full", contentClassName)}>
-          <ChatContainer
-            chat={chat}
-            inputProps={{
-              value: inputProps?.value ?? input,
-              onChange: inputProps?.onChange ?? setInput,
-              onSubmit:
-                inputProps?.onSubmit ?? (chat ? handleSubmit : undefined),
-              onAttach: inputProps?.onAttach,
-            }}
-            header={{
-              ...header,
-              actions: (
-                <>
-                  {header?.actions}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsOpen(false)}
-                    className="h-7 w-7"
-                  >
-                    <XIcon className="h-4 w-4" />
-                  </Button>
-                </>
-              ),
-            }}
-            ui={{
-              placeholder: ui?.placeholder,
-              emptyState: ui?.emptyState,
-              classes: ui?.classes,
-              className: cn("h-full", ui?.className),
-            }}
-            suggestions={{
-              enabled: suggestions?.enabled,
-              prompt: suggestions?.prompt,
-              count: suggestions?.count,
-              onAssistantFinish: (triggerFetch) => {
-                triggerSuggestionsRef.current = triggerFetch;
-              },
-              onSendMessage: (message: string) => {
-                if (chat) chat.sendMessageWithContext(message);
-                else suggestions?.onSendMessage?.(message);
-              },
-            }}
-            commands={{
-              enabled: commands?.enabled,
-              onExecute: commands?.onExecute,
-              onAICommandExecute: commands?.onAICommandExecute,
-            }}
-            state={state}
-          />
+          <ChatContainer {...getChatContainerProps(false)} />
         </div>
       </div>
     </>

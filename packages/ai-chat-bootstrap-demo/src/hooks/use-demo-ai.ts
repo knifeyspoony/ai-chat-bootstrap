@@ -110,40 +110,24 @@ export function useDemoAI({
   ); // Empty deps - only create once on mount
 
   // Share state with AI
-  useAIContext(
-    "counter",
-    { value: counter },
-    {
-      label: "Counter",
-      description: "Current counter widget value",
-      scope: "session",
-      priority: 90,
-    }
-  );
-  useAIContext(
-    "calculation",
-    { result: calculation },
-    {
-      label: "Calculation",
-      description: "Most recent calculator result (if any)",
-      scope: "conversation",
-      priority: 70,
-    }
-  );
-  useAIContext(
-    "selectedSystemPrompt",
-    { prompt: selectedSystemPrompt },
-    {
-      label: "System Prompt",
-      description: "Currently selected AI personality / system prompt key",
-      scope: "session",
-      priority: 60,
-    }
-  );
-  useAIContext("pageInfo", pageInfo, {
-    label: "Page Info",
-    description: "Static metadata about the demo page",
-    scope: "session",
+  useAIContext({
+    description: "Counter",
+    value: { value: counter },
+    priority: 90,
+  });
+  useAIContext({
+    description: "Calculation",
+    value: { result: calculation },
+    priority: 70,
+  });
+  useAIContext({
+    description: "System Prompt",
+    value: { prompt: selectedSystemPrompt },
+    priority: 60,
+  });
+  useAIContext({
+    description: "Page Info",
+    value: pageInfo,
     priority: 40,
   });
 

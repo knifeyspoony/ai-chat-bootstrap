@@ -11,74 +11,33 @@ The `useAIContext` hook allows React components to share their state with the AI
 
 ```typescript
 function useAIContext(
-  id: string,
-  data: Record<string, unknown>,
-  options?: {
-    label?: string;
-    description?: string;
-    scope?: "session" | "conversation" | "message";
+  options: {
+    description: string;
+    value: unknown;
     priority?: number;
-  }
-): void
+    categories?: string[];
+    parentId?: string;
+    available?: "enabled" | "disabled";
+    dump?: (description: string, value: unknown) => string;
+  },
+  dependencies?: unknown[]
+): string | undefined
 ```
 
 ## Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | `string` | Yes | Unique identifier for the context item |
-| `data` | `Record<string, unknown>` | Yes | The actual data to share with the AI |
-| `options.label` | `string` | No | Human-readable name for the context |
-| `options.description` | `string` | No | Explains what this context represents to the AI |
-| `options.scope` | `"session"` \| `"conversation"` \| `"message"` | No | Lifecycle scope (default: `"session"`) |
-| `options.priority` | `number` | No | Higher numbers are sent first (default: `0`) |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `options.description` | `string` | Yes | Human-readable description of this context item |
+| `options.value` | `unknown` | Yes | Data to dump and include in the context line |
+| `options.priority` | `number` | No | Higher numbers are sent first |
+| `options.categories` | `string[]` | No | Optional categories to group context |
+| `options.parentId` | `string` | No | Optional parent context id for grouping |
+| `options.available` | `"enabled" | "disabled"` | No | Toggle context on/off |
+| `options.dump` | `(description, value) => string` | No | Custom dump function to produce the context text |
+| `dependencies` | `unknown[]` | No | Extra deps to recompute when using custom `dump` |
 
-## Context Scopes
-
-### Session Scope
-Persists across conversations until the component unmounts:
-
-```tsx
-useAIContext(
-  "user-settings",
-  { theme: "dark", language: "en" },
-  {
-    scope: "session",
-    priority: 90,
-    description: "User's app preferences and settings"
-  }
-);
-```
-
-### Conversation Scope
-Lasts for the current chat conversation:
-
-```tsx
-useAIContext(
-  "current-task",
-  { taskId: "task-123", status: "in-progress" },
-  {
-    scope: "conversation", 
-    priority: 70,
-    description: "Currently active task information"
-  }
-);
-```
-
-### Message Scope
-Single-message context (rarely used):
-
-```tsx
-useAIContext(
-  "form-data",
-  currentFormState,
-  {
-    scope: "message",
-    priority: 50,
-    description: "Current form state for this specific query"
-  }
-);
-```
+## Examples
 
 ## Priority System
 
@@ -86,13 +45,13 @@ Higher priority context items are sent first to the AI. Use priorities to ensure
 
 ```tsx
 // High priority - critical user info
-useAIContext("user-auth", authData, { priority: 100 });
+useAIContext({ description: "User Auth", value: authData, priority: 100 });
 
 // Medium priority - app state  
-useAIContext("app-settings", settings, { priority: 80 });
+useAIContext({ description: "App Settings", value: settings, priority: 80 });
 
 // Low priority - metadata
-useAIContext("session-info", sessionData, { priority: 60 });
+useAIContext({ description: "Session Info", value: sessionData, priority: 60 });
 ```
 
 ## Examples
@@ -110,16 +69,7 @@ function UserProfile() {
   });
 
   // Share user profile with AI
-  useAIContext(
-    "user-profile",
-    user,
-    {
-      label: "User Profile",
-      description: "Current authenticated user's profile information",
-      scope: "session",
-      priority: 100,
-    }
-  );
+  useAIContext({ description: "User Profile", value: user, priority: 100 });
 
   return <div>...</div>;
 }
@@ -134,21 +84,16 @@ function TaskManager() {
   const [currentTask, setCurrentTask] = useState(null);
   
   // Context updates automatically when task changes
-  useAIContext(
-    "active-task",
-    currentTask ? {
+  useAIContext({
+    description: "Active Task",
+    value: currentTask ? {
       id: currentTask.id,
       title: currentTask.title,
       status: currentTask.status,
       dueDate: currentTask.dueDate,
     } : { message: "No active task" },
-    {
-      label: "Active Task",
-      description: "Currently selected or active task information",
-      scope: "conversation",
-      priority: 90,
-    }
-  );
+    priority: 90,
+  });
 
   return <div>...</div>;
 }
@@ -165,30 +110,26 @@ function Dashboard() {
   const [notifications, setNotifications] = useState(notificationsData);
 
   // User context
-  useAIContext("user", user, {
-    label: "User",
-    priority: 100,
-    scope: "session"
-  });
+  useAIContext({ description: "User", value: user, priority: 100 });
 
   // Projects context  
-  useAIContext("projects", { 
-    activeProjects: projects.filter(p => p.status === 'active'),
-    totalCount: projects.length 
-  }, {
-    label: "Projects", 
+  useAIContext({
+    description: "Projects",
+    value: {
+      activeProjects: projects.filter(p => p.status === 'active'),
+      totalCount: projects.length,
+    },
     priority: 80,
-    scope: "session"
   });
 
   // Notifications context
-  useAIContext("notifications", {
-    unreadCount: notifications.filter(n => !n.read).length,
-    latestNotification: notifications[0]
-  }, {
-    label: "Notifications",
-    priority: 60, 
-    scope: "conversation"
+  useAIContext({
+    description: "Notifications",
+    value: {
+      unreadCount: notifications.filter(n => !n.read).length,
+      latestNotification: notifications[0],
+    },
+    priority: 60,
   });
 
   return <div>...</div>;
@@ -205,22 +146,15 @@ function ConditionalContext() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Only share user context when authenticated
-  useAIContext(
-    "authenticated-user",
-    isAuthenticated && user ? {
+  useAIContext({
+    description: "User Authentication",
+    value: isAuthenticated && user ? {
       id: user.id,
       name: user.name,
       permissions: user.permissions,
     } : { authenticated: false },
-    {
-      label: "User Authentication",
-      description: isAuthenticated 
-        ? "Authenticated user information and permissions"
-        : "User is not authenticated",
-      scope: "session",
-      priority: 100,
-    }
-  );
+    priority: 100,
+  });
 
   return <div>...</div>;
 }
@@ -265,11 +199,11 @@ export async function POST(req: NextRequest) {
 ```typescript
 interface ContextItem {
   id: string;
-  label?: string;
+  text: string;
   description?: string;
-  scope: "session" | "conversation" | "message";
-  priority: number;
-  data: Record<string, unknown>;
+  priority?: number;
+  categories?: string[];
+  parentId?: string;
 }
 ```
 
@@ -302,8 +236,7 @@ useEffect(() => {
 
 1. **Keep data serializable**: Avoid functions, DOM nodes, or complex objects
 2. **Use meaningful IDs**: Choose descriptive, unique identifiers
-3. **Set appropriate scopes**: Match lifecycle to your use case
-4. **Prioritize wisely**: Ensure critical context has higher priority
+3. **Prioritize wisely**: Ensure critical context has higher priority
 5. **Avoid sensitive data**: Never share passwords, API keys, or PII
 6. **Use `useMemo` for expensive computations**: Optimize performance for complex context
 

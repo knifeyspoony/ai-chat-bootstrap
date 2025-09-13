@@ -56,16 +56,7 @@ export function buildEnrichedSuggestionsPrompt(
       "## Context\nThe application has supplied contextual items that may inform intent, constraints, domain specifics, or user/environment state. Treat them as background grounding signals when interpreting the user's messages.\n"
     );
     sortedContext.forEach((c) => {
-      const label = c.label || c.id;
-      const desc = c.description ?? "";
-      const dataStr = c.data
-        ? `\nData: ${JSON.stringify(c.data, null, 2)}`
-        : "";
-      lines.push(
-        `- **${label}**${desc ? ": " + desc : ""}${
-          c.priority !== undefined ? ` (priority ${c.priority})` : ""
-        }${dataStr}`
-      );
+      lines.push(`- ${c.text}${c.priority !== undefined ? ` (priority ${c.priority})` : ""}`);
     });
     lines.push("");
   }

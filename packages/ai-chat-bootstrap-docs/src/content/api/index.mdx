@@ -115,10 +115,7 @@ function ChatWithContext() {
   const [user] = useState({ name: 'Alice', role: 'admin' });
   
   // Share user context with AI
-  useAIContext('user', user, {
-    label: 'User Profile',
-    description: 'Current user information'
-  });
+  useAIContext({ description: 'User Profile', value: user });
 
   const chat = useAIChat({ api: '/api/chat' });
   

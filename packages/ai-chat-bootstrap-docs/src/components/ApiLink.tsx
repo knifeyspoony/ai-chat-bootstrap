@@ -62,45 +62,52 @@ const API_MAP: Record<string, ApiMeta> = {
     description:
       "Share React component state with the AI without causing re-renders.",
     signature: `function useAIContext(
-  id: string,
-  data: Record<string, unknown>,
-  options?: {
-    label?: string;
-    description?: string;
-    scope?: "session" | "conversation" | "message";
+  options: {
+    description: string;
+    value: unknown;
     priority?: number;
-  }
-): void`,
+    categories?: string[];
+    parentId?: string;
+    available?: "enabled" | "disabled";
+    dump?: (description: string, value: unknown) => string;
+  },
+  dependencies?: unknown[]
+): string | undefined`,
     params: [
       {
-        name: "id",
-        type: "string",
-        description: "Unique identifier for the context item",
-      },
-      {
-        name: "data",
-        type: "Record<string, unknown>",
-        description: "The data to share with the AI",
-      },
-      {
-        name: "options.label",
-        type: "string?",
-        description: "Human-readable name for the context",
-      },
-      {
         name: "options.description",
-        type: "string?",
-        description: "Explains what this context represents",
+        type: "string",
+        description: "Human-readable description of the context",
       },
       {
-        name: "options.scope",
-        type: '"session" | "conversation" | "message"?',
-        description: "Lifecycle scope (default: session)",
+        name: "options.value",
+        type: "unknown",
+        description: "Data to dump and include in the context line",
       },
       {
         name: "options.priority",
         type: "number?",
         description: "Higher numbers are sent first",
+      },
+      {
+        name: "options.categories",
+        type: "string[]?",
+        description: "Optional categories for grouping",
+      },
+      {
+        name: "options.parentId",
+        type: "string?",
+        description: "Optional parent context id for grouping",
+      },
+      {
+        name: "options.available",
+        type: '"enabled" | "disabled"?',
+        description: "Toggle context on/off",
+      },
+      {
+        name: "options.dump",
+        type: "(description: string, value: unknown) => string?",
+        description: "Custom dump function to produce the text",
       },
     ],
   },

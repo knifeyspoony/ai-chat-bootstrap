@@ -205,11 +205,7 @@ The `useAIChat` hook automatically integrates with other hooks:
 function ChatWithContext() {
   const [user, setUser] = useState({ name: "Alice", role: "admin" });
 
-  useAIContext("user", user, {
-    label: "User Profile",
-    description: "Current user information",
-    priority: 100
-  });
+  useAIContext({ description: "User Profile", value: user, priority: 100 });
 
   const chat = useAIChat({
     api: "/api/chat",

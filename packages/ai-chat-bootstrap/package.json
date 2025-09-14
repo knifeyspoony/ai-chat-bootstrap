@@ -1,6 +1,6 @@
 {
   "name": "ai-chat-bootstrap",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "React UI + hooks for building modern AI chat interfaces fast. Based on AISDK and AISDK Elements",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -96,6 +96,7 @@
     "@ai-sdk/azure": "^2.0.16",
     "@ai-sdk/react": "^2.0.18",
     "@eslint/eslintrc": "^3",
+    "@testing-library/react": "^16.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -105,6 +106,7 @@
     "ai": "^5.0.18",
     "autoprefixer": "^10.4.0",
     "eslint": "^9",
+    "jsdom": "^25.0.0",
     "playwright": "^1.55.0",
     "postcss": "^8.4.0",
     "react": "19.1.0",

@@ -55,15 +55,13 @@ export function ChatThreadsButton({
   className,
   label = "Threads",
 }: ChatThreadsButtonProps) {
-  const {
-    listThreads,
-    activeThreadId,
-    setActiveThread,
-    createThread,
-    renameThread,
-    isLoaded,
-    loadThreadMetas,
-  } = useChatThreadsStore();
+  const listThreads = useChatThreadsStore((s) => s.listThreads);
+  const activeThreadId = useChatThreadsStore((s) => s.activeThreadId);
+  const setActiveThread = useChatThreadsStore((s) => s.setActiveThread);
+  const createThread = useChatThreadsStore((s) => s.createThread);
+  const renameThread = useChatThreadsStore((s) => s.renameThread);
+  const isLoaded = useChatThreadsStore((s) => s.isLoaded);
+  const loadThreadMetas = useChatThreadsStore((s) => s.loadThreadMetas);
   // Subscribe specifically to metas map so the list updates on title changes
   const metas = useChatThreadsStore((s) => s.metas);
 
@@ -73,7 +71,10 @@ export function ChatThreadsButton({
     }
   }, [isLoaded, loadThreadMetas, scopeKey]);
 
-  const threads = React.useMemo(() => listThreads(scopeKey), [metas, listThreads, scopeKey]);
+  const threads = React.useMemo(
+    () => listThreads(scopeKey),
+    [metas, listThreads, scopeKey]
+  );
 
   const handleNew = () => {
     const t = createThread({ scopeKey });
@@ -108,8 +109,12 @@ export function ChatThreadsButton({
       if (!store.getThreadIfLoaded(renameState.id)) {
         store
           .loadThread(renameState.id)
-          .then(() => store.renameThread(renameState.id, next, { manual: true }))
-          .catch(() => store.renameThread(renameState.id, next, { manual: true }));
+          .then(() =>
+            store.renameThread(renameState.id, next, { manual: true })
+          )
+          .catch(() =>
+            store.renameThread(renameState.id, next, { manual: true })
+          );
       } else {
         renameThread(renameState.id, next, { manual: true });
       }
@@ -147,17 +152,9 @@ export function ChatThreadsButton({
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenu.Trigger asChild>
-              <button
-                type="button"
-                aria-label={label}
-                className={cn(
-                  "px-2 py-1 rounded border bg-[var(--acb-chat-header-bg)] hover:bg-[var(--acb-chat-input-wrapper-bg)] transition-colors inline-flex items-center justify-center",
-                  className
-                )}
-              >
-                <Spool className="h-4 w-4" />
-                <span className="sr-only">{label}</span>
-              </button>
+              <Button size="sm" variant="ghost" aria-label={label}>
+                <Spool size={18} />
+              </Button>
             </DropdownMenu.Trigger>
           </TooltipTrigger>
           <TooltipContent side="bottom">{label}</TooltipContent>

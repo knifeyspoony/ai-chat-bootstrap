@@ -1,5 +1,5 @@
 import type { ChatStatus, UIMessage } from "ai";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef } from "react";
 import { ChatInputWithCommands } from "../../components/chat/chat-input-with-commands";
 import {
   ChatMessages,
@@ -111,30 +111,35 @@ export interface ChatContainerProps {
 export function ChatContainer(props: ChatContainerProps) {
   // Ref to control scrolling programmatically
   const messagesRef = useRef<ChatMessagesHandle | null>(null);
-  // Internal input state for uncontrolled mode
-  const [internalInput, setInternalInput] = useState("");
-  const inputValue = props.inputProps?.value ?? internalInput;
-  const onChange = props.inputProps?.onChange ?? setInternalInput;
   const onAttach = props.inputProps?.onAttach;
+  const controlledValue = props.inputProps?.value;
+  const controlledOnChange = props.inputProps?.onChange;
 
   // Resolve state from chat -> state -> legacy
   const messages = props.chat?.messages ?? props.state?.messages ?? [];
   const isLoading = props.chat?.isLoading ?? props.state?.isLoading ?? false;
   const status = props.chat?.status ?? props.state?.status;
 
+  // Note: We do not sync messages to threads here to avoid render loops.
+  // The useAIChat hook manages persistence into the threads store.
+
   const providedOnSubmit = props.inputProps?.onSubmit;
   const onSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
       if (providedOnSubmit) return providedOnSubmit(e);
-      const text = (inputValue ?? "").toString();
-      if (!text.trim()) return;
-      if (props.chat) {
-        props.chat.sendMessageWithContext(text);
-        setInternalInput("");
+      // Default behavior: extract from form and send via chat hook
+      const form = e.target as HTMLFormElement;
+      try {
+        const fd = new FormData(form);
+        const text = String(fd.get("message") || "").trim();
+        if (!text) return;
+        props.chat?.sendMessageWithContext(text);
+      } catch {
+        /* ignore */
       }
     },
-    [providedOnSubmit, props.chat, inputValue]
+    [providedOnSubmit, props.chat]
   );
 
   // Default AI command execution: prefer chat hook, else delegate to consumer handler.
@@ -142,13 +147,11 @@ export function ChatContainer(props: ChatContainerProps) {
     (message: string, toolName: string, systemPrompt?: string) => {
       if (props.chat) {
         props.chat.sendAICommandMessage(message, toolName, systemPrompt);
-        onChange("");
       } else {
         props.commands?.onAICommandExecute?.(message, toolName, systemPrompt);
-        onChange("");
       }
     },
-    [props.chat, props.commands?.onAICommandExecute, onChange]
+    [props.chat, props.commands?.onAICommandExecute]
   );
   // Handle suggestions
   const {
@@ -219,6 +222,23 @@ export function ChatContainer(props: ChatContainerProps) {
                 />
               </React.Suspense>
             )}
+            {/* Debug tools are only rendered in non-production */}
+            {typeof process !== "undefined" &&
+              process.env.NODE_ENV !== "production" && (
+                <React.Suspense fallback={null}>
+                  {(() => {
+                    try {
+                      // eslint-disable-next-line @typescript-eslint/no-var-requires
+                      const {
+                        ChatDebugButton,
+                      } = require("./chat-debug-button");
+                      return <ChatDebugButton />;
+                    } catch {
+                      return null;
+                    }
+                  })()}
+                </React.Suspense>
+              )}
             {props.header?.actions}
           </>
         }
@@ -243,10 +263,10 @@ export function ChatContainer(props: ChatContainerProps) {
         )}
       >
         <ChatInputWithCommands
-          value={inputValue}
-          onChange={onChange}
           onSubmit={onSubmit}
           onAttach={onAttach}
+          value={controlledValue as any}
+          onChange={controlledOnChange as any}
           placeholder={props.ui?.placeholder}
           disabled={isLoading}
           status={status}

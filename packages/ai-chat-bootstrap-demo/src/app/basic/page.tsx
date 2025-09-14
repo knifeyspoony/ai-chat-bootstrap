@@ -15,6 +15,7 @@ export default function BasicChatPage() {
     threadId,
     scopeKey,
     autoCreateThread: true,
+    threadTitleApi: "/api/thread-title",
   });
 
   return (

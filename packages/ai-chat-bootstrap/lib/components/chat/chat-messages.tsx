@@ -47,7 +47,7 @@ export interface ChatMessagesHandle {
   scrollToBottom: () => void;
 }
 
-export const ChatMessages = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
+const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
   (
     {
       messages,
@@ -170,7 +170,9 @@ const StickToBottomConnector = forwardRef<ChatMessagesHandle>(
   }
 );
 
-ChatMessages.displayName = "ChatMessages";
+export const ChatMessages = React.memo(ChatMessagesInner);
+
+ChatMessagesInner.displayName = "ChatMessages";
 
 type AnyUIPart = UIMessage["parts"][number];
 

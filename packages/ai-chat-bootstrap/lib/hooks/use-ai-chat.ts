@@ -65,7 +65,7 @@ export function useAIChat(
     initialMessages,
     threadId,
     scopeKey,
-    threadTitleApi = "/api/thread-title",
+    threadTitleApi = "",
     threadTitleSampleCount = 8,
     autoCreateThread = true,
     warnOnMissingThread = false,
@@ -414,8 +414,12 @@ export function useAIChat(
                     lastAutoTitleAt: now,
                   });
                   // Send in the last n messages as context (prefer store snapshot just persisted)
-                  const storeMsgs = (state.threads.get(effectiveId)?.messages || []) as UIMessage[];
-                  const source = storeMsgs.length > 0 ? storeMsgs : ((chatHook.messages as UIMessage[]) || []);
+                  const storeMsgs = (state.threads.get(effectiveId)?.messages ||
+                    []) as UIMessage[];
+                  const source =
+                    storeMsgs.length > 0
+                      ? storeMsgs
+                      : (chatHook.messages as UIMessage[]) || [];
                   const sample = source.slice(-threadTitleSampleCount);
                   const payload = {
                     messages: sample,

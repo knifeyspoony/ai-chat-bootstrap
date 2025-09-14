@@ -16,7 +16,7 @@ export interface ChatHeaderProps {
   actions?: React.ReactNode;
 }
 
-export function ChatHeader({
+export const ChatHeader = React.memo(function ChatHeader({
   title,
   subtitle,
   avatar,
@@ -78,4 +78,4 @@ export function ChatHeader({
       )}
     </div>
   );
-}
+});

@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import type { UIMessage } from "ai";
 import { CommandDropdown } from "../../components/ui/chat-command";
 import { CommandParameterInfo } from "../../components/ui/command-parameter-info";
 import { useChatStore } from "../../stores/chat";
@@ -13,6 +14,10 @@ import {
   parseArgsToParams,
 } from "../../utils/command-utils";
 import { ChatInput, type ChatInputProps } from "./chat-input";
+import { useChatThreadsStore } from "../../stores/chat-threads";
+
+// Stable empty array to avoid creating a new reference on each selector call
+const EMPTY_UI_MESSAGES: UIMessage[] = [];
 
 export interface ChatInputWithCommandsProps extends ChatInputProps {
   // Commands props
@@ -25,7 +30,7 @@ export interface ChatInputWithCommandsProps extends ChatInputProps {
   ) => void;
 }
 
-export const ChatInputWithCommands = ({
+const ChatInputWithCommandsImpl = ({
   value,
   onChange,
   onSubmit,
@@ -35,6 +40,18 @@ export const ChatInputWithCommands = ({
   ...props
 }: ChatInputWithCommandsProps) => {
   const setError = useChatStore((state) => state.setError);
+  // Local draft state for uncontrolled usage
+  const [draft, setDraft] = useState("");
+  const isControlled = typeof value === "string" && typeof onChange === "function";
+  const currentValue = isControlled ? (value as string) : draft;
+  const updateValue = (next: string) => {
+    if (isControlled) {
+      (onChange as (v: string) => void)(next);
+    } else {
+      setDraft(next);
+    }
+  };
+  const clearInput = () => updateValue("");
 
   // Command detection state
   const [showCommands, setShowCommands] = useState(false);
@@ -48,17 +65,59 @@ export const ChatInputWithCommands = ({
   const [parameterValidationError, setParameterValidationError] = useState<
     string | null
   >(null);
-  const { getMatchingCommands, executeCommand, getCommand } =
-    useAIChatCommandsStore();
+  const getMatchingCommands = useAIChatCommandsStore(
+    (s) => s.getMatchingCommands
+  );
+  const executeCommand = useAIChatCommandsStore((s) => s.executeCommand);
+  const getCommand = useAIChatCommandsStore((s) => s.getCommand);
+
+  // --- Input history state ---
+  // Index into user message history (0..n-1). null when not navigating history.
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
+  // Preserve the user's current draft before history navigation begins.
+  const [savedDraft, setSavedDraft] = useState<string>("");
+
+  // Source user messages from the active thread in the zustand store to avoid stale props.
+  const threadMessages = useChatThreadsStore((s) => {
+    const id = s.activeThreadId;
+    const msgs = id
+      ? (s.threads.get(id)?.messages as UIMessage[] | undefined)
+      : undefined;
+    return msgs ?? EMPTY_UI_MESSAGES;
+  });
+
+  // Build user text history (chronological). Empty when no messages.
+  const userHistory = useMemo(() => {
+    const list = (threadMessages ?? [])
+      .filter((m) => m.role === "user")
+      .map((m) => {
+        const parts = (m as any).parts as Array<any> | undefined;
+        if (Array.isArray(parts) && parts.length > 0) {
+          const text = parts
+            .map((p) => (p && p.type === "text" ? String(p.text ?? "") : ""))
+            .filter(Boolean)
+            .join(" ")
+            .trim();
+          return text;
+        }
+        const content = (m as any).content as any;
+        if (typeof content === "string") return content;
+        if (Array.isArray(content))
+          return content.map((c) => String(c?.text ?? "")).join(" ").trim();
+        return "";
+      })
+      .filter((t) => t.length > 0);
+    return list;
+  }, [threadMessages]);
 
   // Detect command input and parameter completion
   useEffect(() => {
     if (!enableCommands) return;
 
-    const isCommandInput = value.startsWith("/");
+    const isCommandInput = currentValue.startsWith("/");
 
     if (isCommandInput) {
-      const cmdText = value.slice(1);
+      const cmdText = currentValue.slice(1);
       const [cmdName, ...args] = cmdText.split(" ");
 
       // If we have a space after command name, check if it's a valid command needing args
@@ -74,9 +133,9 @@ export const ChatInputWithCommands = ({
           const textarea = document.querySelector(
             'textarea[data-testid="chat-input"], textarea'
           ) as HTMLTextAreaElement;
-          const cursorPos = textarea?.selectionStart || value.length;
+          const cursorPos = textarea?.selectionStart || currentValue.length;
           const paramIndex = getCurrentParameterIndex(
-            value,
+            currentValue,
             cursorPos,
             command.parameters
           );
@@ -100,12 +159,12 @@ export const ChatInputWithCommands = ({
       setCommandQuery("");
       setSelectedCommand(null);
     }
-  }, [value, enableCommands, getCommand]);
+  }, [currentValue, enableCommands, getCommand]);
 
   // Handle keyboard events
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Only intercept keys when we're actively typing a command (starts with '/')
-    if (showCommands && matchingCommands.length > 0 && value.startsWith("/")) {
+    if (showCommands && matchingCommands.length > 0 && currentValue.startsWith("/")) {
       if (e.key === "Escape") {
         setShowCommands(false);
         setSelectedCommandIndex(0);
@@ -145,10 +204,72 @@ export const ChatInputWithCommands = ({
     if (showParameterInfo && e.key === "Escape") {
       setShowParameterInfo(false);
       setSelectedCommand(null);
-      onChange("");
+      clearInput();
       e.preventDefault();
       e.stopPropagation();
       return;
+    }
+
+    // Input history navigation (only when not in command UI)
+    // - ArrowUp: cycle to previous user messages, starting from most recent
+    // - ArrowDown: cycle forward and eventually restore the saved draft
+    // Behavior only triggers when caret is at start (Up) or end (Down)
+    // and when not typing a "/" command.
+    if (!currentValue.startsWith("/")) {
+      const el = e.currentTarget as HTMLTextAreaElement;
+      const caretStart = el?.selectionStart ?? 0;
+      const caretEnd = el?.selectionEnd ?? 0;
+      const atStart = caretStart === 0 && caretEnd === 0;
+      const atEnd = caretStart === (currentValue?.length ?? 0) && caretEnd === caretStart;
+
+      if (e.key === "ArrowUp" && atStart && userHistory.length > 0) {
+        e.preventDefault();
+        // On first navigation, save the current draft
+        if (historyIndex === null) {
+          setSavedDraft(currentValue);
+          const idx = userHistory.length - 1; // most recent
+          setHistoryIndex(idx);
+          const next = userHistory[idx] ?? "";
+          updateValue(next);
+        } else {
+          const nextIndex = Math.max(0, historyIndex - 1);
+          setHistoryIndex(nextIndex);
+          const next = userHistory[nextIndex] ?? "";
+          updateValue(next);
+        }
+        // Place caret at end after value updates
+        setTimeout(() => {
+          const len = el.value.length;
+          el.setSelectionRange(len, len);
+        }, 0);
+        return;
+      }
+
+      if (e.key === "ArrowDown" && atEnd) {
+        if (historyIndex !== null) {
+          e.preventDefault();
+          const nextIndex = historyIndex + 1;
+          if (nextIndex >= userHistory.length) {
+            // Restore draft and exit history mode
+            setHistoryIndex(null);
+            updateValue(savedDraft);
+            // caret to end
+            setTimeout(() => {
+              const len = el.value.length;
+              el.setSelectionRange(len, len);
+            }, 0);
+          } else {
+            setHistoryIndex(nextIndex);
+            const next = userHistory[nextIndex] ?? "";
+            updateValue(next);
+            setTimeout(() => {
+              const len = el.value.length;
+              el.setSelectionRange(len, len);
+            }, 0);
+          }
+          return;
+        }
+      }
     }
   };
 
@@ -182,7 +303,7 @@ export const ChatInputWithCommands = ({
           const message = `Execute ${cmd.name} command`;
           onAICommandExecute?.(message, cmd.toolName, cmd.systemPrompt);
         }
-        onChange("");
+        clearInput();
         setShowCommands(false);
 
         // Return focus to the chat input
@@ -196,7 +317,7 @@ export const ChatInputWithCommands = ({
         }, 10);
       } else {
         // Command needs parameters - set input with command name and space
-        onChange(`/${cmd.name} `);
+        updateValue(`/${cmd.name} `);
         setShowCommands(false);
         setSelectedCommand(cmd);
         setShowParameterInfo(true);
@@ -211,7 +332,7 @@ export const ChatInputWithCommands = ({
   // Handle form submission - prevent if showing commands
   const handleSubmit = async (e: React.FormEvent) => {
     // Only prevent form submission if we're actively typing a command
-    if (showCommands && matchingCommands.length > 0 && value.startsWith("/")) {
+    if (showCommands && matchingCommands.length > 0 && currentValue.startsWith("/")) {
       e.preventDefault();
       handleCommandSelect(
         matchingCommands[selectedCommandIndex] || matchingCommands[0]
@@ -220,9 +341,9 @@ export const ChatInputWithCommands = ({
     }
 
     // Handle command execution with parameters
-    if (value.startsWith("/")) {
+    if (currentValue.startsWith("/")) {
       e.preventDefault();
-      const cmdText = value.slice(1);
+      const cmdText = currentValue.slice(1);
       const [cmdName, ...args] = cmdText.split(" ");
       const command = getCommand(cmdName);
 
@@ -256,7 +377,7 @@ export const ChatInputWithCommands = ({
             );
           }
 
-          onChange("");
+          clearInput();
           setShowParameterInfo(false);
           setSelectedCommand(null);
           setParameterValidationError(null);
@@ -277,16 +398,18 @@ export const ChatInputWithCommands = ({
       }
     }
 
-    onSubmit(e);
+    onSubmit?.(e);
+    clearInput();
   };
 
   // Enhanced ChatInput with command dropdown
   if (!enableCommands) {
     return (
       <ChatInput
-        value={value}
-        onChange={onChange}
-        onSubmit={onSubmit}
+        value={currentValue}
+        onChange={updateValue}
+        onSubmit={handleSubmit}
+        onKeyDown={handleKeyDown}
         {...props}
       />
     );
@@ -295,8 +418,8 @@ export const ChatInputWithCommands = ({
   return (
     <div className="relative">
       <ChatInput
-        value={value}
-        onChange={onChange}
+        value={currentValue}
+        onChange={updateValue}
         onSubmit={handleSubmit}
         onKeyDown={handleKeyDown}
         {...props}
@@ -325,5 +448,7 @@ export const ChatInputWithCommands = ({
     </div>
   );
 };
+
+export const ChatInputWithCommands = React.memo(ChatInputWithCommandsImpl);
 
 ChatInputWithCommands.displayName = "ChatInputWithCommands";

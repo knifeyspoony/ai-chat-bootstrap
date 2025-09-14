@@ -41,8 +41,9 @@ interface ChatThreadsState {
 
   createThread: (opts?: CreateThreadOptions) => ChatThread;
   updateThreadMessages: (id: string, messages: UIMessage[]) => void;
-  renameThread: (id: string, title: string) => void;
+  renameThread: (id: string, title: string, opts?: { manual?: boolean; allowAutoReplace?: boolean }) => void;
   deleteThread: (id: string) => Promise<void>;
+  updateThreadMetadata: (id: string, patch: Record<string, unknown>) => void;
 }
 
 function toMeta(t: ChatThread): ChatThreadMeta {
@@ -204,11 +205,34 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
     if (p) p.save(updated).catch(() => {});
   },
 
-  renameThread: (id: string, title: string) => {
+  renameThread: (id: string, title: string, opts?: { manual?: boolean; allowAutoReplace?: boolean }) => {
     const now = Date.now();
     const loaded = get().threads.get(id);
     if (loaded) {
-      const updated: ChatThread = { ...loaded, title, updatedAt: now };
+      const prevMeta = (loaded.metadata || {}) as Record<string, unknown>;
+      const isManualLock = prevMeta.manualTitle === true;
+      // If this is an auto rename and user previously set manual title, skip
+      if (!opts?.manual && isManualLock) return;
+
+      // If attempting auto rename and existing title wasn't auto-generated, only replace when allowed
+      if (!opts?.manual && loaded.title && prevMeta.autoTitled !== true && !opts?.allowAutoReplace) {
+        return;
+      }
+
+      const nextMeta: Record<string, unknown> = { ...prevMeta };
+      if (opts?.manual) {
+        nextMeta.manualTitle = true;
+        delete nextMeta.autoTitled;
+      } else {
+        nextMeta.autoTitled = true;
+      }
+
+      const updated: ChatThread = {
+        ...loaded,
+        title,
+        updatedAt: now,
+        metadata: nextMeta,
+      };
       set((state) => ({
         threads: new Map(state.threads).set(id, updated),
         metas: new Map(state.metas).set(id, toMeta(updated)),
@@ -229,7 +253,18 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
       p.load(id)
         .then((t) => {
           if (!t) return;
-          const updated: ChatThread = { ...t, title, updatedAt: now };
+          const prevMeta = (t.metadata || {}) as Record<string, unknown>;
+          const isManualLock = prevMeta.manualTitle === true;
+          if (!opts?.manual && isManualLock) return;
+          if (!opts?.manual && t.title && prevMeta.autoTitled !== true && !opts?.allowAutoReplace) return;
+          const nextMeta: Record<string, unknown> = { ...prevMeta };
+          if (opts?.manual) {
+            nextMeta.manualTitle = true;
+            delete nextMeta.autoTitled;
+          } else {
+            nextMeta.autoTitled = true;
+          }
+          const updated: ChatThread = { ...t, title, updatedAt: now, metadata: nextMeta };
           return p.save(updated);
         })
         .catch(() => {});
@@ -245,6 +280,7 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
         /* ignore */
       }
     }
+    const currentScope = get().scopeKey;
     set((state) => {
       const nextThreads = new Map(state.threads);
       nextThreads.delete(id);
@@ -257,6 +293,47 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
       if (state.activeThreadId === id) next.activeThreadId = undefined;
       return next as ChatThreadsState;
     });
+
+    // Ensure a valid active thread exists after deletion
+    const metasInScope = Array.from(get().metas.values()).filter((m) =>
+      currentScope ? m.scopeKey === currentScope : true
+    );
+    if (metasInScope.length === 0) {
+      // Create a fresh thread for this scope and select it
+      const t = get().createThread({ scopeKey: currentScope });
+      set({ activeThreadId: t.id });
+    } else {
+      // Select the most recently updated remaining thread if none active
+      const st = get();
+      if (!st.activeThreadId) {
+        const [latest] = metasInScope.sort((a, b) => b.updatedAt - a.updatedAt);
+        if (latest) set({ activeThreadId: latest.id });
+      }
+    }
+  },
+  
+  updateThreadMetadata: (id: string, patch: Record<string, unknown>) => {
+    const existing = get().threads.get(id);
+    if (existing) {
+      const nextMeta = { ...(existing.metadata || {}), ...patch };
+      const updated: ChatThread = { ...existing, metadata: nextMeta };
+      set((state) => ({
+        threads: new Map(state.threads).set(id, updated),
+        // metas unchanged except possibly title/count/timestamps
+      }));
+      get().persistence?.save(updated).catch(() => {});
+      return;
+    }
+    const p = get().persistence;
+    if (p?.load) {
+      p.load(id)
+        .then((t) => {
+          if (!t) return;
+          const updated: ChatThread = { ...t, metadata: { ...(t.metadata || {}), ...patch } };
+          set((state) => ({ threads: new Map(state.threads).set(id, updated) }));
+          p.save(updated).catch(() => {});
+        })
+        .catch(() => {});
+    }
   },
 }));
-

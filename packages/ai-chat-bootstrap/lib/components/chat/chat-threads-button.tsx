@@ -64,6 +64,8 @@ export function ChatThreadsButton({
     isLoaded,
     loadThreadMetas,
   } = useChatThreadsStore();
+  // Subscribe specifically to metas map so the list updates on title changes
+  const metas = useChatThreadsStore((s) => s.metas);
 
   React.useEffect(() => {
     if (!isLoaded) {
@@ -71,7 +73,7 @@ export function ChatThreadsButton({
     }
   }, [isLoaded, loadThreadMetas, scopeKey]);
 
-  const threads = listThreads(scopeKey);
+  const threads = React.useMemo(() => listThreads(scopeKey), [metas, listThreads, scopeKey]);
 
   const handleNew = () => {
     const t = createThread({ scopeKey });
@@ -106,10 +108,10 @@ export function ChatThreadsButton({
       if (!store.getThreadIfLoaded(renameState.id)) {
         store
           .loadThread(renameState.id)
-          .then(() => store.renameThread(renameState.id, next))
-          .catch(() => store.renameThread(renameState.id, next));
+          .then(() => store.renameThread(renameState.id, next, { manual: true }))
+          .catch(() => store.renameThread(renameState.id, next, { manual: true }));
       } else {
-        renameThread(renameState.id, next);
+        renameThread(renameState.id, next, { manual: true });
       }
     }
     setRenameState(undefined);
@@ -117,7 +119,22 @@ export function ChatThreadsButton({
 
   const confirmDelete = () => {
     if (deleteId) {
-      useChatThreadsStore.getState().deleteThread(deleteId);
+      const wasActive = activeThreadId === deleteId;
+      useChatThreadsStore
+        .getState()
+        .deleteThread(deleteId)
+        .then(() => {
+          // If we deleted active, emit selection for new active id
+          if (wasActive) {
+            const nextActive = useChatThreadsStore.getState().activeThreadId;
+            if (nextActive) onSelectThread?.(nextActive);
+          }
+        })
+        .catch(() => {
+          // On failure, still try to reflect current active
+          const nextActive = useChatThreadsStore.getState().activeThreadId;
+          if (nextActive) onSelectThread?.(nextActive);
+        });
     }
     setDeleteId(undefined);
   };

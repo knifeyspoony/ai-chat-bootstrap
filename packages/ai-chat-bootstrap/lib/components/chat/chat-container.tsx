@@ -17,7 +17,8 @@ type ChatHook = ReturnType<typeof useAIChat>;
 const ThreadsDropdownWrapper: React.FC<{
   scopeKey?: string;
   onSelectThread?: (id: string) => void;
-}> = ({ scopeKey, onSelectThread }) => {
+  onCreateThread?: (id: string) => void;
+}> = ({ scopeKey, onSelectThread, onCreateThread }) => {
   // dynamic import inside component (sync require acceptable in bundlers)
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -26,6 +27,7 @@ const ThreadsDropdownWrapper: React.FC<{
       <ChatThreadsButton
         scopeKey={scopeKey}
         onSelectThread={onSelectThread}
+        onCreateThread={onCreateThread ?? onSelectThread}
         className="ml-1"
       />
     );

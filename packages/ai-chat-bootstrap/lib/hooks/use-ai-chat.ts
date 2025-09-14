@@ -35,6 +35,16 @@ export function useAIChat(
     /** Optional scope partition key for sharding threads (e.g. notebook/document id). */
     scopeKey?: string;
     /**
+     * Endpoint for AI title generation. Defaults to "/api/thread-title".
+     * Set to a different path to customize, or set to an empty string to disable network-based titling.
+     */
+    threadTitleApi?: string;
+    /**
+     * Number of recent messages to include when asking the backend to generate/upgrade a title.
+     * Defaults to 8 (last 8 messages).
+     */
+    threadTitleSampleCount?: number;
+    /**
      * If a threadId is provided and no thread exists in the store (and cannot be loaded
      * from persistence), automatically create a new thread with that id.
      * Defaults to true.
@@ -55,6 +65,8 @@ export function useAIChat(
     initialMessages,
     threadId,
     scopeKey,
+    threadTitleApi = "/api/thread-title",
+    threadTitleSampleCount = 8,
     autoCreateThread = true,
     warnOnMissingThread = false,
   } = options;
@@ -70,6 +82,9 @@ export function useAIChat(
   const executeTool = useAIToolsStore((state) => state.executeTool);
   const setError = useChatStore((state) => state.setError);
   const setActiveThread = useChatThreadsStore((state) => state.setActiveThread);
+  const storeActiveThreadId = useChatThreadsStore(
+    (state) => state.activeThreadId
+  );
 
   // Direct reference to the zustand store object (not a hook call) for imperative ops
   const threadStore = useChatThreadsStore; // NOTE: used in effects below (getState())
@@ -91,12 +106,82 @@ export function useAIChat(
     }
   }, [scopeKey, threadStore]);
 
+  // When no threadId provided, choose most recently updated in scope or create a new one.
+  useEffect(() => {
+    if (threadId) return; // caller controls id
+    try {
+      const state = threadStore.getState();
+      const scope = scopeKey;
+      async function pickOrCreateLatest() {
+        if (!state.isLoaded) {
+          try {
+            await state.loadThreadMetas(scope);
+          } catch {
+            /* ignore */
+          }
+        }
+        // Prefer existing active if present
+        if (state.activeThreadId) {
+          const id = state.activeThreadId;
+          const t =
+            state.getThreadIfLoaded?.(id) || (await state.loadThread(id));
+          if (t) {
+            const storeMsgs = t.messages as UIMessage[];
+            const differs =
+              chatHook.messages.length !== storeMsgs.length ||
+              chatHook.messages.some((m, i) => storeMsgs[i]?.id !== m.id);
+            if (differs) chatHook.setMessages(storeMsgs);
+            return;
+          }
+        }
+        const metas = state.listThreads(scope);
+        if (metas.length > 0) {
+          const latest = metas[0]; // sorted by updatedAt desc in store
+          state.setActiveThread(latest.id);
+          const t =
+            state.getThreadIfLoaded?.(latest.id) ||
+            (await state.loadThread(latest.id));
+          if (t) {
+            const storeMsgs = t.messages as UIMessage[];
+            const differs =
+              chatHook.messages.length !== storeMsgs.length ||
+              chatHook.messages.some((m, i) => storeMsgs[i]?.id !== m.id);
+            if (differs) chatHook.setMessages(storeMsgs);
+            return;
+          }
+        }
+        // No threads exist: create one for this scope
+        const created = state.createThread({ scopeKey: scope });
+        state.setActiveThread(created.id);
+        if (chatHook.messages.length > 0) {
+          state.updateThreadMessages(
+            created.id,
+            chatHook.messages as UIMessage[]
+          );
+        }
+      }
+      pickOrCreateLatest();
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadId, scopeKey]);
+
   // Load initial thread messages synchronously if already present in memory
   const existingThreadMessages: UIMessage[] | undefined = (() => {
-    if (threadId) {
+    const effectiveId =
+      threadId ??
+      (() => {
+        try {
+          return useChatThreadsStore.getState().activeThreadId;
+        } catch {
+          return undefined;
+        }
+      })();
+    if (effectiveId) {
       try {
         const state = useChatThreadsStore.getState();
-        const t = state.getThreadIfLoaded?.(threadId);
+        const t = state.getThreadIfLoaded?.(effectiveId);
         return t?.messages;
       } catch {
         return undefined;
@@ -108,7 +193,7 @@ export function useAIChat(
   // If a threadId is provided but not yet in memory, attempt to load it from persistence.
   // If still missing, optionally create it (allowing pre-seeding a stable id from app state).
   React.useEffect(() => {
-    if (!threadId) return;
+    if (!threadId) return; // only for controlled id
     try {
       const state = threadStore.getState();
       if (state.getThreadIfLoaded?.(threadId)) return; // already loaded
@@ -270,14 +355,95 @@ export function useAIChat(
       // Hook handles loading state internally
       onFinish?.();
       // Persist updated messages into thread (if any)
-      if (threadId && threadStore) {
+      if (threadStore) {
         try {
           const state = threadStore.getState();
-          if (state.threads.get(threadId)) {
+          const effectiveId = threadId ?? state.activeThreadId;
+          if (effectiveId && state.threads.get(effectiveId)) {
             state.updateThreadMessages(
-              threadId,
+              effectiveId,
               chatHook.messages as UIMessage[]
             );
+            // Immediate default title after first user message (if no manual title)
+            const tNow = state.threads.get(effectiveId);
+            if (tNow && !tNow.title) {
+              const firstUserText = (
+                chatHook.messages.find((m) => m.role === "user")?.parts || []
+              )
+                .map((p: any) =>
+                  p?.type === "text" ? String(p.text || "") : ""
+                )
+                .filter(Boolean)
+                .join(" ")
+                .trim();
+              if (firstUserText) {
+                const PREVIEW_LEN = 24; // keep in sync with UI truncation
+                let preview = firstUserText.slice(0, PREVIEW_LEN);
+                if (firstUserText.length > PREVIEW_LEN) {
+                  // avoid cutting mid-word if possible
+                  const lastSpace = preview.lastIndexOf(" ");
+                  if (lastSpace > 8) preview = preview.slice(0, lastSpace);
+                }
+                preview = preview
+                  .replace(/[\n\r]+/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim();
+                if (preview) {
+                  state.renameThread(effectiveId, preview, {
+                    allowAutoReplace: true,
+                  });
+                }
+              }
+            }
+
+            // AI upgrade on assistant completion with cooldown
+            try {
+              const current = state.threads.get(effectiveId);
+              const meta = (current?.metadata || {}) as Record<string, unknown>;
+              const manual = meta.manualTitle === true;
+              if (!manual && threadTitleApi) {
+                const COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
+                const last =
+                  typeof meta.lastAutoTitleAt === "number"
+                    ? (meta.lastAutoTitleAt as number)
+                    : 0;
+                const now = Date.now();
+                if (now - last >= COOLDOWN_MS) {
+                  // mark attempt time immediately to avoid duplicate triggers
+                  state.updateThreadMetadata?.(effectiveId, {
+                    lastAutoTitleAt: now,
+                  });
+                  // Send in the last n messages as context (prefer store snapshot just persisted)
+                  const storeMsgs = (state.threads.get(effectiveId)?.messages || []) as UIMessage[];
+                  const source = storeMsgs.length > 0 ? storeMsgs : ((chatHook.messages as UIMessage[]) || []);
+                  const sample = source.slice(-threadTitleSampleCount);
+                  const payload = {
+                    messages: sample,
+                    previousTitle:
+                      typeof current?.title === "string"
+                        ? current?.title
+                        : undefined,
+                  } as any;
+                  fetch(threadTitleApi, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  })
+                    .then(async (r) => {
+                      if (!r.ok) return;
+                      const data: { title?: string } = await r.json();
+                      if (data.title) {
+                        state.renameThread(effectiveId, data.title, {
+                          allowAutoReplace: true,
+                        });
+                      }
+                    })
+                    .catch(() => {});
+                }
+              }
+            } catch {
+              /* ignore */
+            }
           }
         } catch {}
       }
@@ -291,9 +457,10 @@ export function useAIChat(
   const lastThreadIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!threadStore) return;
-    if (threadId === lastThreadIdRef.current) return;
+    const effectiveId = threadId ?? storeActiveThreadId;
+    if (effectiveId === lastThreadIdRef.current) return;
     const prev = lastThreadIdRef.current;
-    lastThreadIdRef.current = threadId;
+    lastThreadIdRef.current = effectiveId;
     // Unload previous (optional optimization)
     if (prev) {
       try {
@@ -302,12 +469,12 @@ export function useAIChat(
         st.unloadThread?.(prev);
       } catch {}
     }
-    if (threadId) {
+    if (effectiveId) {
       // Ensure loaded
       try {
         const st = threadStore.getState();
-        if (!st.getThreadIfLoaded?.(threadId)) {
-          st.loadThread(threadId)
+        if (!st.getThreadIfLoaded?.(effectiveId)) {
+          st.loadThread(effectiveId)
             .then((t) => {
               if (!t) return;
               const storeMsgs = t.messages as UIMessage[];
@@ -319,7 +486,7 @@ export function useAIChat(
             })
             .catch(() => {});
         } else {
-          const t = st.getThreadIfLoaded(threadId);
+          const t = st.getThreadIfLoaded(effectiveId);
           if (t) {
             const storeMsgs = t.messages as UIMessage[];
             const existing = chatHook.messages;
@@ -334,7 +501,7 @@ export function useAIChat(
       // no active thread
       chatHook.setMessages([]);
     }
-  }, [threadId, chatHook]);
+  }, [threadId, storeActiveThreadId, chatHook]);
 
   // Note: Removed chat store sync - causes infinite re-renders
   // The chat hook manages its own state internally
@@ -356,46 +523,42 @@ export function useAIChat(
   const sendMessageWithContext = (content: string) => {
     setError(null);
     chatHook.sendMessage({ text: content });
-    if (threadId && threadStore) {
+    if (threadStore) {
       // schedule microtask after message appended by hook
       queueMicrotask(() => {
         try {
           const state = threadStore.getState();
-          if (state.threads.get(threadId)) {
+          const effectiveId = threadId ?? state.activeThreadId;
+          if (effectiveId && state.threads.get(effectiveId)) {
             state.updateThreadMessages(
-              threadId,
+              effectiveId,
               chatHook.messages as UIMessage[]
             );
-            // Auto-title (improved): if no title yet AND we have at least 2 messages (user + assistant)
-            const t = state.threads.get(threadId);
-            if (t && !t.title) {
-              const userCount = chatHook.messages.filter(
-                (m) => m.role === "user"
-              ).length;
-              const assistantCount = chatHook.messages.filter(
-                (m) => m.role === "assistant"
-              ).length;
-              if (
-                userCount > 0 &&
-                (assistantCount > 0 || chatHook.messages.length > 3)
-              ) {
-                // Fire-and-forget fetch to backend title endpoint
-                const payload = { messages: chatHook.messages.slice(0, 8) };
-                fetch("/api/thread-title", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(payload),
-                })
-                  .then(async (r) => {
-                    if (!r.ok) return;
-                    const data: { title?: string } = await r.json();
-                    if (data.title && !state.threads.get(threadId)?.title) {
-                      // Guard again (user could have renamed meanwhile)
-                      state.renameThread(threadId, data.title);
-                    }
-                  })
-                  .catch(() => {});
+            // Initial placeholder title: first user message preview if untitled
+            const t = state.threads.get(effectiveId);
+            if (t && (!t.title || (t.metadata as any)?.autoTitled === true)) {
+              if (!t.title) {
+                const raw = String(content ?? "").trim();
+                if (raw) {
+                  const PREVIEW_LEN = 24; // keep in sync with UI truncation
+                  let preview = raw.slice(0, PREVIEW_LEN);
+                  if (raw.length > PREVIEW_LEN) {
+                    const lastSpace = preview.lastIndexOf(" ");
+                    if (lastSpace > 8) preview = preview.slice(0, lastSpace);
+                    preview = preview + "…"; // indicate truncation in preview
+                  }
+                  preview = preview
+                    .replace(/[\n\r]+/g, " ")
+                    .replace(/\s+/g, " ")
+                    .trim();
+                  if (preview) {
+                    state.renameThread(effectiveId, preview, {
+                      allowAutoReplace: true,
+                    });
+                  }
+                }
               }
+              // Note: AI upgrade is triggered on assistant completion only (see onFinish)
             }
           }
         } catch {}
@@ -425,13 +588,14 @@ export function useAIChat(
         },
       }
     );
-    if (threadId && threadStore) {
+    if (threadStore) {
       queueMicrotask(() => {
         try {
           const state = threadStore.getState();
-          if (state.threads.get(threadId)) {
+          const effectiveId = threadId ?? state.activeThreadId;
+          if (effectiveId && state.threads.get(effectiveId)) {
             state.updateThreadMessages(
-              threadId,
+              effectiveId,
               chatHook.messages as UIMessage[]
             );
           }
@@ -470,15 +634,24 @@ export function useAIChat(
   }
 
   function persistMessagesIfChanged(reason: string) {
-    if (!threadId) return;
+    const effectiveId =
+      threadId ??
+      (() => {
+        try {
+          return threadStore.getState().activeThreadId;
+        } catch {
+          return undefined;
+        }
+      })();
+    if (!effectiveId) return;
     try {
       const store = threadStore.getState();
-      const loaded = store.getThreadIfLoaded?.(threadId);
+      const loaded = store.getThreadIfLoaded?.(effectiveId);
       if (!loaded) return; // only persist hydrated threads
       const msgs = chatHook.messages as UIMessage[];
       const sig = computeSignature(msgs);
       if (sig === lastSavedSignatureRef.current) return;
-      store.updateThreadMessages(threadId, msgs);
+      store.updateThreadMessages(effectiveId, msgs);
       lastSavedSignatureRef.current = sig;
       // Optionally debug: console.debug('[acb][autosave]', reason, sig)
     } catch {
@@ -488,42 +661,14 @@ export function useAIChat(
 
   // Persist whenever messages settle and we are idle (not streaming/submitting)
   useEffect(() => {
-    if (!threadId) return;
+    const effectiveId = threadId ?? storeActiveThreadId;
+    if (!effectiveId) return;
     if (chatHook.status === "streaming" || chatHook.status === "submitted")
       return;
     persistMessagesIfChanged("idle");
-  }, [threadId, chatHook.status, chatHook.messages]);
+  }, [threadId, storeActiveThreadId, chatHook.status, chatHook.messages]);
 
-  // Periodic re-title attempt (e.g., after more context) if still untitled.
-  useEffect(() => {
-    if (!threadId) return;
-    const store = threadStore.getState();
-    const t = store.threads.get(threadId);
-    if (!t || t.title) return; // already titled or missing
-    if (chatHook.messages.length < 4) return; // need some substance
-    const handle = setTimeout(() => {
-      // Double-check still untitled
-      const current = threadStore.getState().threads.get(threadId);
-      if (!current || current.title) return;
-      fetch("/api/thread-title", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: chatHook.messages.slice(0, 12) }),
-      })
-        .then(async (r) => {
-          if (!r.ok) return;
-          const data: { title?: string } = await r.json();
-          if (
-            data.title &&
-            !threadStore.getState().threads.get(threadId)?.title
-          ) {
-            threadStore.getState().renameThread(threadId, data.title);
-          }
-        })
-        .catch(() => {});
-    }, 4000); // wait a few seconds after latest change
-    return () => clearTimeout(handle);
-  }, [threadId, chatHook.messages]);
+  // Removed prior periodic re-title effect; AI upgrade is triggered on assistant completion with cooldown
 
   // Persist on unmount
   useEffect(() => {

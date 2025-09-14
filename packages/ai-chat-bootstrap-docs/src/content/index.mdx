@@ -87,20 +87,18 @@ import React from "react";
 import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
 
 export function App() {
-	const chat = useAIChat({
-		api: "/api/chat",
-		systemPrompt: "You are a helpful AI assistant.",
-	});
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You are a helpful AI assistant.",
+  });
 
-	return (
-		<ChatContainer
-			messages={chat.messages}
-			input={chat.input}
-			onInputChange={chat.handleInputChange}
-			onSubmit={chat.handleSubmit}
-			isLoading={chat.isLoading}
-		/>
-	);
+  return (
+    <ChatContainer
+      chat={chat}
+      header={{ title: "AI Assistant", subtitle: "Connected to AI" }}
+      ui={{ placeholder: "Ask me anything..." }}
+    />
+  );
 }
 ```
 
@@ -153,14 +151,6 @@ See the monorepo root <Link href="https://github.com/knifeyspoony/ai-chat-bootst
 
 MIT © Contributors
 
-## Next Steps
-
-- Try the <Link href="/chat/basic-chat">Basic Chat example</Link>
-- Add tools & structured function calling
-- Provide contextual state via `useAIContext`
-- Customize theme tokens / radii / colors
-
 ---
 
-Need something that's missing? Open an issue or start a discussion in the repo.
-
+Questions or missing details? Open an issue in the repo.

@@ -122,14 +122,12 @@ export function ChatWithTools() {
       {/* Chat Interface */}
       <div className="h-[420px] w-full">
         <ChatContainer
-          title="AI Assistant with Tools"
-          subtitle="Can control the counter above"
-          messages={chat.messages}
-          input={chat.input}
-          onInputChange={chat.handleInputChange}
-          onSubmit={chat.handleSubmit}
-          isLoading={chat.isLoading}
-          placeholder="Try: 'increment by 3' or 'decrease by 2'"
+          chat={chat}
+          header={{
+            title: "AI Assistant with Tools",
+            subtitle: "Can control the counter above",
+          }}
+          ui={{ placeholder: "Try: 'increment by 3' or 'decrease by 2'" }}
         />
       </div>
     </div>
@@ -142,24 +140,26 @@ export function ChatWithTools() {
 The backend automatically receives registered tools and can execute them:
 
 ```tsx
-import { openai } from "@ai-sdk/openai";
-import { streamText, convertToCoreMessages } from "ai";
-import { NextRequest } from "next/server";
+import { createAzure } from "@ai-sdk/azure";
+import { convertToModelMessages, streamText } from "ai";
 
-export async function POST(req: NextRequest) {
-  const {
-    messages,
-    systemPrompt,
-    enrichedSystemPrompt,
-    tools,
-    context,
-    focus
-  } = await req.json();
+const azure = createAzure({
+  resourceName: process.env.AZURE_RESOURCE_NAME!,
+  apiKey: process.env.AZURE_API_KEY!,
+  apiVersion: process.env.AZURE_API_VERSION ?? "preview",
+});
 
-  const result = streamText({
-    model: openai("gpt-4"),
-    system: enrichedSystemPrompt,
-    messages: convertToCoreMessages(messages),
+const model = azure(process.env.AZURE_DEPLOYMENT_ID!);
+
+export async function POST(req: Request) {
+  const { messages, enrichedSystemPrompt, tools } = await req.json();
+
+  const result = await streamText({
+    model,
+    messages: [
+      { role: "system", content: enrichedSystemPrompt },
+      ...convertToModelMessages(messages),
+    ],
     tools,
   });
 

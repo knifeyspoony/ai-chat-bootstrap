@@ -254,14 +254,12 @@ export function ChatWithAICommands() {
   return (
     <div className="h-[600px] w-full">
       <ChatContainer
-        title="AI Assistant with Commands"
-        subtitle="Try: /summarize url:https://example.com style:brief"
-        messages={chat.messages}
-        input={chat.input}
-        onInputChange={chat.handleInputChange}
-        onSubmit={chat.handleSubmit}
-        isLoading={chat.isLoading}
-        placeholder="Type / to see available commands"
+        chat={chat}
+        header={{
+          title: "AI Assistant with Commands",
+          subtitle: "Try: /summarize url:https://example.com style:brief",
+        }}
+        ui={{ placeholder: "Type / to see available commands" }}
       />
     </div>
   );

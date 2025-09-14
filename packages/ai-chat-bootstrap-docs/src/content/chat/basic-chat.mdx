@@ -32,14 +32,9 @@ export function BasicChat() {
   return (
     <div className="h-[420px] w-full">
       <ChatContainer
-        title="AI Assistant"
-        subtitle="Connected to AI"
-        messages={chat.messages}
-        input={chat.input}
-        onInputChange={chat.handleInputChange}
-        onSubmit={chat.handleSubmit}
-        isLoading={chat.isLoading}
-        placeholder="Ask me anything..."
+        chat={chat}
+        header={{ title: "AI Assistant", subtitle: "Connected to AI" }}
+        ui={{ placeholder: "Ask me anything..." }}
       />
     </div>
   );
@@ -51,20 +46,29 @@ export function BasicChat() {
 Create an API route at `app/api/chat/route.ts` (Next.js App Router):
 
 ```tsx
-import { openai } from "@ai-sdk/openai";
-import { streamText } from "ai";
-import { NextRequest } from "next/server";
+import { createAzure } from "@ai-sdk/azure";
+import { convertToModelMessages, streamText } from "ai";
 
-export async function POST(req: NextRequest) {
-  const { messages, systemPrompt, enrichedSystemPrompt } = await req.json();
+const azure = createAzure({
+  resourceName: process.env.AZURE_RESOURCE_NAME!,
+  apiKey: process.env.AZURE_API_KEY!,
+  apiVersion: process.env.AZURE_API_VERSION ?? "preview",
+});
 
-  const result = streamText({
-    model: openai("gpt-4"),
-    system: enrichedSystemPrompt,
-    messages,
+const model = azure(process.env.AZURE_DEPLOYMENT_ID!);
+
+export async function POST(req: Request) {
+  const { messages, enrichedSystemPrompt } = await req.json();
+
+  const result = await streamText({
+    model,
+    messages: [
+      { role: "system", content: enrichedSystemPrompt },
+      ...convertToModelMessages(messages),
+    ],
   });
 
-  return result.toDataStreamResponse();
+  return result.toUIMessageStreamResponse();
 }
 ```
 

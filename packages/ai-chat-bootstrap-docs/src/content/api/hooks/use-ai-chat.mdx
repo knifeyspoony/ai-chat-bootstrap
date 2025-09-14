@@ -104,11 +104,7 @@ function ChatInterface() {
 
   return (
     <ChatContainer
-      messages={chat.messages}
-      input={chat.input}
-      onInputChange={chat.handleInputChange}
-      onSubmit={chat.handleSubmit}
-      isLoading={chat.isLoading}
+      chat={chat}
     />
   );
 }
@@ -183,13 +179,7 @@ function ChatWithControls() {
         <button onClick={stopGeneration}>Stop generation</button>
       </div>
 
-      <ChatContainer
-        messages={chat.messages}
-        input={chat.input}
-        onInputChange={chat.handleInputChange}
-        onSubmit={chat.handleSubmit}
-        isLoading={chat.isLoading}
-      />
+      <ChatContainer chat={chat} />
     </div>
   );
 }
@@ -212,7 +202,7 @@ function ChatWithContext() {
     systemPrompt: "You have access to the user's profile information."
   });
 
-  return <ChatContainer {...chat} />;
+  return <ChatContainer chat={chat} />;
 }
 ```
 
@@ -236,7 +226,7 @@ function ChatWithFocus() {
           </div>
         )}
       </div>
-      <ChatContainer {...chat} />
+      <ChatContainer chat={chat} />
     </div>
   );
 }
@@ -268,7 +258,7 @@ function ChatWithTools() {
   return (
     <div>
       <div className="mb-4">Counter: {counter}</div>
-      <ChatContainer {...chat} />
+      <ChatContainer chat={chat} />
     </div>
   );
 }
@@ -319,25 +309,18 @@ interface ChatRequestPayload {
 
 ```tsx
 import { openai } from "@ai-sdk/openai";
-import { streamText, convertToCoreMessages } from "ai";
+import { convertToModelMessages, streamText } from "ai";
 
-export async function POST(req: NextRequest) {
-  const {
-    messages,
-    systemPrompt,
-    enrichedSystemPrompt,
-    tools,
-    context,
-    focus
-  } = await req.json();
+export async function POST(req: Request) {
+  const { messages, enrichedSystemPrompt, tools } = await req.json();
 
-  
-  const result = streamText({
-    model: openai("gpt-4"),
-    system: enrichedSystemPrompt,
-    messages: convertToCoreMessages(messages),
+  const result = await streamText({
+    model,
+    messages: [
+      { role: "system", content: enrichedSystemPrompt },
+      ...convertToModelMessages(messages),
+    ],
     tools,
-    toolChoice: "auto",
   });
 
   return result.toUIMessageStreamResponse();
@@ -367,7 +350,7 @@ function ChatWithCustomProcessing() {
     }
   });
 
-  return <ChatContainer {...chat} />;
+  return <ChatContainer chat={chat} />;
 }
 ```
 
@@ -393,7 +376,7 @@ function ChatWithErrorRecovery() {
     }
   });
 
-  return <ChatContainer {...chat} />;
+  return <ChatContainer chat={chat} />;
 }
 ```
 
@@ -428,7 +411,7 @@ function ChatWithValidation() {
     }
   });
 
-  return <ChatContainer {...chat} />;
+  return <ChatContainer chat={chat} />;
 }
 ```
 
@@ -469,7 +452,7 @@ function ChatWithHistoryLimit() {
     }
   });
 
-  return <ChatContainer {...chat} />;
+  return <ChatContainer chat={chat} />;
 }
 ```
 
@@ -496,9 +479,10 @@ function ChatWithDebouncedInput() {
 
   return (
     <ChatContainer
-      {...chat}
-      onInputChange={handleInputChange}
-      onSubmit={debouncedSubmit}
+      chat={chat}
+      inputProps={{ onChange: (v) => handleInputChange({ target: { value: v } } as any) }}
+      // Note: debounced submit must be bound to form submit
+      // Consumers can wire a custom form if needed
     />
   );
 }

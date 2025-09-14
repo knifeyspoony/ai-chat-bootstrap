@@ -165,27 +165,28 @@ function ConditionalContext() {
 The backend automatically receives context items in the request payload (`enrichedSystemPrompt` embeds context/focus/tool summaries):
 
 ```tsx
-import { openai } from "@ai-sdk/openai";
-import { streamText, convertToCoreMessages } from "ai";
-import { NextRequest } from "next/server";
+import { createAzure } from "@ai-sdk/azure";
+import { convertToModelMessages, streamText } from "ai";
 
-export async function POST(req: NextRequest) {
-  const {
-    messages,
-    systemPrompt,
-    enrichedSystemPrompt,
-    tools,
-    context,
-    focus
-  } = await req.json();
+const azure = createAzure({
+  resourceName: process.env.AZURE_RESOURCE_NAME!,
+  apiKey: process.env.AZURE_API_KEY!,
+  apiVersion: process.env.AZURE_API_VERSION ?? "preview",
+});
 
-  const result = streamText({
-    model: openai("gpt-4"),
-    system: enrichedSystemPrompt,
-    messages: convertToCoreMessages(messages),
+const model = azure(process.env.AZURE_DEPLOYMENT_ID!);
+
+export async function POST(req: Request) {
+  const { messages, enrichedSystemPrompt, tools, context, focus } = await req.json();
+
+  const result = await streamText({
+    model,
+    messages: [
+      { role: "system", content: enrichedSystemPrompt },
+      ...convertToModelMessages(messages),
+    ],
     tools,
-    // Optionally surface context/focus to provider metadata if your model / infra can leverage it
-    experimental_providerMetadata: { context, focus }
+    experimental_providerMetadata: { context, focus },
   });
 
   return result.toUIMessageStreamResponse();

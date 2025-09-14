@@ -321,14 +321,9 @@ export function ChatWithUICommands() {
   return (
     <div className="h-[600px] w-full">
       <ChatContainer
-        title="Chat with UI Commands"
-        subtitle="Try: /clear, /theme dark, /debug true"
-        messages={chat.messages}
-        input={chat.input}
-        onInputChange={chat.handleInputChange}
-        onSubmit={chat.handleSubmit}
-        isLoading={chat.isLoading}
-        placeholder="Type / to see available commands"
+        chat={chat}
+        header={{ title: "Chat with UI Commands", subtitle: "Try: /clear, /theme dark, /debug true" }}
+        ui={{ placeholder: "Type / to see available commands" }}
       />
       
       {debugMode && (

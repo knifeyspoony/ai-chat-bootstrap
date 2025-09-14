@@ -177,14 +177,12 @@ export function AIContextDemo() {
 
       {/* Chat Interface */}
       <ChatContainer
-        title="AI with Shared Context"
-        subtitle="AI knows your profile and settings"
-        messages={chat.messages}
-        input={chat.input}
-        onInputChange={chat.handleInputChange}
-        onSubmit={chat.handleSubmit}
-        isLoading={chat.isLoading}
-        placeholder="Ask about your profile or settings!"
+        chat={chat}
+        header={{
+          title: "AI with Shared Context",
+          subtitle: "AI knows your profile and settings",
+        }}
+        ui={{ placeholder: "Ask about your profile or settings!" }}
       />
     </div>
   );
@@ -196,25 +194,26 @@ export function AIContextDemo() {
 The backend automatically receives context items in the request payload along with `enrichedSystemPrompt` (which already embeds Tools / Context / Focus summaries and appends your original `systemPrompt` if provided):
 
 ```tsx
-import { openai } from "@ai-sdk/openai";
-import { streamText, convertToCoreMessages } from "ai";
-import { NextRequest } from "next/server";
+import { createAzure } from "@ai-sdk/azure";
+import { convertToModelMessages, streamText } from "ai";
 
-export async function POST(req: NextRequest) {
-  const {
-    messages,
-    systemPrompt,
-    enrichedSystemPrompt,
-    tools,
-    context,
-    focus
-  } = await req.json();
+const azure = createAzure({
+  resourceName: process.env.AZURE_RESOURCE_NAME!,
+  apiKey: process.env.AZURE_API_KEY!,
+  apiVersion: process.env.AZURE_API_VERSION ?? "preview",
+});
 
+const model = azure(process.env.AZURE_DEPLOYMENT_ID!);
 
-  const result = streamText({
-    model: openai("gpt-4"),
-    system: enrichedSystemPrompt,
-    messages: convertToCoreMessages(messages),
+export async function POST(req: Request) {
+  const { messages, enrichedSystemPrompt, tools } = await req.json();
+
+  const result = await streamText({
+    model,
+    messages: [
+      { role: "system", content: enrichedSystemPrompt },
+      ...convertToModelMessages(messages),
+    ],
     tools,
   });
 

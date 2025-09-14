@@ -288,14 +288,12 @@ export function ChatWithCommands() {
     <div className="space-y-4">
       <div className="h-[500px] w-full">
         <ChatContainer
-          title="Chat with Commands"
-          subtitle="Try AI: /analyze or UI: /theme, /clear, /debug"
-          messages={chat.messages}
-          input={chat.input}
-          onInputChange={chat.handleInputChange}
-          onSubmit={chat.handleSubmit}
-          isLoading={chat.isLoading}
-          placeholder="Type / to see available commands"
+          chat={chat}
+          header={{
+            title: "Chat with Commands",
+            subtitle: "Try AI: /analyze or UI: /theme, /clear, /debug",
+          }}
+          ui={{ placeholder: "Type / to see available commands" }}
         />
       </div>
       
@@ -428,23 +426,26 @@ For AI commands, the backend receives the tools automatically:
 
 ```tsx
 // app/api/chat/route.ts
-import { openai } from "@ai-sdk/openai";
-import { streamText, convertToCoreMessages } from "ai";
+import { createAzure } from "@ai-sdk/azure";
+import { convertToModelMessages, streamText } from "ai";
 
-export async function POST(req: NextRequest) {
-  const {
-    messages,
-    systemPrompt,
-    enrichedSystemPrompt,
-    tools,
-    context,
-    focus
-  } = await req.json();
+const azure = createAzure({
+  resourceName: process.env.AZURE_RESOURCE_NAME!,
+  apiKey: process.env.AZURE_API_KEY!,
+  apiVersion: process.env.AZURE_API_VERSION ?? "preview",
+});
 
-  const result = streamText({
-    model: openai("gpt-4"),
-    system: enrichedSystemPrompt,
-    messages: convertToCoreMessages(messages),
+const model = azure(process.env.AZURE_DEPLOYMENT_ID!);
+
+export async function POST(req: Request) {
+  const { messages, enrichedSystemPrompt, tools } = await req.json();
+
+  const result = await streamText({
+    model,
+    messages: [
+      { role: "system", content: enrichedSystemPrompt },
+      ...convertToModelMessages(messages),
+    ],
     tools,
   });
 

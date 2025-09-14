@@ -96,11 +96,8 @@ function MyChat() {
 
   return (
     <ChatContainer
-      messages={chat.messages}
-      input={chat.input}
-      onInputChange={chat.handleInputChange}
-      onSubmit={chat.handleSubmit}
-      isLoading={chat.isLoading}
+      chat={chat}
+      header={{ title: 'My Chat' }}
     />
   );
 }
@@ -119,7 +116,7 @@ function ChatWithContext() {
 
   const chat = useAIChat({ api: '/api/chat' });
   
-  return <ChatContainer {...chat} />;
+  return <ChatContainer chat={chat} />;
 }
 ```
 
@@ -150,7 +147,7 @@ function ChatWithTools() {
   return (
     <div>
       <div>Count: {count}</div>
-      <ChatContainer {...chat} />
+      <ChatContainer chat={chat} />
     </div>
   );
 }
@@ -160,22 +157,25 @@ function ChatWithTools() {
 
 ### ChatContainer
 
-Main chat interface component with message display and input.
+Main chat interface component with messages UI and input. Prefer passing the hook result via the `chat` prop.
 
-```tsx
-interface ChatContainerProps {
-  title?: string;
-  subtitle?: string;
-  messages: UIMessage[];
-  input: string;
-  onInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onSubmit: (e?: FormEvent) => void;
-  isLoading?: boolean;
-  error?: Error | null;
-  placeholder?: string;
-  className?: string;
-}
+```ts
+type ChatContainerProps = {
+  // Preferred
+  chat?: ReturnType<typeof useAIChat>;
+
+  // Optional: group overrides when not using `chat`
+  state?: { messages?: UIMessage[]; isLoading?: boolean; status?: ChatStatus };
+  inputProps?: { value?: string; onChange?: (v: string) => void; onSubmit?: (e: FormEvent) => void; onAttach?: () => void };
+  header?: { title?: string; subtitle?: string; avatar?: React.ReactNode; badge?: React.ReactNode; actions?: React.ReactNode; className?: string };
+  ui?: { placeholder?: string; className?: string; classes?: { header?: string; messages?: string; message?: string; input?: string }; emptyState?: React.ReactNode };
+  suggestions?: { enabled?: boolean; prompt?: string; count?: number; api?: string; onAssistantFinish?: (cb: () => void) => void; onSendMessage?: (message: string) => void };
+  commands?: { enabled?: boolean; onExecute?: (commandName: string, args?: string) => void; onAICommandExecute?: (message: string, toolName: string, systemPrompt?: string) => void };
+  threads?: { enabled?: boolean; scopeKey?: string; threadId?: string; onThreadChange?: (id: string) => void };
+};
 ```
+
+Why: Groups keep layout independent from hook wiring and avoid prop soup while still allowing targeted overrides.
 
 ### ChatMessage
 
@@ -274,24 +274,26 @@ interface ChatRequestPayload {
 ### Example API Route (Next.js)
 
 ```tsx
-import { openai } from '@ai-sdk/openai';
-import { streamText, convertToCoreMessages } from 'ai';
-import { NextRequest } from 'next/server';
+import { createAzure } from '@ai-sdk/azure';
+import { convertToModelMessages, streamText } from 'ai';
 
-export async function POST(req: NextRequest) {
-  const {
-    messages,
-    systemPrompt,
-    enrichedSystemPrompt,
-    tools,
-    context,
-    focus
-  } = await req.json();
-  
-  const result = streamText({
-    model: openai('gpt-4'),
-    enrichedSystemPrompt,
-    messages: convertToCoreMessages(messages),
+const azure = createAzure({
+  resourceName: process.env.AZURE_RESOURCE_NAME!,
+  apiKey: process.env.AZURE_API_KEY!,
+  apiVersion: process.env.AZURE_API_VERSION ?? 'preview',
+});
+
+const model = azure(process.env.AZURE_DEPLOYMENT_ID!);
+
+export async function POST(req: Request) {
+  const { messages, enrichedSystemPrompt, tools } = await req.json();
+
+  const result = await streamText({
+    model,
+    messages: [
+      { role: 'system', content: enrichedSystemPrompt },
+      ...convertToModelMessages(messages),
+    ],
     tools,
   });
 

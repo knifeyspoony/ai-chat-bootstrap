@@ -120,13 +120,8 @@ export function ChatWithFocus() {
     <div className="grid grid-cols-2 gap-4">
       <DocumentSelector documents={myDocuments} />
       <ChatContainer
-        title="AI Assistant"
-        subtitle={`${allFocusItems.length} items in focus`}
-        messages={chat.messages}
-        input={chat.input}
-        onInputChange={chat.handleInputChange}
-        onSubmit={chat.handleSubmit}
-        isLoading={chat.isLoading}
+        chat={chat}
+        header={{ title: "AI Assistant", subtitle: `${allFocusItems.length} items in focus` }}
       />
     </div>
   );
@@ -216,27 +211,30 @@ function MultiTypeSelector() {
 Focus items are included in the client-built `enrichedSystemPrompt`, so you should not rebuild or concatenate them again server-side:
 
 ```tsx
-import { streamText, convertToCoreMessages } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { createAzure } from '@ai-sdk/azure';
+import { convertToModelMessages, streamText } from 'ai';
+
+const azure = createAzure({
+  resourceName: process.env.AZURE_RESOURCE_NAME!,
+  apiKey: process.env.AZURE_API_KEY!,
+  apiVersion: process.env.AZURE_API_VERSION ?? 'preview',
+});
+
+const model = azure(process.env.AZURE_DEPLOYMENT_ID!);
 
 export async function POST(request: Request) {
-  const {
-    messages,
-    systemPrompt,
-    enrichedSystemPrompt,
-    tools,
-    context,
-    focus
-  } = await request.json();
+  const { messages, enrichedSystemPrompt, tools } = await request.json();
 
   const result = await streamText({
-    model: openai('gpt-4-turbo'),
-    system: enrichedSystemPrompt,
-    messages: convertToCoreMessages(messages),
+    model,
+    messages: [
+      { role: 'system', content: enrichedSystemPrompt },
+      ...convertToModelMessages(messages),
+    ],
     tools,
   });
 
-  return result.toDataStreamResponse();
+  return result.toUIMessageStreamResponse();
 }
 ```
 

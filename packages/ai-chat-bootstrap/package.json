@@ -46,8 +46,8 @@
     "lint": "eslint lib/",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist/",
-    "release": "pnpm typecheck && pnpm lint && pnpm build && pnpm publish --access public",
-    "prepublishOnly": "pnpm lint && pnpm build",
+    "release": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm publish --access public",
+    "prepublishOnly": "pnpm lint && pnpm test && pnpm build",
     "test": "vitest run"
   },
   "dependencies": {

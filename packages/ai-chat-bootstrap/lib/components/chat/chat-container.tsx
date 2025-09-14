@@ -7,6 +7,7 @@ import {
 } from "../../components/chat/chat-messages";
 import { useSuggestions } from "../../hooks/use-suggestions";
 import { cn } from "../../utils";
+import { ChatThreadsButton } from "./chat-threads-button";
 
 // type-only import to avoid cycles
 import type { useAIChat } from "../../hooks";
@@ -19,21 +20,14 @@ const ThreadsDropdownWrapper: React.FC<{
   onSelectThread?: (id: string) => void;
   onCreateThread?: (id: string) => void;
 }> = ({ scopeKey, onSelectThread, onCreateThread }) => {
-  // dynamic import inside component (sync require acceptable in bundlers)
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { ChatThreadsButton } = require("./chat-threads-button");
-    return (
-      <ChatThreadsButton
-        scopeKey={scopeKey}
-        onSelectThread={onSelectThread}
-        onCreateThread={onCreateThread ?? onSelectThread}
-        className="ml-1"
-      />
-    );
-  } catch {
-    return null;
-  }
+  return (
+    <ChatThreadsButton
+      scopeKey={scopeKey}
+      onSelectThread={onSelectThread}
+      onCreateThread={onCreateThread ?? onSelectThread}
+      className="ml-1"
+    />
+  );
 };
 
 export interface ChatContainerProps {

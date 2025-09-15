@@ -38,11 +38,8 @@ function JsonBlock({ label, value }: { label: string; value: unknown }) {
 }
 
 export function ChatDebugButton() {
-  // Only render in non-production to avoid shipping debugging UI accidentally
-  if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
-    return null;
-  }
-
+  // We intentionally call hooks unconditionally (even in production) to satisfy
+  // the rules-of-hooks linter; we then no-op render in production.
   const [open, setOpen] = React.useState(false);
   // Select stable store slices (Maps) to avoid new references each render
   const contextMap = useAIContextStore((s) => s.contextItems);
@@ -68,6 +65,11 @@ export function ChatDebugButton() {
       return [] as unknown[];
     }
   }, [toolsMap]);
+
+  // Production build: do not expose debug UI
+  if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
+    return null;
+  }
 
   return (
     <>

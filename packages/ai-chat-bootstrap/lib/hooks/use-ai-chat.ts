@@ -81,7 +81,6 @@ export function useAIChat(
   );
   const executeTool = useAIToolsStore((state) => state.executeTool);
   const setError = useChatStore((state) => state.setError);
-  const setActiveThread = useChatThreadsStore((state) => state.setActiveThread);
   const storeActiveThreadId = useChatThreadsStore(
     (state) => state.activeThreadId
   );
@@ -637,7 +636,7 @@ export function useAIChat(
     return `${msgs.length}:${tailIds}`;
   }
 
-  function persistMessagesIfChanged(reason: string) {
+  function persistMessagesIfChanged() {
     const effectiveId =
       threadId ??
       (() => {

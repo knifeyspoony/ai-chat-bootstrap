@@ -14,6 +14,11 @@ import type { useAIChat } from "../../hooks";
 import { ChatHeader } from "./chat-header";
 type ChatHook = ReturnType<typeof useAIChat>;
 
+// Lazily load the debug button (development only) so it is tree-shaken away in production
+const LazyChatDebugButton = React.lazy(async () =>
+  import("./chat-debug-button").then((m) => ({ default: m.ChatDebugButton }))
+);
+
 // Lightweight wrapper to lazy load the threads dropdown only when needed
 const ThreadsDropdownWrapper: React.FC<{
   scopeKey?: string;
@@ -220,17 +225,8 @@ export function ChatContainer(props: ChatContainerProps) {
             {typeof process !== "undefined" &&
               process.env.NODE_ENV !== "production" && (
                 <React.Suspense fallback={null}>
-                  {(() => {
-                    try {
-                      // eslint-disable-next-line @typescript-eslint/no-var-requires
-                      const {
-                        ChatDebugButton,
-                      } = require("./chat-debug-button");
-                      return <ChatDebugButton />;
-                    } catch {
-                      return null;
-                    }
-                  })()}
+                  {/* Dynamic import to avoid including debug UI in prod bundles */}
+                  <LazyChatDebugButton />
                 </React.Suspense>
               )}
             {props.header?.actions}

@@ -1,7 +1,10 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { convertToModelMessages, streamText } from "ai";
 import type { ChatRequest } from "ai-chat-bootstrap/server";
-import { deserializeFrontendTools } from "ai-chat-bootstrap/server";
+import {
+  deserializeFrontendTools,
+  loadMcpTools,
+} from "ai-chat-bootstrap/server";
 
 /**
  * Build a minimal SSE stream compatible with AI SDK UI message transport.
@@ -85,7 +88,7 @@ function buildMockStreamResponse(text: string) {
 
 export async function POST(req: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
-  const { messages, tools, enrichedSystemPrompt }: ChatRequest =
+  const { messages, tools, enrichedSystemPrompt, mcpServers }: ChatRequest =
     await req.json();
 
   if (!enrichedSystemPrompt) {
@@ -171,6 +174,8 @@ export async function POST(req: Request) {
   const model = openai("gpt-4o-mini");
 
   const deserializedTools = deserializeFrontendTools(tools);
+  const { tools: mcpTools } = await loadMcpTools(mcpServers);
+  const combinedTools = { ...mcpTools, ...deserializedTools };
   const modelMessages = convertToModelMessages(messages, {
     ignoreIncompleteToolCalls: true,
   });
@@ -181,7 +186,7 @@ export async function POST(req: Request) {
       { role: "system", content: enrichedSystemPrompt },
       ...modelMessages,
     ],
-    tools: deserializedTools,
+    tools: combinedTools,
     temperature: 0.7,
   });
 

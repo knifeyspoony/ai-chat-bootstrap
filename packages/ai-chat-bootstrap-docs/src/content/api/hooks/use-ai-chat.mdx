@@ -14,6 +14,10 @@ interface UseAIChatOptions {
   api: string;
   systemPrompt?: string;
   initialMessages?: UIMessage[];
+  models?: ChatModelOption[];
+  selectedModelId?: string;
+  chainOfThoughtEnabled?: boolean;
+  mcpEnabled?: boolean;
   onFinish?: (message: UIMessage) => void;
   onError?: (error: Error) => void;
 }
@@ -39,6 +43,10 @@ Per-call override: you can still override the final string by passing `body.enri
 | `api` | `string` | Yes | API endpoint for chat requests |
 | `systemPrompt` | `string` | No | Application-specific system prompt |
 | `initialMessages` | `UIMessage[]` | No | Initial chat messages |
+| `models` | `ChatModelOption[]` | No | Available models for selection |
+| `selectedModelId` | `string` | No | Initially selected model ID |
+| `chainOfThoughtEnabled` | `boolean` | No | Enable reasoning display mode |
+| `mcpEnabled` | `boolean` | No | Enable MCP server tools |
 | `onFinish` | `(message: UIMessage) => void` | No | Callback when a message is completed |
 | `onError` | `(error: Error) => void` | No | Error callback |
 
@@ -50,6 +58,16 @@ interface UseAIChatReturn {
   input: string;
   isLoading: boolean;
   error: Error | null;
+
+  // Model Selection
+  models: ChatModelOption[];
+  model?: string; // selected model ID
+  setModel: (modelId: string) => void;
+
+  // Chain of Thought
+  chainOfThoughtEnabled: boolean;
+
+  // Core Actions
   handleInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   handleSubmit: (e?: FormEvent) => void;
   setInput: (input: string) => void;
@@ -57,14 +75,22 @@ interface UseAIChatReturn {
   append: (message: UIMessage) => void;
   reload: () => void;
   stop: () => void;
-  // Additional exposed convenience + state:
+
+  // Convenience Methods
   sendMessageWithContext: (text: string) => void;
   sendAICommandMessage: (text: string, toolName: string, systemPrompt?: string) => void;
   retryLastMessage: () => void;
   clearError: () => void;
+
+  // Context & Tools
   context: ContextItem[];
   tools: { name: string; description: string; inputSchema: unknown }[];
   focusItems: FocusItem[];
+
+  // Thread Management
+  threadId?: string;
+  scopeKey?: string;
+  mcpEnabled: boolean;
 }
 ```
 
@@ -76,6 +102,10 @@ interface UseAIChatReturn {
 | `input` | `string` | Current input value |
 | `isLoading` | `boolean` | Whether a request is in progress |
 | `error` | `Error \| null` | Current error state |
+| `models` | `ChatModelOption[]` | Available models for selection |
+| `model` | `string \| undefined` | Currently selected model ID |
+| `chainOfThoughtEnabled` | `boolean` | Whether reasoning display is enabled |
+| `mcpEnabled` | `boolean` | Whether MCP server tools are enabled |
 
 ### Action Methods
 
@@ -110,25 +140,33 @@ function ChatInterface() {
 }
 ```
 
-### With Initial Messages
+### With Model Selection
 
 ```tsx
-const initialMessages: UIMessage[] = [
-  {
-    id: "1",
-    role: "assistant",
-    parts: [{
-      type: "text",
-      text: "Hello! How can I help you today?"
-    }]
-  }
-];
-
 const chat = useAIChat({
   api: "/api/chat",
-  systemPrompt: "You are a helpful assistant.",
-  initialMessages
+  models: [
+    { id: "gpt-4", name: "GPT-4", description: "Most capable model" },
+    { id: "gpt-3.5-turbo", name: "GPT-3.5", description: "Faster, less expensive" },
+    { id: "claude-3-sonnet", name: "Claude 3 Sonnet", description: "Balanced performance" }
+  ],
+  selectedModelId: "gpt-4",
+  systemPrompt: "You are a helpful assistant."
 });
+
+// Model selection dropdown appears automatically in ChatContainer
+```
+
+### With Chain of Thought
+
+```tsx
+const chat = useAIChat({
+  api: "/api/chat",
+  chainOfThoughtEnabled: true,
+  systemPrompt: "You are a helpful assistant. Show your reasoning."
+});
+
+// Reasoning blocks are displayed automatically when present
 ```
 
 ### With Event Handlers
@@ -307,24 +345,16 @@ interface ChatRequestPayload {
 
 ## Example API Route
 
-```tsx
-import { openai } from "@ai-sdk/openai";
-import { convertToModelMessages, streamText } from "ai";
+```ts
+import { createOpenAI } from "@ai-sdk/openai";
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
 
-export async function POST(req: Request) {
-  const { messages, enrichedSystemPrompt, tools } = await req.json();
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+const model = openai("gpt-4o-mini");
 
-  const result = await streamText({
-    model,
-    messages: [
-      { role: "system", content: enrichedSystemPrompt },
-      ...convertToModelMessages(messages),
-    ],
-    tools,
-  });
-
-  return result.toUIMessageStreamResponse();
-}
+export const POST = createAIChatHandler({
+  model,
+});
 ```
 
 ## Advanced Usage
@@ -456,35 +486,28 @@ function ChatWithHistoryLimit() {
 }
 ```
 
-### Debounced Input
+### Auto-Submit on Enter
 
 ```tsx
-import { useMemo } from 'react';
-import { debounce } from 'lodash';
+import { useEffect } from 'react';
 
-function ChatWithDebouncedInput() {
+function ChatWithAutoSubmit() {
   const chat = useAIChat({ api: "/api/chat" });
 
-  const debouncedSubmit = useMemo(
-    () => debounce(chat.handleSubmit, 500),
-    [chat.handleSubmit]
-  );
+  // Auto-submit when user presses Enter (without Shift)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey && chat.input.trim()) {
+        e.preventDefault();
+        chat.handleSubmit();
+      }
+    };
 
-  const handleInputChange = (e) => {
-    chat.handleInputChange(e);
-    if (e.target.value.trim()) {
-      debouncedSubmit();
-    }
-  };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [chat.input, chat.handleSubmit]);
 
-  return (
-    <ChatContainer
-      chat={chat}
-      inputProps={{ onChange: (v) => handleInputChange({ target: { value: v } } as any) }}
-      // Note: debounced submit must be bound to form submit
-      // Consumers can wire a custom form if needed
-    />
-  );
+  return <ChatContainer chat={chat} />;
 }
 ```
 

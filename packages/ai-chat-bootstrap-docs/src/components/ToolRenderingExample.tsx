@@ -4,8 +4,8 @@ import {
   useAIFrontendTool,
   type UIMessage,
 } from "ai-chat-bootstrap";
-import React, { useState } from "react";
 import { z } from "zod";
+import { useMockAIChat } from "./shared/useMockAIChat";
 
 // Custom Chart Component
 function ChartComponent({
@@ -133,9 +133,7 @@ function ProgressBar({ progress, label }: { progress: number; label: string }) {
 
 // Demo component with custom rendering tools
 export function ToolRenderingExample() {
-  const [messages, setMessages] = useState<UIMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const mockChat = useMockAIChat();
 
   // Chart creation tool with custom rendering
   useAIFrontendTool({
@@ -196,28 +194,25 @@ export function ToolRenderingExample() {
     ),
   });
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!input.trim()) return;
-
+  // Override the sendMessageWithContext to add our custom logic
+  const sendMessageWithContext = (text: string) => {
+    if (!text.trim()) return;
     const userMessage: UIMessage = {
       id: crypto.randomUUID(),
       role: "user",
-      parts: [{ type: "text", text: input }],
+      parts: [{ type: "text", text }],
     };
-    setMessages((m) => [...m, userMessage]);
-    const userInput = input;
-    setInput("");
-    setIsLoading(true);
+    mockChat.setMessages((m) => [...m, userMessage]);
+    mockChat.setIsLoading(true);
 
     // Simulate AI tool usage for demo
     setTimeout(() => {
-      const responseText = `You said: "${userInput}".`;
+      const responseText = `You said: "${text}".`;
 
       // Check if user is asking for a chart
       if (
-        userInput.toLowerCase().includes("chart") ||
-        userInput.toLowerCase().includes("graph")
+        text.toLowerCase().includes("chart") ||
+        text.toLowerCase().includes("graph")
       ) {
         const sampleData = [
           { label: "React", value: 45 },
@@ -226,9 +221,7 @@ export function ToolRenderingExample() {
           { label: "Svelte", value: 10 },
         ];
 
-        const chartType = userInput.toLowerCase().includes("pie")
-          ? "pie"
-          : "bar";
+        const chartType = text.toLowerCase().includes("pie") ? "pie" : "bar";
 
         const toolMessage: UIMessage = {
           id: crypto.randomUUID(),
@@ -257,8 +250,8 @@ export function ToolRenderingExample() {
             },
           ],
         };
-        setMessages((m) => [...m, toolMessage]);
-      } else if (userInput.toLowerCase().includes("progress")) {
+        mockChat.setMessages((m) => [...m, toolMessage]);
+      } else if (text.toLowerCase().includes("progress")) {
         const progress = Math.floor(Math.random() * 100) + 1;
 
         const toolMessage: UIMessage = {
@@ -286,7 +279,7 @@ export function ToolRenderingExample() {
             },
           ],
         };
-        setMessages((m) => [...m, toolMessage]);
+        mockChat.setMessages((m) => [...m, toolMessage]);
       } else {
         const assistantMessage: UIMessage = {
           id: crypto.randomUUID(),
@@ -298,26 +291,26 @@ export function ToolRenderingExample() {
             },
           ],
         };
-        setMessages((m) => [...m, assistantMessage]);
+        mockChat.setMessages((m) => [...m, assistantMessage]);
       }
-      setIsLoading(false);
+      mockChat.setIsLoading(false);
     }, 1000);
-  }
+  };
+
+  const chat = {
+    ...mockChat,
+    sendMessageWithContext,
+  };
 
   return (
     <div className="h-[500px] w-full">
       <ChatContainer
+        chat={chat}
         header={{
           title: "AI with Custom Tool Rendering",
           subtitle: "Tools that render React components",
         }}
         ui={{ placeholder: "Try: 'create a bar chart' or 'show progress'" }}
-        state={{ messages, isLoading }}
-        inputProps={{
-          value: input,
-          onChange: setInput,
-          onSubmit: handleSubmit,
-        }}
       />
     </div>
   );

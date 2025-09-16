@@ -8,6 +8,11 @@ import {
   PromptInputTextarea,
   PromptInputToolbar,
   PromptInputTools,
+  PromptInputModelSelect,
+  PromptInputModelSelectTrigger,
+  PromptInputModelSelectValue,
+  PromptInputModelSelectContent,
+  PromptInputModelSelectItem,
 } from "../../components/ai-elements/prompt-input";
 import { Alert, AlertDescription } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
@@ -20,7 +25,7 @@ import {
 } from "../../components/ui/dropdown-menu";
 import { useAIFocus } from "../../hooks";
 import { useChatStore } from "../../stores/chat";
-import type { FocusItem, Suggestion } from "../../types/chat";
+import type { ChatModelOption, FocusItem, Suggestion } from "../../types/chat";
 import { cn } from "../../utils";
 
 export interface ChatInputProps {
@@ -36,6 +41,9 @@ export interface ChatInputProps {
   maxRows?: number;
   className?: string;
   onKeyDown?: (e: React.KeyboardEvent) => void;
+  models?: ChatModelOption[];
+  selectedModelId?: string;
+  onModelChange?: (modelId: string) => void;
 
   // Suggestions props
   enableSuggestions?: boolean;
@@ -56,6 +64,9 @@ export const ChatInput = ({
   maxRows = 4,
   className,
   onKeyDown,
+  models,
+  selectedModelId,
+  onModelChange,
 
   // Suggestions props
   enableSuggestions = false,
@@ -67,6 +78,13 @@ export const ChatInput = ({
   const { allFocusItems, clearFocus } = useAIFocus();
   const error = useChatStore((state) => state.error);
   const setError = useChatStore((state) => state.setError);
+  const modelOptions = Array.isArray(models) ? models : [];
+  const hasModelOptions = modelOptions.length > 0;
+  const selectModelValue = hasModelOptions
+    ? selectedModelId && modelOptions.some((option) => option.id === selectedModelId)
+      ? selectedModelId
+      : modelOptions[0]?.id
+    : undefined;
 
   // Keep focus in the input after submit
   const handleSubmit = useCallback(
@@ -83,6 +101,27 @@ export const ChatInput = ({
   // Do not disable textarea while sending/streaming; keep it interactive to preserve focus
   const textareaDisabled =
     disabled && !["submitted", "streaming"].includes(String(status ?? ""));
+
+  const handleTextareaKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      onKeyDown?.(event);
+
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      if (
+        (disabled || status === "submitted" || status === "streaming") &&
+        event.key === "Enter" &&
+        !event.shiftKey &&
+        !event.nativeEvent.isComposing
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    },
+    [disabled, onKeyDown, status]
+  );
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
@@ -144,17 +183,46 @@ export const ChatInput = ({
           placeholder={placeholder}
           disabled={textareaDisabled}
           maxHeight={maxRows * 24}
-          onKeyDown={onKeyDown}
+          onKeyDown={handleTextareaKeyDown}
           ref={textareaRef}
         />
         <PromptInputToolbar>
-          <PromptInputTools>
-            {onAttach && (
-              <PromptInputButton onClick={onAttach} disabled={disabled}>
-                <PlusIcon className="h-4 w-4" />
-              </PromptInputButton>
+          <div className="flex items-center gap-1">
+            {hasModelOptions && (
+              <PromptInputModelSelect
+                value={selectModelValue}
+                onValueChange={(value) => onModelChange?.(value)}
+                disabled={disabled}
+              >
+                <PromptInputModelSelectTrigger className="h-8 px-2 text-sm">
+                  <PromptInputModelSelectValue placeholder="Select a model" />
+                </PromptInputModelSelectTrigger>
+                <PromptInputModelSelectContent align="start">
+                  {modelOptions.map((option) => (
+                    <PromptInputModelSelectItem key={option.id} value={option.id}>
+                      <div className="flex flex-col gap-0.5 py-1">
+                        <span className="text-sm font-medium leading-tight">
+                          {option.label ?? option.id}
+                        </span>
+                        {option.description && (
+                          <span className="text-xs text-muted-foreground leading-tight">
+                            {option.description}
+                          </span>
+                        )}
+                      </div>
+                    </PromptInputModelSelectItem>
+                  ))}
+                </PromptInputModelSelectContent>
+              </PromptInputModelSelect>
             )}
-          </PromptInputTools>
+            <PromptInputTools>
+              {onAttach && (
+                <PromptInputButton onClick={onAttach} disabled={disabled}>
+                  <PlusIcon className="h-4 w-4" />
+                </PromptInputButton>
+              )}
+            </PromptInputTools>
+          </div>
 
           {/* Right side buttons group - Suggestions + Send */}
           <div className="flex gap-1">

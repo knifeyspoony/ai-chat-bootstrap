@@ -5,15 +5,28 @@ import {
   UIMessage,
 } from "ai";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+// z import removed - no longer needed without planning schemas
 import { useShallow } from "zustand/react/shallow";
 import {
   useAIContextStore,
   useAIFocusStore,
+  useAIModelsStore,
+  useAIMCPServersStore,
   useAIToolsStore,
   useChatThreadsStore,
 } from "../stores";
 import { useChatStore } from "../stores/";
+import type { SerializedMCPServer } from "../stores/mcp";
+// Planning types and schemas removed - using flow capture instead
+import type { ChatModelOption } from "../types/chat";
 import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
+import { useChainOfThought } from "./use-chain-of-thought";
+
+const EMPTY_MODEL_OPTIONS: ChatModelOption[] = [];
+
+// Planning schemas removed - using simplified flow capture approach
+
+// All planning schemas removed - flow capture handles planning automatically
 
 /**
  * Enhanced chat hook that integrates with AI SDK and our Zustand stores.
@@ -28,12 +41,15 @@ export function useAIChat(
   options: {
     api?: string;
     systemPrompt?: string;
-    onToolCall?: (toolCall: unknown) => void;
-    onFinish?: () => void;
     initialMessages?: UIMessage[];
     threadId?: string; // optional thread integration
     /** Optional scope partition key for sharding threads (e.g. notebook/document id). */
     scopeKey?: string;
+    /**
+     * When true, the hook exposes a lightweight planning UI powered by built-in frontend tools.
+     * The assistant can create/update/complete a plan that is shown temporarily to the user.
+     */
+    enableChainOfThought?: boolean;
     /**
      * Endpoint for AI title generation. Defaults to "/api/thread-title".
      * Set to a different path to customize, or set to an empty string to disable network-based titling.
@@ -55,21 +71,101 @@ export function useAIChat(
      * Defaults to false.
      */
     warnOnMissingThread?: boolean;
+    mcp?: {
+      enabled?: boolean;
+      api?: string;
+      servers?: SerializedMCPServer[];
+    };
+    /**
+     * Optional list of model choices to expose in the prompt input. When provided, the
+     * hook keeps track of the selected model and forwards it with each chat request.
+     */
+    models?: ChatModelOption[];
+    /**
+     * Initial model identifier to select on mount. Defaults to the first model in the
+     * provided list when omitted.
+     */
+    model?: string;
   } = {}
 ) {
   const {
     api = "/api/chat",
     systemPrompt,
-    onToolCall,
-    onFinish,
     initialMessages,
     threadId,
     scopeKey,
+    enableChainOfThought = false,
     threadTitleApi = "",
     threadTitleSampleCount = 8,
     autoCreateThread = true,
     warnOnMissingThread = false,
+    mcp,
+    models: providedModels,
+    model: providedModel,
   } = options;
+  const incomingModels = providedModels ?? EMPTY_MODEL_OPTIONS;
+  const mcpEnabled = mcp?.enabled ?? false;
+
+  const { models, selectedModelId } = useAIModelsStore(
+    useShallow((state) => ({
+      models: state.models,
+      selectedModelId: state.selectedModelId,
+    }))
+  );
+  const setModelsInStore = useAIModelsStore((state) => state.setModels);
+  const setSelectedModelIdInStore = useAIModelsStore(
+    (state) => state.setSelectedModelId
+  );
+
+  useEffect(() => {
+    const state = useAIModelsStore.getState();
+    const currentModels = state.models;
+
+    const sameModels =
+      currentModels.length === incomingModels.length &&
+      currentModels.every((model, index) => {
+        const incoming = incomingModels[index];
+        if (!incoming) return false;
+        return (
+          model.id === incoming.id &&
+          model.label === incoming.label &&
+          model.description === incoming.description
+        );
+      });
+
+    const preferredRequested =
+      providedModel !== undefined &&
+      incomingModels.some((model) => model.id === providedModel);
+
+    const preferredMatchesSelection = providedModel === state.selectedModelId;
+
+    if (!sameModels || (preferredRequested && !preferredMatchesSelection)) {
+      setModelsInStore(incomingModels, { preferredId: providedModel });
+      return;
+    }
+
+    if (state.selectedModelId) {
+      const stillValid = incomingModels.some(
+        (model) => model.id === state.selectedModelId
+      );
+      if (!stillValid) {
+        setModelsInStore(incomingModels, { preferredId: providedModel });
+      }
+    }
+  }, [incomingModels, providedModel, setModelsInStore]);
+
+  const selectedModelRef = useRef<string | undefined>(selectedModelId);
+
+  useEffect(() => {
+    selectedModelRef.current = selectedModelId;
+  }, [selectedModelId]);
+
+  const setModel = React.useCallback(
+    (modelId: string) => {
+      setSelectedModelIdInStore(modelId);
+    },
+    [setSelectedModelIdInStore]
+  );
 
   // Get raw store data with stable selectors - these return the same reference when unchanged
   const contextItemsMap = useAIContextStore(
@@ -79,11 +175,53 @@ export function useAIChat(
   const focusItemsMap = useAIFocusStore(
     useShallow((state) => state.focusItems)
   );
+  const { registerTool, unregisterTool } = useAIToolsStore(
+    useShallow((state) => ({
+      registerTool: state.registerTool,
+      unregisterTool: state.unregisterTool,
+    }))
+  );
   const executeTool = useAIToolsStore((state) => state.executeTool);
   const setError = useChatStore((state) => state.setError);
   const storeActiveThreadId = useChatThreadsStore(
     (state) => state.activeThreadId
   );
+  const setMcpEnabled = useAIMCPServersStore((state) => state.setEnabled);
+  const setMcpDefaultApi = useAIMCPServersStore((state) => state.setDefaultApi);
+  const setMcpConfigurations = useAIMCPServersStore(
+    (state) => state.setConfigurations
+  );
+
+  // Only register the chain of thought hook, passing enableChainOfThought
+  useChainOfThought({
+    enabled: enableChainOfThought,
+    registerTool,
+    unregisterTool,
+  });
+
+  // Removed chain of thought state and effects
+
+  useEffect(() => {
+    setMcpEnabled(mcpEnabled);
+    if (!mcpEnabled) return;
+    try {
+      if (mcp?.api) {
+        setMcpDefaultApi(mcp.api);
+      }
+      if (Array.isArray(mcp?.servers)) {
+        setMcpConfigurations(mcp.servers);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [
+    mcpEnabled,
+    mcp?.api,
+    mcp?.servers,
+    setMcpDefaultApi,
+    setMcpEnabled,
+    setMcpConfigurations,
+  ]);
 
   // Direct reference to the zustand store object (not a hook call) for imperative ops
   const threadStore = useChatThreadsStore; // NOTE: used in effects below (getState())
@@ -288,20 +426,53 @@ export function useAIChat(
           .getState()
           .serializeToolsForBackend();
         const currentFocusItems = useAIFocusStore.getState().getAllFocusItems();
+        const mcpStore = useAIMCPServersStore.getState();
+        const currentMcpServers = mcpStore.serializeServersForBackend();
+        const mcpToolSummaries = mcpStore.getAllToolSummaries();
         const callerBody = options.body ?? {};
 
         // Per-call overrides
         const overrideTools = (callerBody as any).tools as
           | unknown[]
           | undefined;
+        const overrideMcpServers = (callerBody as any).mcpServers as
+          | SerializedMCPServer[]
+          | undefined;
         const overrideSystemPrompt = (callerBody as any).systemPrompt as
           | string
           | undefined;
         const overrideEnrichedSystemPrompt = (callerBody as any)
           .enrichedSystemPrompt as string | undefined;
+        const overrideModel = (callerBody as any).model as string | undefined;
 
         const toolsToSend = overrideTools ?? currentTools;
+        const mcpServersToSend = overrideMcpServers ?? currentMcpServers;
         const systemPromptToSend = overrideSystemPrompt ?? systemPrompt;
+        // No chain of thought prompt
+
+        const toolSummaryMap = new Map<
+          string,
+          { name: string; description?: string }
+        >();
+        toolsToSend.forEach((tool: any) => {
+          if (!tool?.name) return;
+          if (!toolSummaryMap.has(tool.name)) {
+            toolSummaryMap.set(tool.name, {
+              name: tool.name,
+              description: tool.description,
+            });
+          }
+        });
+        mcpToolSummaries.forEach((tool) => {
+          if (!tool?.name) return;
+          if (!toolSummaryMap.has(tool.name)) {
+            toolSummaryMap.set(tool.name, {
+              name: tool.name,
+              description: tool.description,
+            });
+          }
+        });
+        const combinedToolSummaries = Array.from(toolSummaryMap.values());
 
         // Build enriched system prompt unless explicitly supplied
         const enrichedSystemPromptToSend =
@@ -310,27 +481,34 @@ export function useAIChat(
             originalSystemPrompt: systemPromptToSend,
             context: currentContext,
             focus: currentFocusItems,
-            tools: toolsToSend.map((t: any) => ({
-              name: t.name,
-              description: t.description,
-            })),
+            tools: combinedToolSummaries,
+            chainOfThoughtEnabled: enableChainOfThought,
           });
+
+        const body = {
+          ...callerBody,
+          messages: options.messages,
+          context: currentContext,
+          tools: toolsToSend,
+          mcpServers: mcpServersToSend,
+          focus: currentFocusItems, // Send complete focus items
+          systemPrompt: systemPromptToSend,
+          enrichedSystemPrompt: enrichedSystemPromptToSend,
+        } as Record<string, unknown>;
+
+        if (overrideModel !== undefined) {
+          body.model = overrideModel;
+        } else if (selectedModelRef.current) {
+          body.model = selectedModelRef.current;
+        }
 
         return {
           ...options,
-          body: {
-            ...callerBody,
-            messages: options.messages,
-            context: currentContext,
-            tools: toolsToSend,
-            focus: currentFocusItems, // Send complete focus items
-            systemPrompt: systemPromptToSend,
-            enrichedSystemPrompt: enrichedSystemPromptToSend,
-          },
+          body,
         };
       },
     });
-  }, [api, systemPrompt]);
+  }, [api, systemPrompt, enableChainOfThought]);
 
   const [draftInput, setDraftInput] = useState("");
 
@@ -341,28 +519,24 @@ export function useAIChat(
     onToolCall: async ({ toolCall }) => {
       try {
         // Execute frontend tool if available
-        const result = await executeTool(toolCall.toolName, toolCall.input);
-        onToolCall?.(toolCall);
-        // Add the tool result to the chat stream and still return it
-        addToolResultForCall(toolCall, result);
+        if (!toolCall.dynamic) {
+          const result = await executeTool(toolCall.toolName, toolCall.input);
+          // Add the tool result to the chat stream and still return it
+          addToolResultForCall(toolCall, result);
+        }
       } catch (error) {
         setError("Tool execution failed");
         throw error;
       }
     },
     onFinish: () => {
-      // Hook handles loading state internally
-      onFinish?.();
       // Persist updated messages into thread (if any)
       if (threadStore) {
         try {
           const state = threadStore.getState();
           const effectiveId = threadId ?? state.activeThreadId;
           if (effectiveId && state.threads.get(effectiveId)) {
-            state.updateThreadMessages(
-              effectiveId,
-              chatHook.messages as UIMessage[]
-            );
+            state.updateThreadMessages(effectiveId, chatHook.messages);
             // Immediate default title after first user message (if no manual title)
             const tNow = state.threads.get(effectiveId);
             if (tNow && !tNow.title) {
@@ -561,7 +735,6 @@ export function useAIChat(
                   }
                 }
               }
-              // Note: AI upgrade is triggered on assistant completion only (see onFinish)
             }
           }
         } catch {}
@@ -636,7 +809,8 @@ export function useAIChat(
     return `${msgs.length}:${tailIds}`;
   }
 
-  function persistMessagesIfChanged() {
+  function persistMessagesIfChanged(reason?: string) {
+    void reason;
     const effectiveId =
       threadId ??
       (() => {
@@ -696,5 +870,13 @@ export function useAIChat(
     availableTools,
     tools,
     focusItems,
+    mcpEnabled,
+    models,
+    model: selectedModelId,
+    setModel,
+    // Expose options for UI components
+    threadId: options.threadId,
+    scopeKey: options.scopeKey,
+    chainOfThoughtEnabled: options.enableChainOfThought ?? false,
   };
 }

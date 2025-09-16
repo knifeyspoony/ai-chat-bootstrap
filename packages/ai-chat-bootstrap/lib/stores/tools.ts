@@ -17,6 +17,7 @@ export interface FrontendTool<
   parameters: P;
   execute: (params: z.infer<P>) => Promise<R> | R;
   render?: (result: R) => React.ReactNode;
+  toolIcon?: React.ComponentType<{ className?: string }>;
 }
 
 // Convenience alias for internal non-generic storage usage

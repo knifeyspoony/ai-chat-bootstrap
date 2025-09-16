@@ -6,14 +6,13 @@ import {
   useUIChatCommand,
   type UIMessage,
 } from "ai-chat-bootstrap";
-import React, { useState } from "react";
+import { useState } from "react";
 import { z } from "zod";
+import { useMockAIChat } from "./shared/useMockAIChat";
 
 // Demo component that demonstrates both AI and UI commands
 export function CommandsExample() {
-  const [messages, setMessages] = useState<UIMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const mockChat = useMockAIChat();
   const [theme, setTheme] = useState("light");
   const [debugMode, setDebugMode] = useState(false);
   const [counter, setCounter] = useState(0);
@@ -150,7 +149,7 @@ export function CommandsExample() {
     description: "Clear the chat history",
     parameters: z.object({}),
     execute: async () => {
-      setMessages([]);
+      mockChat.setMessages([]);
       console.log("Chat cleared");
     },
   });
@@ -173,7 +172,7 @@ export function CommandsExample() {
     description: "Reset all demo state",
     parameters: z.object({}),
     execute: async () => {
-      setMessages([]);
+      mockChat.setMessages([]);
       setTheme("light");
       setDebugMode(false);
       setCounter(0);
@@ -181,20 +180,16 @@ export function CommandsExample() {
     },
   });
 
-  // Mock chat functionality for the demo
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
-
+  // Override the sendMessageWithContext to add our custom logic
+  const sendMessageWithContext = (text: string) => {
+    if (!text.trim()) return;
     const userMessage: UIMessage = {
       id: Date.now().toString(),
       role: "user",
-      parts: [{ type: "text", text: input }],
+      parts: [{ type: "text", text }],
     };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setIsLoading(true);
+    mockChat.setMessages((prev) => [...prev, userMessage]);
+    mockChat.setIsLoading(true);
 
     // Simulate AI response for demo
     setTimeout(() => {
@@ -204,13 +199,18 @@ export function CommandsExample() {
         parts: [
           {
             type: "text",
-            text: `This is a demo response. In a real app, the AI would process your message: "${input}". Try using commands like /analyze, /theme, /clear, or /debug!`,
+            text: `This is a demo response. In a real app, the AI would process your message: "${text}". Try using commands like /analyze, /theme, /clear, or /debug!`,
           },
         ],
       };
-      setMessages((prev) => [...prev, aiMessage]);
-      setIsLoading(false);
+      mockChat.setMessages((prev) => [...prev, aiMessage]);
+      mockChat.setIsLoading(false);
     }, 1000);
+  };
+
+  const chat = {
+    ...mockChat,
+    sendMessageWithContext,
   };
 
   return (
@@ -226,6 +226,7 @@ export function CommandsExample() {
       {/* Chat Interface */}
       <div className="h-[400px] w-full">
         <ChatContainer
+          chat={chat}
           header={{
             title: "Commands Demo",
             subtitle: `Theme: ${theme} | Debug: ${debugMode ? "ON" : "OFF"}`,
@@ -234,44 +235,8 @@ export function CommandsExample() {
             placeholder:
               "Try: /analyze text:hello, /theme mode:dark, /clear, /debug",
           }}
-          state={{ messages, isLoading }}
-          inputProps={{
-            value: input,
-            onChange: setInput,
-            onSubmit: handleSubmit,
-          }}
           commands={{
             enabled: true,
-            onExecute: (commandName: string, args?: string) => {
-              console.log(`Executed UI command: /${commandName}${args ? ` ${args}` : ""}`);
-            },
-            onAICommandExecute: (message: string, toolName: string, systemPrompt?: string) => {
-              // Add the AI command message to chat
-              const userMessage: UIMessage = {
-                id: Date.now().toString(),
-                role: "user",
-                parts: [{ type: "text", text: message }],
-              };
-              
-              setMessages((prev) => [...prev, userMessage]);
-              setIsLoading(true);
-              
-              // Mock AI response that simulates using the tool
-              setTimeout(() => {
-                const aiMessage: UIMessage = {
-                  id: (Date.now() + 1).toString(),
-                  role: "assistant",
-                  parts: [
-                    {
-                      type: "text",
-                      text: `I've executed the ${toolName} tool as requested. In a real implementation, this would process: "${message}" with system prompt: "${systemPrompt || 'default'}". Check the console or debug panel to see the tool execution results!`,
-                    },
-                  ],
-                };
-                setMessages((prev) => [...prev, aiMessage]);
-                setIsLoading(false);
-              }, 1500);
-            },
           }}
         />
       </div>
@@ -283,7 +248,7 @@ export function CommandsExample() {
           <pre className="text-xs overflow-auto">
             {JSON.stringify(
               {
-                messageCount: messages.length,
+                messageCount: mockChat.messages.length,
                 theme,
                 debugMode,
                 counter,

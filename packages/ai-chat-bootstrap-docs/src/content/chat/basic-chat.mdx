@@ -43,33 +43,37 @@ export function BasicChat() {
 
 ## Backend API Route
 
-Create an API route at `app/api/chat/route.ts` (Next.js App Router):
+Create an API route at `app/api/chat/route.ts` using the new server template:
 
-```tsx
+```ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+  streamOptions: { temperature: 0.7 },
+});
+
+export { handler as POST };
+```
+
+Or with Azure OpenAI:
+
+```ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
 import { createAzure } from "@ai-sdk/azure";
-import { convertToModelMessages, streamText } from "ai";
 
 const azure = createAzure({
   resourceName: process.env.AZURE_RESOURCE_NAME!,
   apiKey: process.env.AZURE_API_KEY!,
-  apiVersion: process.env.AZURE_API_VERSION ?? "preview",
 });
 
-const model = azure(process.env.AZURE_DEPLOYMENT_ID!);
+const handler = createAIChatHandler({
+  model: azure("gpt-4"),
+  streamOptions: { temperature: 0.7 },
+});
 
-export async function POST(req: Request) {
-  const { messages, enrichedSystemPrompt } = await req.json();
-
-  const result = await streamText({
-    model,
-    messages: [
-      { role: "system", content: enrichedSystemPrompt },
-      ...convertToModelMessages(messages),
-    ],
-  });
-
-  return result.toUIMessageStreamResponse();
-}
+export { handler as POST };
 ```
 
 > Note: The `useAIChat` hook automatically sends an `enrichedSystemPrompt` containing a standardized preamble plus conditional sections (Tools / Context / Focus) and then appends your `systemPrompt` (if provided). Always prefer `enrichedSystemPrompt` when present and do not rebuild those sections again on the server.
@@ -83,7 +87,7 @@ export async function POST(req: Request) {
 
 ## Next steps
 
-- **Add tools**: Enable function calling by passing tools to both <API name="useAIChat">useAIChat</API> and `streamText`
+- **Add tools**: Register frontend tools (or MCP servers) and they are automatically merged into the handler request
 - **Add context**: Use <API name="useAIContext">useAIContext</API> to share app state with the AI
 - **Add suggestions**: Enable contextual suggestions with `enableSuggestions={true}`
 - **Style**: Customize appearance via Tailwind classes or component props

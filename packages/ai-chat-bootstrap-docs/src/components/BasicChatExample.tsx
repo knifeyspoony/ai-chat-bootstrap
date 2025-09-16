@@ -1,53 +1,17 @@
 "use client";
-import { ChatContainer, type UIMessage } from "ai-chat-bootstrap";
-import React, { useState } from "react";
+import { ChatContainer } from "ai-chat-bootstrap";
+import { useMockAIChat } from "./shared/useMockAIChat";
 
 // A super lightweight mock chat producing a canned assistant reply.
 export function BasicChatExample() {
-  const [messages, setMessages] = useState<UIMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!input.trim()) return;
-    const userMessage: UIMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      parts: [{ type: "text", text: input }],
-    };
-    setMessages((m) => [...m, userMessage]);
-    const userInput = input;
-    setInput("");
-    setIsLoading(true);
-    // Simulate a network/AI delay
-    setTimeout(() => {
-      const assistantMessage: UIMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        parts: [
-          {
-            type: "text",
-            text: `You said: "${userInput}". This is a mock response from the AI model.`,
-          },
-        ],
-      };
-      setMessages((m) => [...m, assistantMessage]);
-      setIsLoading(false);
-    }, 600);
-  }
+  const chat = useMockAIChat();
 
   return (
     <div className="h-[420px] w-full">
       <ChatContainer
+        chat={chat}
         header={{ title: "AI Assistant", subtitle: "Connected to AI" }}
         ui={{ placeholder: "Ask me anything..." }}
-        state={{ messages, isLoading }}
-        inputProps={{
-          value: input,
-          onChange: setInput,
-          onSubmit: handleSubmit,
-        }}
       />
     </div>
   );

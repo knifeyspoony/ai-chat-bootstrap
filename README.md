@@ -4,7 +4,7 @@
 [![license](https://img.shields.io/npm/l/ai-chat-bootstrap.svg)](./LICENSE)
 [![types](https://img.shields.io/badge/types-TypeScript-blue)](https://www.npmjs.com/package/ai-chat-bootstrap)
 
-React UI + hooks for building modern AI chat interfaces fast. Built on top of Vercel AI SDK and AI SDK Elements.
+React UI + hooks for building modern AI chat interfaces fast. Built on top of Vercel AI SDK, Zustand, and AI SDK Elements.
 
 This repository contains:
 
@@ -12,6 +12,7 @@ This repository contains:
 | ---------------------- | --------------------------------- | ---------------------------------------------------------- |
 | ai-chat-bootstrap      | `packages/ai-chat-bootstrap`      | Distributable component & hooks library (published to npm) |
 | ai-chat-bootstrap-demo | `packages/ai-chat-bootstrap-demo` | Next.js demo app showcasing the library                    |
+| ai-chat-bootstrap-docs | `packages/ai-chat-bootstrap-docs` | Documentation site (published to GitHub Pages)             |
 
 ---
 
@@ -29,8 +30,6 @@ This repository contains:
 
 ## Install (Library)
 
-As of 0.3.0 `ai` and `@ai-sdk/react` are peer dependencies (along with React).
-
 ```bash
 pnpm add ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zod
 # or
@@ -44,32 +43,30 @@ Peer warning notes:
 - React 19 may trigger warnings from packages that have not yet expanded their peer range beyond 18.
 - zod v4 may trigger a warning from provider utilities expecting v3; functionality is compatible for typical schemas.
 
-Consume styles using one of two modes:
+## Styling
 
-Zero‑config (recommended):
+The library accepts **shadcn/ui** and **Tailwind** classes naturally, falling back to built-in styles. Two setup modes:
+
+**Zero‑config** (recommended):
 
 ```css
 /* globals.css */
-@import "ai-chat-bootstrap/tokens.css"; /* design tokens + minimal globals */
-@import "ai-chat-bootstrap/ai-chat.css"; /* minimal utility slice used by components */
+@import "ai-chat-bootstrap/tokens.css";
+@import "ai-chat-bootstrap/ai-chat.css";
 ```
 
-Tailwind‑native (advanced / dedupe with your own utilities):
+**Tailwind‑native** (advanced):
 
 ```ts
 // tailwind.config.ts
 import preset from "ai-chat-bootstrap/tailwind.preset";
-
 export default {
   presets: [preset],
-  content: [
-    "./src/**/*.{js,ts,jsx,tsx}",
-    "../../packages/ai-chat-bootstrap/lib/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ["./src/**/*.{js,ts,jsx,tsx}"],
 };
 ```
 
-In Tailwind‑native mode do NOT import `ai-chat.css`—your build will generate the needed classes. Pick one mode; don't use both.
+Don't use both modes together.
 
 ## Quick Start
 
@@ -87,9 +84,30 @@ export function App() {
 }
 ```
 
+## Server Templates
+
+New helper functions make deploying API endpoints easier:
+
+```ts
+// app/api/chat/route.ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+  streamOptions: { temperature: 0.7 },
+});
+
+export { handler as POST };
+```
+
+Also available: `createSuggestionsHandler`, `createThreadTitleHandler`, `createMcpToolsHandler`.
+
 ## Features
 
 - Chat container + message rendering primitives
+- **Model selection** dropdown with store management
+- **Chain of thought** reasoning display mode
 - Slash command system (zod parameter schemas)
 - Frontend tool registration (execute functions client-side)
 - Automatic context sharing hooks
@@ -105,7 +123,10 @@ Context sharing:
 ```tsx
 import { useAIContext } from "ai-chat-bootstrap";
 useAIContext({ description: "Counter", value: counter });
-useAIContext({ description: "User Profile", value: { name: user.name, role: user.role } });
+useAIContext({
+  description: "User Profile",
+  value: { name: user.name, role: user.role },
+});
 ```
 
 Frontend tool:
@@ -157,14 +178,19 @@ Full styling docs live in `packages/ai-chat-bootstrap/README.md`.
 
 ## ChatContainer props
 
-- chat: result of `useAIChat` (preferred). When provided, the container wires sending and loading automatically.
-- inputProps: control the input manually
-  - value, onChange, onSubmit, onAttach
-- header: title, subtitle, avatar, status, badge, actions, className
-- ui: placeholder, className, classes.{header,messages,message,input}, emptyState
-- suggestions: enabled, prompt, count, onAssistantFinish(triggerFetch), onSendMessage
-- commands: enabled, onExecute(commandName, args?), onAICommandExecute(message, toolName, systemPrompt?)
-- state: messages, isLoading, status (use when not passing `chat`)
+**Required:**
+
+- `chat`: result of `useAIChat` hook (handles all state and actions)
+
+**Optional:**
+
+- `header`: title, subtitle, avatar, badge, actions, className
+- `ui`: placeholder, className, classes (`header`, `messages`, `message`, `input`, `assistantActions`), emptyState
+- `suggestions`: enabled, prompt, count
+- `commands`: enabled
+- `threads`: enabled
+- `assistantActions`: controls rendered beneath each assistant reply; accepts a node or `(message) => node` and appears by default on the latest response (earlier responses reveal on hover/focus)
+- `assistantLatestActions`: extra controls only appended to the most recent assistant reply (e.g. retry buttons)
 
 Example controlled input:
 

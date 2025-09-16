@@ -6,6 +6,7 @@ import {
   type UIMessage,
 } from "ai-chat-bootstrap";
 import React, { useMemo, useState } from "react";
+import { useMockAIChat } from "./shared/useMockAIChat";
 
 // Domain types for this example (kept local to docs example)
 interface UserProfile {
@@ -225,12 +226,9 @@ function ContextStatusDisplay() {
   );
 }
 
+// Mock useAIChat hook for demo purposes
 // Demo component with AI context sharing
 export function AIContextExample() {
-  const [messages, setMessages] = useState<UIMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-
   // Demo state
   const [userProfile, setUserProfile] = useState<UserProfile>({
     userId: "user-123",
@@ -272,77 +270,63 @@ export function AIContextExample() {
     priority: 60,
   });
 
+  // Create custom response generator that uses context
+  const contextAwareResponseGenerator = React.useCallback((text: string) => {
+    let responseText = `You asked: "${text}". `;
+
+    // Respond based on user's context
+    if (
+      text.toLowerCase().includes("name") ||
+      text.toLowerCase().includes("who")
+    ) {
+      responseText += `I can see from your profile that you're ${userProfile.name}, ${userProfile.role} with a ${userProfile.plan} plan.`;
+    } else if (
+      text.toLowerCase().includes("settings") ||
+      text.toLowerCase().includes("theme") ||
+      text.toLowerCase().includes("preferences")
+    ) {
+      responseText += `Your current settings show you prefer ${settings.theme} theme, ${settings.language} language, with a max of ${settings.maxMessages} messages and auto-save ${settings.autoSave ? "enabled" : "disabled"}.`;
+    } else if (
+      text.toLowerCase().includes("context") ||
+      text.toLowerCase().includes("what do you know")
+    ) {
+      const contextItems = useAIContextStore.getState().contextItems;
+      responseText += `I currently have access to ${contextItems.size} context items: ${Array.from(
+        contextItems.values()
+      )
+        .map((item) => item.text || item.id)
+        .join(
+          ", "
+        )}. This helps me understand your current state and preferences.`;
+    } else {
+      responseText += `I have access to your profile (${userProfile.name}), app settings (${settings.theme} theme), and session info to provide personalized responses.`;
+    }
+
+    return responseText;
+  }, [userProfile, settings]);
+
+  // Create mock chat with context-aware responses
+  const mockChat = useMockAIChat({
+    responseGenerator: contextAwareResponseGenerator,
+    responseDelay: 1000,
+  });
+
   // Dynamic conversation context
   useAIContext({
     description: "Widget State",
     // Memoize shared data so the effect in useAIContext does not run every render
     value: React.useMemo(
       () => ({
-        totalInteractions: messages.length,
+        totalInteractions: mockChat.messages.length,
         // Update timestamp only when messages length changes (avoid per-render churn)
         lastUpdated: new Date().toISOString(),
         contextItemsCount: useAIContextStore.getState().contextItems.size,
       }),
-      [messages.length]
+      [mockChat.messages.length]
     ),
     priority: 40,
   });
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!input.trim()) return;
-
-    const userMessage: UIMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      parts: [{ type: "text", text: input }],
-    };
-    setMessages((m) => [...m, userMessage]);
-    const userInput = input;
-    setInput("");
-    setIsLoading(true);
-
-    // Simulate AI response that understands context
-    setTimeout(() => {
-      let responseText = `You asked: "${userInput}". `;
-
-      // Respond based on user's context
-      if (
-        userInput.toLowerCase().includes("name") ||
-        userInput.toLowerCase().includes("who")
-      ) {
-        responseText += `I can see from your profile that you're ${userProfile.name}, ${userProfile.role} with a ${userProfile.plan} plan.`;
-      } else if (
-        userInput.toLowerCase().includes("settings") ||
-        userInput.toLowerCase().includes("theme")
-      ) {
-        responseText += `Your current settings show you prefer ${
-          settings.theme
-        } theme and ${settings.language} language, with auto-save ${
-          settings.autoSave ? "enabled" : "disabled"
-        }.`;
-      } else if (userInput.toLowerCase().includes("context")) {
-        const contextItems = useAIContextStore.getState().listContext();
-        responseText += `I have access to ${
-          contextItems.length
-        } context items: ${contextItems
-          .map((item) => item.text || item.id)
-          .join(
-            ", "
-          )}. This helps me understand your current state and preferences.`;
-      } else {
-        responseText += `I have access to your profile (${userProfile.name}), app settings (${settings.theme} theme), and session info to provide personalized responses.`;
-      }
-
-      const assistantMessage: UIMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        parts: [{ type: "text", text: responseText }],
-      };
-      setMessages((m) => [...m, assistantMessage]);
-      setIsLoading(false);
-    }, 1000);
-  }
 
   return (
     <div className="space-y-4">
@@ -361,18 +345,13 @@ export function AIContextExample() {
       {/* Chat Interface */}
       <div className="h-[400px] w-full">
         <ChatContainer
+          chat={mockChat}
           header={{
             title: "AI with Shared Context",
             subtitle: "AI knows your profile, settings, and session state",
           }}
           ui={{
             placeholder: "Try: 'What's my name?' or 'What are my settings?'",
-          }}
-          state={{ messages, isLoading }}
-          inputProps={{
-            value: input,
-            onChange: setInput,
-            onSubmit: handleSubmit,
           }}
         />
       </div>

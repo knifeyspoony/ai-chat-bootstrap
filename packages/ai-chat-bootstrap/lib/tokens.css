@@ -2,98 +2,127 @@
    Now layered: primitives -> semantic -> dark -> component hooks & globals.
    Consumers can alternatively import the specific layers:
      import 'ai-chat-bootstrap/tokens.primitives.css'
-     import 'ai-chat-bootstrap/tokens.semantic.css'
      import 'ai-chat-bootstrap/tokens.dark.css' // optional
      import 'ai-chat-bootstrap/tokens.css'      // for hooks & globals
 */
 
 @import "./tokens.primitives.css";
-@import "./tokens.semantic.css";
 @import "./tokens.dark.css";
 
-/* Component & feature hook variables (single source). */
+/* Component & feature hook variables with fallbacks to defaults. */
 :root {
-  --acb-chat-container-bg: var(--background);
-  --acb-chat-container-border: var(--secondary);
-  --acb-chat-container-radius: var(--radius);
-  --acb-chat-header-bg: var(--background);
-  --acb-chat-header-fg: var(--foreground);
-  --acb-chat-header-border: var(--secondary);
+  --acb-chat-container-bg: var(--background, var(--acb-default-bg));
+  --acb-chat-container-border: var(--secondary, var(--acb-default-secondary));
+  --acb-chat-container-radius: var(--radius, var(--acb-default-radius-base));
+  --acb-chat-header-bg: var(--background, var(--acb-default-bg));
+  --acb-chat-header-fg: var(--foreground, var(--acb-default-fg));
+  --acb-chat-header-border: var(--secondary, var(--acb-default-secondary));
   --acb-chat-messages-bg: transparent;
-  --acb-chat-message-user-bg: var(--primary);
-  --acb-chat-message-user-fg: var(--primary-foreground);
-  --acb-chat-message-assistant-bg: var(--muted);
-  --acb-chat-message-assistant-fg: var(--muted-foreground);
-  --acb-chat-message-system-bg: var(--accent);
-  --acb-chat-message-system-fg: var(--accent-foreground);
-  --acb-chat-message-radius: var(--radius);
-  --acb-chat-input-wrapper-bg: oklch(from var(--background) l c h / 0.5);
-  --acb-chat-input-wrapper-border: var(--secondary);
-  --acb-chat-input-bg: var(--background);
-  --acb-chat-input-border: var(--input);
-  --acb-chat-input-fg: var(--foreground);
-  --acb-chat-input-toolbar-bg: var(--background);
-  --acb-chat-input-toolbar-border: var(--border);
-  --acb-scrollbar-track: var(--border);
+  --acb-chat-message-user-bg: var(--primary, var(--acb-default-primary));
+  --acb-chat-message-user-fg: var(
+    --primary-foreground,
+    var(--acb-default-primary-fg)
+  );
+  --acb-chat-message-assistant-bg: var(--muted, var(--acb-default-muted));
+  --acb-chat-message-assistant-fg: var(
+    --muted-foreground,
+    var(--acb-default-muted-fg)
+  );
+  --acb-chat-message-system-bg: var(--accent, var(--acb-default-accent));
+  --acb-chat-message-system-fg: var(
+    --accent-foreground,
+    var(--acb-default-accent-fg)
+  );
+  --acb-chat-message-radius: var(--radius, var(--acb-default-radius-base));
+  --acb-chat-input-wrapper-bg: oklch(
+    from var(--background, var(--acb-default-bg)) l c h / 0.5
+  );
+  --acb-chat-input-wrapper-border: var(
+    --secondary,
+    var(--acb-default-secondary)
+  );
+  --acb-chat-input-bg: var(--background, var(--acb-default-bg));
+  --acb-chat-input-border: var(--input, var(--acb-default-input));
+  --acb-chat-input-fg: var(--foreground, var(--acb-default-fg));
+  --acb-chat-input-toolbar-bg: var(--background, var(--acb-default-bg));
+  --acb-chat-input-toolbar-border: var(--border, var(--acb-default-border));
+  --acb-scrollbar-track: var(--border, var(--acb-default-border));
   --acb-scrollbar-thumb: color-mix(
     in oklab,
-    var(--foreground) 25%,
-    var(--border)
+    var(--foreground, var(--acb-default-fg)) 25%,
+    var(--border, var(--acb-default-border))
   );
   --acb-scrollbar-thumb-hover: color-mix(
     in oklab,
-    var(--foreground) 35%,
-    var(--border)
+    var(--foreground, var(--acb-default-fg)) 35%,
+    var(--border, var(--acb-default-border))
   );
-  --acb-tool-bg: var(--card);
-  --acb-tool-border: var(--border);
-  --acb-tool-radius: var(--radius);
-  --acb-tool-header-bg: var(--muted);
-  --acb-tool-header-fg: var(--muted-foreground);
-  --acb-tool-input-bg: var(--muted);
-  --acb-tool-input-fg: var(--foreground);
-  --acb-tool-output-bg: var(--accent);
-  --acb-tool-output-fg: var(--accent-foreground);
+  --acb-tool-bg: var(--card, var(--acb-default-card));
+  --acb-tool-border: var(--border, var(--acb-default-border));
+  --acb-tool-radius: var(--radius, var(--acb-default-radius-base));
+  --acb-tool-header-bg: var(--muted, var(--acb-default-muted));
+  --acb-tool-header-fg: var(--muted-foreground, var(--acb-default-muted-fg));
+  --acb-tool-input-bg: var(--muted, var(--acb-default-muted));
+  --acb-tool-input-fg: var(--foreground, var(--acb-default-fg));
+  --acb-tool-output-bg: var(--accent, var(--acb-default-accent));
+  --acb-tool-output-fg: var(--accent-foreground, var(--acb-default-accent-fg));
   --acb-tool-error-bg: color-mix(
     in oklab,
-    var(--destructive) 15%,
-    var(--background)
+    var(--destructive, var(--acb-default-destructive)) 15%,
+    var(--background, var(--acb-default-bg))
   );
-  --acb-tool-error-fg: var(--destructive);
-  --acb-reasoning-fg: var(--muted-foreground);
-  --acb-reasoning-icon: var(--muted-foreground);
-  --acb-code-bg: var(--background);
-  --acb-code-fg: var(--foreground);
-  --acb-code-border: var(--border);
-  --acb-code-radius: calc(var(--radius) - 2px);
-  --acb-code-line-number-fg: var(--muted-foreground);
+  --acb-tool-error-fg: var(--destructive, var(--acb-default-destructive));
+  --acb-reasoning-fg: var(--muted-foreground, var(--acb-default-muted-fg));
+  --acb-reasoning-icon: var(--muted-foreground, var(--acb-default-muted-fg));
+  --acb-code-bg: var(--background, var(--acb-default-bg));
+  --acb-code-fg: var(--foreground, var(--acb-default-fg));
+  --acb-code-border: var(--border, var(--acb-default-border));
+  --acb-code-radius: calc(var(--radius, var(--acb-default-radius-base)) - 2px);
+  --acb-code-line-number-fg: var(
+    --muted-foreground,
+    var(--acb-default-muted-fg)
+  );
   --acb-prompt-border: var(--acb-chat-input-border);
   --acb-prompt-bg: var(--acb-chat-input-bg);
   --acb-prompt-fg: var(--acb-chat-input-fg);
 }
 
-/* Dark-only hook adjustments (semantic + primitives already switch). */
+/* Dark-only hook adjustments. */
 .dark,
 :root[data-theme="dark"],
 html[data-theme="dark"] {
-  --acb-chat-header-bg: var(--card);
-  --acb-chat-input-wrapper-bg: oklch(from var(--background) l c h / 0.5);
-  --acb-chat-message-assistant-bg: var(--muted);
-  --acb-scrollbar-track: var(--secondary);
+  --acb-chat-header-bg: var(--card, var(--acb-default-card));
+  --acb-chat-input-wrapper-bg: oklch(
+    from var(--background, var(--acb-default-bg)) l c h / 0.5
+  );
+  --acb-chat-message-assistant-bg: var(--muted, var(--acb-default-muted));
+  --acb-scrollbar-track: var(--secondary, var(--acb-default-secondary));
   --acb-scrollbar-thumb: color-mix(
     in oklab,
-    var(--foreground) 20%,
-    var(--secondary)
+    var(--foreground, var(--acb-default-fg)) 20%,
+    var(--secondary, var(--acb-default-secondary))
   );
   --acb-scrollbar-thumb-hover: color-mix(
     in oklab,
-    var(--foreground) 30%,
-    var(--secondary)
+    var(--foreground, var(--acb-default-fg)) 30%,
+    var(--secondary, var(--acb-default-secondary))
   );
-  --acb-tool-header-bg: color-mix(in oklab, var(--muted) 60%, black);
-  --acb-tool-input-bg: color-mix(in oklab, var(--muted) 55%, black);
-  --acb-tool-output-bg: color-mix(in oklab, var(--accent) 55%, black);
-  --acb-code-bg: var(--card);
+  --acb-tool-header-bg: color-mix(
+    in oklab,
+    var(--muted, var(--acb-default-muted)) 60%,
+    black
+  );
+  --acb-tool-input-bg: color-mix(
+    in oklab,
+    var(--muted, var(--acb-default-muted)) 55%,
+    black
+  );
+  --acb-tool-output-bg: color-mix(
+    in oklab,
+    var(--accent, var(--acb-default-accent)) 55%,
+    black
+  );
+  --acb-code-bg: var(--card, var(--acb-default-card));
 }
 
 :root[data-theme="dark"] .acb-scrollbar::-webkit-scrollbar-track,

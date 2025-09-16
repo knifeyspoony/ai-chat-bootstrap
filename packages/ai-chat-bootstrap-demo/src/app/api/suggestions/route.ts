@@ -1,10 +1,8 @@
 import { createAzure } from "@ai-sdk/azure";
-import { generateObject } from "ai";
-import type {
-  SuggestionsRequest,
-  SuggestionsResponse,
+import {
+  createSuggestionsHandler,
+  type SuggestionsRequest,
 } from "ai-chat-bootstrap/server";
-import { SuggestionsSchema } from "ai-chat-bootstrap/server";
 
 // Configure Azure OpenAI (users will need to set these env vars)
 const azure = createAzure({
@@ -15,49 +13,16 @@ const azure = createAzure({
 
 const model = azure(process.env.AZURE_DEPLOYMENT_ID ?? "gpt-4.1");
 
-export async function POST(req: Request) {
-  try {
-    const { prompt }: SuggestionsRequest = await req.json();
-
-    // Enforce that frontend provided enriched prompt (already contains context/focus/tools summary)
-    if (!prompt) {
-      return new Response(
-        JSON.stringify({ error: "Missing enriched suggestions prompt" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
-    // Optional lightweight log length only (avoid logging full prompt in prod)
+export const POST = createSuggestionsHandler({
+  model,
+  generateOptions: { temperature: 0.8 },
+  buildGenerateOptions: ({ body }: { body: SuggestionsRequest }) => {
     if (process.env.NODE_ENV !== "production") {
-      console.log(`[chat-api] enrichedSystemPrompt length=${prompt.length}`);
-      console.log(`[chat-api] enrichedSystemPrompt: ${prompt}`);
+      console.log(`[suggestions-api] prompt length=${body.prompt?.length ?? 0}`);
     }
-
-    const result = await generateObject({
-      model,
-      schema: SuggestionsSchema,
-      messages: [
-        { role: "system", content: prompt },
-        { role: "user", content: "Generate suggestions." },
-      ],
-      temperature: 0.8, // Slightly higher temperature for creative suggestions
-    });
-
-    const response: SuggestionsResponse = {
-      suggestions: result.object.suggestions,
-    };
-
-    return new Response(JSON.stringify(response), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
+    return {};
+  },
+  onError: (error: unknown) => {
     console.error("Suggestions API error:", error);
-    return new Response(
-      JSON.stringify({ error: "Failed to generate suggestions" }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      }
-    );
-  }
-}
+  },
+});

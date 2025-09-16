@@ -1,6 +1,13 @@
 import { type UIMessage } from "ai";
 import { z } from "zod";
 import type { SerializedTool } from "../stores/tools";
+import type { SerializedMCPServer } from "../stores/mcp";
+
+export interface ChatModelOption {
+  id: string;
+  label?: string;
+  description?: string;
+}
 
 /**
  * Focus items: minimal, explicit shape for interoperability.
@@ -39,6 +46,11 @@ export interface ContextItem {
 export interface ChatRequest {
   messages: UIMessage[];
   /**
+   * Optional model identifier to forward to the backend. When provided, the backend
+   * should dispatch the request using this model instead of its default.
+   */
+  model?: string;
+  /**
    * Structured context list (already normalized & optionally priority-sorted).
    */
   context?: ContextItem[];
@@ -50,6 +62,11 @@ export interface ChatRequest {
    * Full focus item objects – typically a small set of currently highlighted / selected entities.
    */
   focus?: FocusItem[];
+  /**
+   * Registered MCP servers serialized for backend consumption.
+   * These describe remote tool providers that the backend can connect to during requests.
+   */
+  mcpServers?: SerializedMCPServer[];
   /**
    * Legacy direct system prompt. If present, the enrichment builder treats it as the
    * "original system prompt" and appends it verbatim at the end of the enrichedSystemPrompt.
@@ -78,6 +95,7 @@ export interface SuggestionsRequest {
   messages: UIMessage[];
   context?: ContextItem[];
   focus?: FocusItem[];
+  tools?: { name: string; description?: string }[];
   prompt?: string;
 }
 

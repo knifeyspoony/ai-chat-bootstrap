@@ -4,6 +4,7 @@ export * from "./use-ai-context";
 export * from "./use-ai-focus";
 export * from "./use-ai-focus-item";
 export * from "./use-ai-frontend-tool";
+export * from "./use-mcp-server";
 export * from "./use-suggestions";
 export * from "./use-theme";
 export * from "./use-ui-chat-command";

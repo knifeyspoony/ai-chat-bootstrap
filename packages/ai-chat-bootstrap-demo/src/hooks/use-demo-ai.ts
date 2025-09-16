@@ -1,13 +1,22 @@
 "use client";
 
+import type { MCPToolSummary } from "ai-chat-bootstrap";
 import {
   useAIChatCommand,
   useAIContext,
   useAIFocus,
   useAIFrontendTool,
   useAIToolsStore,
+  useMCPServer,
   useUIChatCommand,
 } from "ai-chat-bootstrap";
+import {
+  Calculator,
+  Clock,
+  Minus,
+  Plus,
+  Settings
+} from "lucide-react";
 import { useMemo } from "react";
 import { z } from "zod";
 
@@ -45,7 +54,16 @@ interface UseDemoAIReturn {
     pool: { min: number; max: number };
     replicas: string[];
   };
+  mcpStatus: {
+    isEnabled: boolean;
+    isLoading: boolean;
+    error: string | null;
+    tools: MCPToolSummary[];
+  };
 }
+
+const DEFAULT_MCP_SERVER_URL =
+  process.env.NEXT_PUBLIC_MCP_SERVER_URL ?? "http://127.0.0.1:3030/mcp";
 
 export function useDemoAI({
   counter,
@@ -60,6 +78,13 @@ export function useDemoAI({
   const { setFocus, clearFocus, getFocus, focusedIds, clearAllFocus } =
     useAIFocus();
   const toolsCount = useAIToolsStore((state) => state.tools.size);
+
+  const mcpServer = useMCPServer({
+    id: "demo-mcp-server",
+    name: "Demo MCP Toolkit",
+    url: DEFAULT_MCP_SERVER_URL,
+    transportType: "streamable-http",
+  });
 
   // Demo domain objects to use as focus items
   const userProfile = useMemo(
@@ -88,6 +113,16 @@ export function useDemoAI({
     []
   );
 
+  const counterContextValue = useMemo(() => ({ value: counter }), [counter]);
+  const calculationContextValue = useMemo(
+    () => ({ result: calculation }),
+    [calculation]
+  );
+  const systemPromptContextValue = useMemo(
+    () => ({ prompt: selectedSystemPrompt }),
+    [selectedSystemPrompt]
+  );
+
   // System prompt options
   const systemPrompts = {
     default: undefined,
@@ -112,17 +147,17 @@ export function useDemoAI({
   // Share state with AI
   useAIContext({
     description: "Counter",
-    value: { value: counter },
+    value: counterContextValue,
     priority: 90,
   });
   useAIContext({
     description: "Calculation",
-    value: { result: calculation },
+    value: calculationContextValue,
     priority: 70,
   });
   useAIContext({
     description: "System Prompt",
-    value: { prompt: selectedSystemPrompt },
+    value: systemPromptContextValue,
     priority: 60,
   });
   useAIContext({
@@ -213,6 +248,7 @@ export function useDemoAI({
     parameters: z.object({
       amount: z.number().default(1).describe("Amount to increment by"),
     }),
+    toolIcon: Plus,
     execute: async (params: unknown) => {
       const { amount } = params as { amount: number };
       let newValue: number = 0;
@@ -225,11 +261,29 @@ export function useDemoAI({
   });
 
   useAIFrontendTool({
+    name: "delay",
+    description: "Run a delay for a specified number of seconds",
+    parameters: z.object({
+      amount: z
+        .number()
+        .default(1)
+        .describe("Amount of time to delay (in seconds)"),
+    }),
+    toolIcon: Clock,
+    execute: async (params: unknown) => {
+      const { amount } = params as { amount: number };
+      await new Promise((resolve) => setTimeout(resolve, amount * 1000));
+      return { message: `Delayed for ${amount} seconds` };
+    },
+  });
+
+  useAIFrontendTool({
     name: "decrement_counter",
     description: "Decrement the demo counter",
     parameters: z.object({
       amount: z.number().default(1).describe("Amount to decrement by"),
     }),
+    toolIcon: Minus,
     execute: async (params: unknown) => {
       const { amount } = params as { amount: number };
       let newValue: number = 0;
@@ -251,6 +305,7 @@ export function useDemoAI({
       a: z.number().describe("First number"),
       b: z.number().describe("Second number"),
     }),
+    toolIcon: Calculator,
     execute: async (params: unknown) => {
       const { operation, a, b } = params as {
         operation: string;
@@ -294,6 +349,7 @@ export function useDemoAI({
         .enum(["default", "helpful", "technical", "creative"])
         .describe("The type of AI personality to use"),
     }),
+    toolIcon: Settings,
     execute: async (params: unknown) => {
       const { promptType } = params as { promptType: string };
       setSelectedSystemPrompt(promptType);
@@ -450,5 +506,11 @@ export function useDemoAI({
     clearAllFocus,
     userProfile,
     dbSettings,
+    mcpStatus: {
+      isEnabled: true,
+      isLoading: mcpServer.isLoading,
+      error: mcpServer.error,
+      tools: mcpServer.tools,
+    },
   };
 }

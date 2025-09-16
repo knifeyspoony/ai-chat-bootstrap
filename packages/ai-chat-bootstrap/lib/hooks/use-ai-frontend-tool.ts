@@ -86,6 +86,7 @@ export function useAIFrontendTool<
       parameters: tool.parameters,
       execute: stableExecute,
       render: stableRender,
+      toolIcon: tool.toolIcon,
     };
 
     registerTool(stableTool);

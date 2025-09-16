@@ -1,0 +1,573 @@
+---
+title: createThreadTitleHandler
+description: Pre-built handler for automatically generating descriptive titles for chat conversations based on message content.
+---
+
+# createThreadTitleHandler
+
+Creates an API route handler that automatically generates descriptive titles for chat conversations based on the message content. This helps users organize and find their conversations later.
+
+## Import
+
+```ts
+import { createThreadTitleHandler } from "ai-chat-bootstrap/server";
+```
+
+## Syntax
+
+```ts
+function createThreadTitleHandler(options: ThreadTitleHandlerOptions): RequestHandler
+```
+
+## Parameters
+
+```ts
+interface ThreadTitleHandlerOptions {
+  // Required
+  model: LanguageModel;
+
+  // Optional configuration
+  maxTitleLength?: number;
+  titleStyle?: "descriptive" | "concise" | "creative" | "technical";
+  onTitleGenerated?: (title: string, context: RequestContext) => string | Promise<string>;
+  onError?: (error: Error, context: RequestContext) => Response | Promise<Response>;
+  validateRequest?: (request: Request) => boolean | Promise<boolean>;
+}
+```
+
+## Basic Usage
+
+### Simple Setup
+
+```ts
+// app/api/thread-title/route.ts
+import { createThreadTitleHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createThreadTitleHandler({
+  model: openai("gpt-4o-mini"), // Fast model for title generation
+  maxTitleLength: 60,
+});
+
+export { handler as POST };
+```
+
+### With Custom Configuration
+
+```ts
+// app/api/thread-title/route.ts
+import { createThreadTitleHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createThreadTitleHandler({
+  model: openai("gpt-4o-mini"),
+  maxTitleLength: 80,
+  titleStyle: "descriptive",
+
+  onTitleGenerated: async (title, context) => {
+    // Clean up the title
+    const cleanTitle = title
+      .replace(/^["']|["']$/g, '') // Remove quotes
+      .replace(/\.$/, '') // Remove trailing period
+      .trim();
+
+    // Ensure it's not too generic
+    const genericTitles = ["Chat", "Conversation", "Discussion"];
+    if (genericTitles.includes(cleanTitle)) {
+      return "New Conversation";
+    }
+
+    return cleanTitle;
+  }
+});
+
+export { handler as POST };
+```
+
+## Frontend Integration
+
+Enable automatic title generation:
+
+```tsx
+// Frontend component
+import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+
+function ChatWithAutoTitles() {
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You are a helpful assistant.",
+  });
+
+  return (
+    <ChatContainer
+      chat={chat}
+      thread={{
+        enabled: true,
+        titleGeneration: {
+          enabled: true,
+          api: "/api/thread-title",
+          triggerAfterMessages: 2, // Generate title after 2 messages
+          autoUpdate: false, // Don't update existing titles
+        }
+      }}
+    />
+  );
+}
+```
+
+## Request Processing
+
+The handler processes requests containing:
+
+```ts
+interface ThreadTitleRequest {
+  messages: UIMessage[];
+  existingTitle?: string;
+  context?: ContextItem[];
+  maxLength?: number;
+  style?: "descriptive" | "concise" | "creative" | "technical";
+}
+```
+
+## Response Format
+
+The handler returns a structured response:
+
+```ts
+interface ThreadTitleResponse {
+  title: string;
+  confidence: number;
+  generated_at: string;
+  word_count: number;
+  character_count: number;
+}
+```
+
+Example response:
+```json
+{
+  "title": "React Component State Management Discussion",
+  "confidence": 0.85,
+  "generated_at": "2024-01-15T10:30:00Z",
+  "word_count": 5,
+  "character_count": 41
+}
+```
+
+## Title Styles
+
+### Descriptive (Default)
+Clear, informative titles that describe the main topic:
+
+```
+"Setting up Next.js with TypeScript and Tailwind CSS"
+"Debugging API Authentication Issues"
+"User Profile Component Implementation"
+```
+
+### Concise
+Short, punchy titles that capture the essence:
+
+```
+"Next.js Setup"
+"Auth Debug"
+"Profile Component"
+```
+
+### Creative
+Engaging titles with personality:
+
+```
+"Building the Perfect Next.js Stack"
+"Solving the Authentication Mystery"
+"Crafting User Profiles Like a Pro"
+```
+
+### Technical
+Precise, technical language for developer audiences:
+
+```
+"Next.js 14 App Router Configuration with TypeScript"
+"OAuth2 Bearer Token Validation Troubleshooting"
+"React Functional Component State Architecture"
+```
+
+## Advanced Configuration
+
+### Custom Title Processing
+
+```ts
+const handler = createThreadTitleHandler({
+  model: openai("gpt-4o-mini"),
+  maxTitleLength: 60,
+
+  onTitleGenerated: async (title, context) => {
+    // Add emoji based on conversation type
+    const lowerTitle = title.toLowerCase();
+
+    if (lowerTitle.includes("bug") || lowerTitle.includes("error")) {
+      return `🐛 ${title}`;
+    }
+
+    if (lowerTitle.includes("feature") || lowerTitle.includes("new")) {
+      return `✨ ${title}`;
+    }
+
+    if (lowerTitle.includes("question") || lowerTitle.includes("help")) {
+      return `❓ ${title}`;
+    }
+
+    if (lowerTitle.includes("tutorial") || lowerTitle.includes("guide")) {
+      return `📚 ${title}`;
+    }
+
+    return title;
+  }
+});
+```
+
+### Domain-Specific Titles
+
+```ts
+const handler = createThreadTitleHandler({
+  model: openai("gpt-4o-mini"),
+  titleStyle: "technical",
+
+  onTitleGenerated: async (title, context) => {
+    // Add project context if available
+    const projectName = context.projectName;
+    if (projectName && !title.includes(projectName)) {
+      return `${projectName}: ${title}`;
+    }
+
+    // Standardize technical terms
+    const standardizations = {
+      "js": "JavaScript",
+      "ts": "TypeScript",
+      "api": "API",
+      "db": "Database",
+      "ui": "UI",
+    };
+
+    let standardizedTitle = title;
+    Object.entries(standardizations).forEach(([short, full]) => {
+      const regex = new RegExp(`\\b${short}\\b`, 'gi');
+      standardizedTitle = standardizedTitle.replace(regex, full);
+    });
+
+    return standardizedTitle;
+  }
+});
+```
+
+### Multi-language Support
+
+```ts
+const handler = createThreadTitleHandler({
+  model: openai("gpt-4o-mini"),
+
+  onTitleGenerated: async (title, context) => {
+    const userLanguage = context.userLanguage || "en";
+
+    // Translate title if needed
+    if (userLanguage !== "en") {
+      const translatedTitle = await translateText(title, "en", userLanguage);
+      return translatedTitle;
+    }
+
+    return title;
+  }
+});
+```
+
+## Performance Optimization
+
+### Use Fast Models
+Title generation should be quick:
+
+```ts
+const handler = createThreadTitleHandler({
+  model: openai("gpt-4o-mini"), // Faster and cheaper
+  maxTitleLength: 50, // Shorter = faster generation
+});
+```
+
+### Caching
+Cache titles for similar conversations:
+
+```ts
+const handler = createThreadTitleHandler({
+  model: openai("gpt-4o-mini"),
+
+  onTitleGenerated: async (title, context) => {
+    const conversationHash = hashConversation(context.messages);
+    await cacheService.set(`title:${conversationHash}`, title, 3600); // 1 hour cache
+    return title;
+  }
+});
+```
+
+### Debounced Generation
+Frontend should debounce title generation:
+
+```tsx
+const chat = useAIChat({
+  api: "/api/chat",
+  thread: {
+    titleGeneration: {
+      enabled: true,
+      api: "/api/thread-title",
+      debounceMs: 2000, // Wait 2s after last message
+      triggerAfterMessages: 3,
+    }
+  }
+});
+```
+
+## Production Examples
+
+### SaaS Application
+
+```ts
+// app/api/thread-title/route.ts
+import { createThreadTitleHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createThreadTitleHandler({
+  model: openai("gpt-4o-mini"),
+  maxTitleLength: 60,
+  titleStyle: "descriptive",
+
+  validateRequest: async (request) => {
+    const userId = request.headers.get("x-user-id");
+    const subscription = await getUserSubscription(userId);
+
+    // Only allow title generation for paid users
+    return subscription?.plan !== "free";
+  },
+
+  onTitleGenerated: async (title, context) => {
+    // Log title generation for analytics
+    await logEvent("title_generated", {
+      userId: context.userId,
+      titleLength: title.length,
+      messageCount: context.messages?.length || 0,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Clean up common issues
+    let cleanTitle = title
+      .replace(/^["']|["']$/g, '') // Remove quotes
+      .replace(/\.$/, '') // Remove trailing period
+      .replace(/^\w/, c => c.toUpperCase()); // Capitalize first letter
+
+    // Ensure minimum quality
+    if (cleanTitle.length < 10) {
+      cleanTitle = "New Conversation";
+    }
+
+    return cleanTitle;
+  }
+});
+
+export { handler as POST };
+```
+
+### Documentation Assistant
+
+```ts
+// app/api/thread-title/route.ts
+import { createThreadTitleHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createThreadTitleHandler({
+  model: openai("gpt-4o-mini"),
+  titleStyle: "technical",
+  maxTitleLength: 80,
+
+  onTitleGenerated: async (title, context) => {
+    // Categorize based on content
+    const messages = context.messages || [];
+    const conversationText = messages
+      .map(m => m.parts.filter(p => p.type === 'text').map(p => p.text).join(' '))
+      .join(' ')
+      .toLowerCase();
+
+    // Add category prefixes
+    if (conversationText.includes('install') || conversationText.includes('setup')) {
+      return `Setup: ${title}`;
+    }
+
+    if (conversationText.includes('tutorial') || conversationText.includes('guide')) {
+      return `Tutorial: ${title}`;
+    }
+
+    if (conversationText.includes('troubleshoot') || conversationText.includes('debug')) {
+      return `Troubleshooting: ${title}`;
+    }
+
+    if (conversationText.includes('api') || conversationText.includes('endpoint')) {
+      return `API: ${title}`;
+    }
+
+    return title;
+  }
+});
+
+export { handler as POST };
+```
+
+### Customer Support
+
+```ts
+// app/api/thread-title/route.ts
+import { createThreadTitleHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createThreadTitleHandler({
+  model: openai("gpt-4o-mini"),
+  titleStyle: "descriptive",
+
+  onTitleGenerated: async (title, context) => {
+    const messages = context.messages || [];
+    const userMessages = messages.filter(m => m.role === 'user');
+
+    // Analyze sentiment for priority
+    const urgentKeywords = ['urgent', 'critical', 'emergency', 'broken', 'down'];
+    const isUrgent = userMessages.some(msg =>
+      msg.parts.some(part =>
+        part.type === 'text' &&
+        urgentKeywords.some(keyword => part.text.toLowerCase().includes(keyword))
+      )
+    );
+
+    if (isUrgent) {
+      return `🚨 ${title}`;
+    }
+
+    // Categorize support type
+    const bugKeywords = ['bug', 'error', 'issue', 'problem', 'not working'];
+    const isBug = userMessages.some(msg =>
+      msg.parts.some(part =>
+        part.type === 'text' &&
+        bugKeywords.some(keyword => part.text.toLowerCase().includes(keyword))
+      )
+    );
+
+    if (isBug) {
+      return `🐛 ${title}`;
+    }
+
+    return `💬 ${title}`;
+  }
+});
+
+export { handler as POST };
+```
+
+## Best Practices
+
+### Performance
+1. **Use fast models** like `gpt-4o-mini` for quick generation
+2. **Limit title length** to 60-80 characters for readability
+3. **Cache generated titles** to avoid regeneration
+4. **Debounce requests** to prevent excessive API calls
+
+### Quality
+1. **Clean up generated titles** by removing quotes and fixing capitalization
+2. **Validate title quality** and provide fallbacks for poor results
+3. **Use consistent style** throughout your application
+4. **Avoid generic titles** like "Chat" or "Conversation"
+
+### User Experience
+1. **Generate titles automatically** after a few messages
+2. **Allow manual editing** of generated titles
+3. **Don't update existing titles** unless explicitly requested
+4. **Show loading states** during title generation
+
+### Security
+1. **Validate requests** in production environments
+2. **Rate limit title generation** to prevent abuse
+3. **Log generation events** for monitoring and analytics
+4. **Sanitize titles** to prevent injection attacks
+
+## Common Patterns
+
+### Conditional Generation
+
+```ts
+const handler = createThreadTitleHandler({
+  model: openai("gpt-4o-mini"),
+
+  validateRequest: async (request) => {
+    const body = await request.json();
+
+    // Only generate if we have enough content
+    const messageCount = body.messages?.length || 0;
+    const totalLength = body.messages?.reduce((sum, msg) =>
+      sum + msg.parts.filter(p => p.type === 'text').reduce((s, p) => s + p.text.length, 0), 0
+    ) || 0;
+
+    return messageCount >= 2 && totalLength >= 50;
+  }
+});
+```
+
+### Context-Aware Titles
+
+```ts
+const handler = createThreadTitleHandler({
+  model: openai("gpt-4o-mini"),
+
+  onTitleGenerated: async (title, context) => {
+    // Include user role or department
+    const userRole = context.userProfile?.role;
+    if (userRole === 'developer') {
+      return `[Dev] ${title}`;
+    } else if (userRole === 'designer') {
+      return `[Design] ${title}`;
+    }
+
+    // Include project context
+    const projectName = context.projectContext?.name;
+    if (projectName) {
+      return `${projectName} - ${title}`;
+    }
+
+    return title;
+  }
+});
+```
+
+### Incremental Updates
+
+```ts
+const handler = createThreadTitleHandler({
+  model: openai("gpt-4o-mini"),
+
+  onTitleGenerated: async (title, context) => {
+    const existingTitle = context.existingTitle;
+
+    // If we already have a good title, only update if significantly different
+    if (existingTitle && existingTitle !== "New Conversation") {
+      const similarity = calculateSimilarity(title, existingTitle);
+      if (similarity > 0.8) {
+        return existingTitle; // Keep existing title
+      }
+    }
+
+    return title;
+  }
+});
+```
+
+## Environment Variables
+
+No additional environment variables required beyond those for the AI model.
+
+## See Also
+
+- [Server Templates Overview](/api/server-templates)
+- [createAIChatHandler](/api/server-templates/create-ai-chat-handler)
+- [ChatContainer Threads](/api/components/chat-container#threads)
+- [useAIChat Hook](/api/hooks/use-ai-chat)

@@ -164,9 +164,9 @@ function ConditionalContext() {
 
 The backend automatically receives context items in the request payload (`enrichedSystemPrompt` embeds context/focus/tool summaries):
 
-```tsx
+```ts
 import { createAzure } from "@ai-sdk/azure";
-import { convertToModelMessages, streamText } from "ai";
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
 
 const azure = createAzure({
   resourceName: process.env.AZURE_RESOURCE_NAME!,
@@ -176,21 +176,9 @@ const azure = createAzure({
 
 const model = azure(process.env.AZURE_DEPLOYMENT_ID!);
 
-export async function POST(req: Request) {
-  const { messages, enrichedSystemPrompt, tools, context, focus } = await req.json();
-
-  const result = await streamText({
-    model,
-    messages: [
-      { role: "system", content: enrichedSystemPrompt },
-      ...convertToModelMessages(messages),
-    ],
-    tools,
-    experimental_providerMetadata: { context, focus },
-  });
-
-  return result.toUIMessageStreamResponse();
-}
+export const POST = createAIChatHandler({
+  model,
+});
 ```
 
 > Note: Do not re-concatenate context data into the system prompt on the server. The client-generated `enrichedSystemPrompt` already contains a standardized preamble and conditional sections (Tools / Context / Focus) plus the original `systemPrompt` (if supplied). Rebuilding would cause duplication and potential truncation.

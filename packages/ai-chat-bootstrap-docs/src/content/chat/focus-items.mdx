@@ -99,32 +99,21 @@ export function ChatWithFocus() {
 
 Focus items are automatically reflected in the client‑generated `enrichedSystemPrompt`, so you should not rebuild or concatenate them again on the server:
 
-```tsx
-import { convertToModelMessages, streamText } from 'ai';
-import { createAzure } from '@ai-sdk/azure';
+```ts
+import { createAzure } from "@ai-sdk/azure";
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
 
 const azure = createAzure({
   resourceName: process.env.AZURE_RESOURCE_NAME!,
   apiKey: process.env.AZURE_API_KEY!,
-  apiVersion: process.env.AZURE_API_VERSION ?? 'preview',
+  apiVersion: process.env.AZURE_API_VERSION ?? "preview",
 });
 
 const model = azure(process.env.AZURE_DEPLOYMENT_ID!);
 
-export async function POST(request: Request) {
-  const { messages, enrichedSystemPrompt, tools } = await request.json();
-
-  const result = await streamText({
-    model,
-    messages: [
-      { role: 'system', content: enrichedSystemPrompt },
-      ...convertToModelMessages(messages),
-    ],
-    tools,
-  });
-
-  return result.toUIMessageStreamResponse();
-}
+export const POST = createAIChatHandler({
+  model,
+});
 ```
 
 ## API Reference

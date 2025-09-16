@@ -1,3 +1,4 @@
+import { Settings2 } from "lucide-react";
 import React from "react";
 import {
   Avatar,
@@ -5,15 +6,18 @@ import {
   AvatarImage,
 } from "../../components/ui/avatar";
 import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
 import { cn } from "../../utils";
 
 export interface ChatHeaderProps {
   title?: string;
   subtitle?: string;
-  avatar?: React.ReactNode; // string URL or custom node
-  badge?: React.ReactNode; // string or custom node
+  avatar?: React.ReactNode;
+  badge?: React.ReactNode;
   className?: string;
   actions?: React.ReactNode;
+  showMcpButton?: boolean;
+  onOpenMcpDialog?: () => void;
 }
 
 export const ChatHeader = React.memo(function ChatHeader({
@@ -23,8 +27,12 @@ export const ChatHeader = React.memo(function ChatHeader({
   badge,
   className,
   actions,
+  showMcpButton,
+  onOpenMcpDialog,
 }: ChatHeaderProps) {
-  if (!title && !subtitle && !avatar && !actions) {
+  const hasActions = showMcpButton || Boolean(actions);
+
+  if (!title && !subtitle && !avatar && !hasActions) {
     return null;
   }
 
@@ -56,7 +64,9 @@ export const ChatHeader = React.memo(function ChatHeader({
         )}
 
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          {title && <h3 className="font-semibold text-base truncate">{title}</h3>}
+          {title && (
+            <h3 className="font-semibold text-base truncate">{title}</h3>
+          )}
           {badge &&
             (typeof badge === "string" ? (
               <Badge variant="secondary" className="text-xs flex-shrink-0">
@@ -73,8 +83,22 @@ export const ChatHeader = React.memo(function ChatHeader({
         </div>
       </div>
 
-      {actions && (
-        <div className="flex items-center gap-1 flex-shrink-0">{actions}</div>
+      {hasActions && (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {showMcpButton && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onOpenMcpDialog}
+              aria-label="Configure MCP servers"
+              disabled={!onOpenMcpDialog}
+            >
+              <Settings2 className="h-4 w-4" />
+            </Button>
+          )}
+          {actions}
+        </div>
       )}
     </div>
   );

@@ -1,0 +1,616 @@
+---
+title: createMcpToolsHandler
+description: Pre-built handler for integrating Model Context Protocol (MCP) servers with your AI chat application.
+---
+
+# createMcpToolsHandler
+
+Creates an API route handler that integrates Model Context Protocol (MCP) servers with your AI chat application. MCP servers provide external tools and capabilities that can be dynamically discovered and used by the AI.
+
+## Import
+
+```ts
+import { createMcpToolsHandler } from "ai-chat-bootstrap/server";
+```
+
+## Syntax
+
+```ts
+function createMcpToolsHandler(options: McpToolsHandlerOptions): RequestHandler
+```
+
+## Parameters
+
+```ts
+interface McpToolsHandlerOptions {
+  // Required
+  mcpServers: McpServerConfig[];
+
+  // Optional configuration
+  timeout?: number;
+  retryAttempts?: number;
+  onToolDiscovered?: (tool: McpTool, server: string) => McpTool | Promise<McpTool>;
+  onToolCall?: (tool: McpTool, params: any, server: string) => any | Promise<any>;
+  onError?: (error: Error, context: RequestContext) => Response | Promise<Response>;
+  validateRequest?: (request: Request) => boolean | Promise<boolean>;
+}
+
+interface McpServerConfig {
+  url: string;
+  name: string;
+  enabled?: boolean;
+  timeout?: number;
+  headers?: Record<string, string>;
+}
+```
+
+## Basic Usage
+
+### Simple Setup
+
+```ts
+// app/api/mcp-tools/route.ts
+import { createMcpToolsHandler } from "ai-chat-bootstrap/server";
+
+const handler = createMcpToolsHandler({
+  mcpServers: [
+    {
+      url: "http://localhost:3001",
+      name: "file-tools",
+      enabled: true,
+    },
+    {
+      url: "http://localhost:3002",
+      name: "web-search",
+      enabled: true,
+    }
+  ],
+  timeout: 5000,
+});
+
+export { handler as POST };
+```
+
+### With Custom Configuration
+
+```ts
+// app/api/mcp-tools/route.ts
+import { createMcpToolsHandler } from "ai-chat-bootstrap/server";
+
+const handler = createMcpToolsHandler({
+  mcpServers: [
+    {
+      url: process.env.MCP_FILE_SERVER_URL!,
+      name: "file-operations",
+      enabled: true,
+      timeout: 10000,
+      headers: {
+        "Authorization": `Bearer ${process.env.MCP_FILE_TOKEN}`,
+        "X-Client-ID": "ai-chat-bootstrap",
+      }
+    },
+    {
+      url: process.env.MCP_SEARCH_SERVER_URL!,
+      name: "web-search",
+      enabled: process.env.NODE_ENV === "production",
+    }
+  ],
+
+  onToolDiscovered: async (tool, serverName) => {
+    console.log(`Discovered tool: ${tool.name} from ${serverName}`);
+
+    // Filter tools based on permissions
+    if (tool.name.includes("admin") && !hasAdminPermissions()) {
+      return null; // Exclude this tool
+    }
+
+    return tool;
+  },
+
+  onToolCall: async (tool, params, serverName) => {
+    console.log(`Calling tool: ${tool.name} on ${serverName}`, params);
+
+    // Log tool usage
+    await logToolUsage({
+      toolName: tool.name,
+      serverName,
+      params,
+      timestamp: new Date(),
+    });
+
+    return params; // Pass through unchanged
+  }
+});
+
+export { handler as POST };
+```
+
+## Frontend Integration
+
+Enable MCP tools in your chat:
+
+```tsx
+// Frontend component
+import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+
+function ChatWithMcpTools() {
+  const chat = useAIChat({
+    api: "/api/chat",
+    mcpEnabled: true, // Enable MCP tool integration
+    systemPrompt: "You have access to external tools via MCP servers.",
+  });
+
+  return (
+    <ChatContainer
+      chat={chat}
+      mcp={{
+        enabled: true,
+        discoveryApi: "/api/mcp-tools",
+        refreshInterval: 30000, // Refresh tools every 30 seconds
+      }}
+    />
+  );
+}
+```
+
+## MCP Server Discovery
+
+The handler automatically discovers available tools from MCP servers:
+
+### Request Processing
+```ts
+interface McpDiscoveryRequest {
+  serverNames?: string[]; // Optional: specific servers to query
+  includeDisabled?: boolean; // Whether to include disabled servers
+  forceRefresh?: boolean; // Force refresh of cached tools
+}
+```
+
+### Response Format
+```ts
+interface McpDiscoveryResponse {
+  servers: McpServerStatus[];
+  tools: McpTool[];
+  discovered_at: string;
+  cache_expires_at: string;
+}
+
+interface McpServerStatus {
+  name: string;
+  url: string;
+  status: "online" | "offline" | "error";
+  toolCount: number;
+  lastChecked: string;
+  error?: string;
+}
+
+interface McpTool {
+  name: string;
+  description: string;
+  inputSchema: JsonSchema;
+  server: string;
+  version?: string;
+  category?: string;
+}
+```
+
+## Tool Categories
+
+MCP tools are typically organized by category:
+
+### File Operations
+```json
+{
+  "name": "read_file",
+  "description": "Read contents of a file",
+  "category": "file",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "path": { "type": "string", "description": "File path" }
+    }
+  }
+}
+```
+
+### Web Search
+```json
+{
+  "name": "search_web",
+  "description": "Search the web for information",
+  "category": "search",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "query": { "type": "string", "description": "Search query" },
+      "limit": { "type": "number", "default": 10 }
+    }
+  }
+}
+```
+
+### Database Operations
+```json
+{
+  "name": "query_database",
+  "description": "Execute SQL query",
+  "category": "database",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "sql": { "type": "string", "description": "SQL query" },
+      "params": { "type": "array", "description": "Query parameters" }
+    }
+  }
+}
+```
+
+## Advanced Configuration
+
+### Server Health Monitoring
+
+```ts
+const handler = createMcpToolsHandler({
+  mcpServers: [
+    {
+      url: "http://localhost:3001",
+      name: "file-tools",
+      enabled: true,
+    }
+  ],
+
+  onToolDiscovered: async (tool, serverName) => {
+    // Check server health before including tools
+    const serverHealth = await checkServerHealth(serverName);
+
+    if (serverHealth.status !== "healthy") {
+      console.warn(`Server ${serverName} is unhealthy, excluding tool ${tool.name}`);
+      return null;
+    }
+
+    return tool;
+  }
+});
+```
+
+### Dynamic Server Configuration
+
+```ts
+const handler = createMcpToolsHandler({
+  mcpServers: await loadMcpServersFromConfig(),
+
+  onError: async (error, context) => {
+    // Handle server connection errors gracefully
+    if (error.message.includes("ECONNREFUSED")) {
+      console.warn("MCP server unavailable, falling back to cached tools");
+
+      return new Response(JSON.stringify({
+        servers: [],
+        tools: await getCachedTools(),
+        discovered_at: new Date().toISOString(),
+        cache_expires_at: new Date(Date.now() + 300000).toISOString() // 5 min
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    throw error;
+  }
+});
+```
+
+### Permission-Based Tool Filtering
+
+```ts
+const handler = createMcpToolsHandler({
+  mcpServers: getMcpServers(),
+
+  validateRequest: async (request) => {
+    const userId = request.headers.get("x-user-id");
+    return userId && await validateUserAccess(userId);
+  },
+
+  onToolDiscovered: async (tool, serverName) => {
+    const userId = getCurrentUserId();
+    const userPermissions = await getUserPermissions(userId);
+
+    // Filter tools based on user permissions
+    const requiredPermission = getToolPermission(tool.name);
+
+    if (requiredPermission && !userPermissions.includes(requiredPermission)) {
+      return null; // User doesn't have permission for this tool
+    }
+
+    return tool;
+  }
+});
+```
+
+## Caching and Performance
+
+### Tool Discovery Caching
+
+```ts
+const handler = createMcpToolsHandler({
+  mcpServers: getMcpServers(),
+
+  onToolDiscovered: async (tool, serverName) => {
+    // Cache discovered tools
+    const cacheKey = `mcp:tools:${serverName}`;
+    const cachedTools = await cache.get(cacheKey) || [];
+
+    cachedTools.push(tool);
+    await cache.set(cacheKey, cachedTools, 300); // 5 minute cache
+
+    return tool;
+  }
+});
+```
+
+### Server Connection Pooling
+
+```ts
+const handler = createMcpToolsHandler({
+  mcpServers: getMcpServers(),
+  timeout: 5000,
+  retryAttempts: 3,
+
+  onError: async (error, context) => {
+    // Implement exponential backoff for retries
+    const retryDelay = Math.pow(2, context.attemptNumber || 0) * 1000;
+
+    console.warn(`MCP server error, retrying in ${retryDelay}ms:`, error.message);
+
+    await new Promise(resolve => setTimeout(resolve, retryDelay));
+    throw error; // Will trigger retry
+  }
+});
+```
+
+## Production Examples
+
+### Multi-Environment Setup
+
+```ts
+// app/api/mcp-tools/route.ts
+import { createMcpToolsHandler } from "ai-chat-bootstrap/server";
+
+const getMcpServers = () => {
+  const baseServers = [
+    {
+      url: process.env.MCP_FILE_SERVER_URL!,
+      name: "file-operations",
+      enabled: true,
+      headers: {
+        "Authorization": `Bearer ${process.env.MCP_FILE_TOKEN}`
+      }
+    }
+  ];
+
+  // Add search server only in production
+  if (process.env.NODE_ENV === "production") {
+    baseServers.push({
+      url: process.env.MCP_SEARCH_SERVER_URL!,
+      name: "web-search",
+      enabled: true,
+      headers: {
+        "X-API-Key": process.env.SEARCH_API_KEY!
+      }
+    });
+  }
+
+  // Add database tools for admin users
+  if (process.env.ENABLE_DB_TOOLS === "true") {
+    baseServers.push({
+      url: process.env.MCP_DB_SERVER_URL!,
+      name: "database",
+      enabled: true,
+      timeout: 15000, // Longer timeout for DB operations
+    });
+  }
+
+  return baseServers;
+};
+
+const handler = createMcpToolsHandler({
+  mcpServers: getMcpServers(),
+  timeout: 10000,
+  retryAttempts: 2,
+
+  onToolDiscovered: async (tool, serverName) => {
+    // Log tool discovery for monitoring
+    console.log(`MCP tool discovered: ${tool.name} from ${serverName}`);
+
+    // Filter dangerous tools in production
+    if (process.env.NODE_ENV === "production") {
+      const dangerousTools = ["delete_file", "drop_table", "system_command"];
+      if (dangerousTools.includes(tool.name)) {
+        console.warn(`Filtering dangerous tool: ${tool.name}`);
+        return null;
+      }
+    }
+
+    return tool;
+  }
+});
+
+export { handler as POST };
+```
+
+### Enterprise Configuration
+
+```ts
+// app/api/mcp-tools/route.ts
+import { createMcpToolsHandler } from "ai-chat-bootstrap/server";
+
+const handler = createMcpToolsHandler({
+  mcpServers: [
+    {
+      url: process.env.ENTERPRISE_MCP_SERVER!,
+      name: "enterprise-tools",
+      enabled: true,
+      headers: {
+        "Authorization": `Bearer ${process.env.ENTERPRISE_TOKEN}`,
+        "X-Tenant-ID": process.env.TENANT_ID!,
+      }
+    }
+  ],
+
+  validateRequest: async (request) => {
+    // Enterprise authentication
+    const token = request.headers.get("authorization");
+    const tenantId = request.headers.get("x-tenant-id");
+
+    return token && tenantId && await validateEnterpriseAccess(token, tenantId);
+  },
+
+  onToolDiscovered: async (tool, serverName) => {
+    const tenantId = getCurrentTenantId();
+    const tenantConfig = await getTenantConfiguration(tenantId);
+
+    // Filter tools based on tenant configuration
+    if (!tenantConfig.enabledFeatures.includes(tool.category)) {
+      return null;
+    }
+
+    // Add tenant-specific metadata
+    return {
+      ...tool,
+      metadata: {
+        tenantId,
+        billingCategory: tool.category,
+        costMultiplier: tenantConfig.costMultipliers[tool.category] || 1.0,
+      }
+    };
+  },
+
+  onToolCall: async (tool, params, serverName) => {
+    // Track usage for billing
+    await trackToolUsage({
+      tenantId: getCurrentTenantId(),
+      toolName: tool.name,
+      serverName,
+      timestamp: new Date(),
+      costMultiplier: tool.metadata?.costMultiplier || 1.0,
+    });
+
+    return params;
+  }
+});
+
+export { handler as POST };
+```
+
+### Development and Testing
+
+```ts
+// app/api/mcp-tools/route.ts
+import { createMcpToolsHandler } from "ai-chat-bootstrap/server";
+
+const handler = createMcpToolsHandler({
+  mcpServers: process.env.NODE_ENV === "development"
+    ? [
+        { url: "http://localhost:3001", name: "dev-file-tools", enabled: true },
+        { url: "http://localhost:3002", name: "dev-search", enabled: true },
+      ]
+    : [
+        { url: process.env.PROD_MCP_SERVER!, name: "prod-tools", enabled: true },
+      ],
+
+  onToolDiscovered: async (tool, serverName) => {
+    if (process.env.NODE_ENV === "development") {
+      // Add development-specific metadata
+      return {
+        ...tool,
+        description: `[DEV] ${tool.description}`,
+        development: true,
+      };
+    }
+
+    return tool;
+  },
+
+  onError: async (error, context) => {
+    if (process.env.NODE_ENV === "development") {
+      // Detailed error information in development
+      console.error("MCP Tools Error:", {
+        error: error.message,
+        stack: error.stack,
+        context,
+      });
+
+      return new Response(JSON.stringify({
+        error: error.message,
+        stack: error.stack,
+        context,
+      }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    // Generic error in production
+    return new Response("MCP service unavailable", { status: 503 });
+  }
+});
+
+export { handler as POST };
+```
+
+## Best Practices
+
+### Performance
+1. **Cache tool discovery** to avoid repeated server queries
+2. **Set appropriate timeouts** for server connections
+3. **Use connection pooling** for high-traffic applications
+4. **Implement retry logic** with exponential backoff
+
+### Security
+1. **Validate server certificates** in production
+2. **Use authentication tokens** for MCP server access
+3. **Filter dangerous tools** based on user permissions
+4. **Sanitize tool inputs** to prevent injection attacks
+
+### Reliability
+1. **Handle server unavailability** gracefully
+2. **Implement fallback mechanisms** when servers are down
+3. **Monitor server health** and tool availability
+4. **Log tool usage** for debugging and analytics
+
+### User Experience
+1. **Show tool availability** in the UI
+2. **Provide clear error messages** when tools fail
+3. **Cache tool results** when appropriate
+4. **Allow users to disable** specific tool categories
+
+## Environment Variables
+
+```bash
+# MCP Server URLs
+MCP_FILE_SERVER_URL=http://localhost:3001
+MCP_SEARCH_SERVER_URL=http://localhost:3002
+MCP_DB_SERVER_URL=http://localhost:3003
+
+# Authentication tokens
+MCP_FILE_TOKEN=your_file_server_token
+MCP_SEARCH_TOKEN=your_search_server_token
+MCP_DB_TOKEN=your_db_server_token
+
+# Feature flags
+ENABLE_DB_TOOLS=false
+ENABLE_FILE_OPERATIONS=true
+ENABLE_WEB_SEARCH=true
+
+# Enterprise configuration
+ENTERPRISE_MCP_SERVER=https://mcp.company.com
+ENTERPRISE_TOKEN=your_enterprise_token
+TENANT_ID=your_tenant_id
+```
+
+## See Also
+
+- [Server Templates Overview](/api/server-templates)
+- [createAIChatHandler](/api/server-templates/create-ai-chat-handler)
+- [Model Context Protocol Specification](https://github.com/modelcontextprotocol/specification)
+- [useAIChat Hook](/api/hooks/use-ai-chat)

@@ -22,7 +22,7 @@ React UI + hooks for building modern AI chat interfaces fast. Built on top of Ve
 
 ## Install
 
-You now need to install required peer dependencies explicitly (React, AI SDK core, React bindings, plus whatever model provider you use):
+Install with required peer dependencies:
 
 ```bash
 pnpm add ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zod
@@ -32,70 +32,38 @@ npm install ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zo
 
 If you use a different provider, swap `@ai-sdk/openai` for `@ai-sdk/azure`, `@ai-sdk/google`, etc. `zod` is optional unless you define tool / command schemas (recommended).
 
-There are two ways to consume styles:
+## Styling
 
-### 1. Zero‑config (fastest)
+The library accepts **shadcn/ui** and **Tailwind** classes naturally, falling back to built-in styles. Two setup modes:
 
-Import the design tokens _before_ other layers so CSS variables are defined early, then import our prebuilt minimal utility layer (no Tailwind preflight; only the classes our components actually use):
+### 1. Zero‑config (recommended)
 
 ```css
 /* globals.css */
-@import "ai-chat-bootstrap/tokens.css"; /* tokens & minimal globals */
-@import "tailwindcss"; /* (optional) your existing base/util layers */
-@import "tw-animate-css"; /* (optional) any other libs */
-@import "ai-chat-bootstrap/ai-chat.css"; /* minimal namespaced utility slice */
-@source "../node_modules/streamdown/dist/index.js"; /* this is a streamdown requirement */
+@import "ai-chat-bootstrap/tokens.css";
+@import "ai-chat-bootstrap/ai-chat.css";
 ```
 
-That's it—no need to scan our source or safelist classes. The generated `ai-chat.css` only contains the utilities actually used by the library (preflight disabled, curated so they won't stomp your own config).
-
-Want to theme it? Override the CSS custom properties after importing `tokens.css`:
-
+To theme, override CSS custom properties:
 ```css
 :root {
   --radius: 0.75rem;
   --primary: oklch(0.58 0.2 264);
-  --primary-foreground: oklch(0.985 0 0);
-}
-
-.dark {
-  --background: oklch(0.16 0 0);
-  --foreground: oklch(0.97 0 0);
 }
 ```
 
-> Choose either Zero‑config _or_ Tailwind‑native (below). Don't use both; otherwise you'd duplicate utilities and bloat CSS.
-
-### 2. Tailwind-native (advanced / maximum dedupe)
-
-If you prefer your app's Tailwind build to emit all utilities (allowing shared merging / future purging), **do not import** `ai-chat.css`. Instead, add our preset so tokens resolve and compile classes from your own content:
+### 2. Tailwind‑native (advanced)
 
 ```ts
 // tailwind.config.ts
 import preset from "ai-chat-bootstrap/tailwind.preset";
-
 export default {
   presets: [preset],
   content: ["./src/**/*.{js,ts,jsx,tsx}"],
 };
 ```
 
-Monorepo example (include the library source so Tailwind sees the class usage):
-
-```ts
-// tailwind.config.ts (app package)
-import preset from "ai-chat-bootstrap/tailwind.preset";
-
-export default {
-  presets: [preset],
-  content: [
-    "./src/**/*.{js,ts,jsx,tsx}",
-    "../../packages/ai-chat-bootstrap/lib/**/*.{js,ts,jsx,tsx}",
-  ],
-};
-```
-
-Most users should start with Zero‑config; switch to Tailwind‑native only if you need maximum deduplication across many internal component libraries or want to merge/tune utilities centrally.
+Don't use both modes together.
 
 ## Quick Start
 
@@ -113,73 +81,36 @@ export function App() {
 }
 ```
 
-## CLI Scaffold (New)
+## Server Templates
 
-Generate a ready-to-run Next.js app with chat + API route:
+New helper functions make deploying API endpoints easier:
 
-```bash
-npx ai-chat-bootstrap@latest init my-chat-app
+```ts
+// app/api/chat/route.ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+  streamOptions: { temperature: 0.7 },
+});
+
+export { handler as POST };
 ```
 
-Tailwind-native mode (no prebuilt utility slice):
+Available handlers:
+- `createAIChatHandler` - Main chat streaming
+- `createSuggestionsHandler` - AI-generated suggestions
+- `createThreadTitleHandler` - Auto thread titles
+- `createMcpToolsHandler` - MCP server tools
 
-```bash
-npx ai-chat-bootstrap@latest init my-chat-app --tailwind-native
-```
-
-What you get:
-
-- Next.js (App Router, TS, Tailwind)
-- Installed peers: react, react-dom, ai, @ai-sdk/react, @ai-sdk/openai, zod, ai-chat-bootstrap
-- `/api/chat` route with streaming example
-- `/chat` page using `ChatContainer`
-- Global CSS updated for chosen style mode
-
-Next steps after scaffold:
-
-```bash
-cd my-chat-app
-npm run dev
-```
-
-Visit http://localhost:3000/chat.
-
-### Local / Development Testing of the CLI
-
-When iterating on the CLI locally (before publishing to npm) you can instruct the scaffold to use a local build of `ai-chat-bootstrap` instead of downloading from the registry.
-
-1. Build the package so `dist/` exists:
-
-```bash
-pnpm --filter ai-chat-bootstrap build
-```
-
-2. From anywhere (e.g. repo root) run the CLI with `--local` pointing at the package directory:
-
-```bash
-node packages/ai-chat-bootstrap/bin/cli.js init demo-local --local packages/ai-chat-bootstrap
-# or via npx after a local `pnpm link --global` (optional)
-```
-
-You can also set an env var:
-
-```bash
-AI_CHAT_BOOTSTRAP_LOCAL=packages/ai-chat-bootstrap node packages/ai-chat-bootstrap/bin/cli.js init demo-local
-```
-
-3. The installer will run `npm install ai-chat-bootstrap@file:/abs/path/...` so changes you rebuild will be reflected when you reinstall.
-
-Notes:
-
-- The path may be absolute or relative (relative is resolved from the scaffold working dir's parent).
-- Re-run the build after code changes to update the local `dist/` consumed by newly scaffolded apps.
-- If install fails with `ENOENT` ensure the path is correct and `dist/` exists.
-
-This avoids publishing every tweak just to validate scaffold behavior.
+Each handler accepts model configuration and error handling options.
 
 ## Features
 
 - Chat container + message rendering primitives
+- **Model selection** dropdown with store management
+- **Chain of thought** reasoning display mode
 - Slash command system with parameter schema (zod)
 - Frontend tool registration (execute functions client side)
 - Context sharing hooks (inject dynamic UI state as model context)
@@ -201,7 +132,6 @@ You can opt into granular layers instead of the aggregate `tokens.css`:
 
 ```ts
 import "ai-chat-bootstrap/tokens.primitives.css"; // primitive scales
-import "ai-chat-bootstrap/tokens.semantic.css"; // semantic mapping
 import "ai-chat-bootstrap/tokens.dark.css"; // dark overrides (optional)
 import "ai-chat-bootstrap/tokens.css"; // component hooks + globals only
 ```
@@ -400,22 +330,29 @@ Why not bake these into components? This keeps runtime weight minimal (no varian
 
 If you need additional variant surfaces, open an issue or PR—extending CVA configs is non-breaking.
 
-## ChatContainer props
+## Component Props
 
-- chat: result of `useAIChat` (preferred). When provided, the container wires sending and loading automatically.
-- inputProps: control the input manually
-  - value, onChange, onSubmit, onAttach
-- header: title, subtitle, avatar, status, badge, actions, className
-- ui: placeholder, className, classes.{header,messages,message,input}, emptyState
-- suggestions: enabled, prompt, count, onAssistantFinish(triggerFetch), onSendMessage
-- commands: enabled, onExecute(commandName, args?), onAICommandExecute(message, toolName, systemPrompt?)
-- state: messages, isLoading, status (use when not passing `chat`)
+### ChatContainer
 
-Example controlled input:
+**Required:**
+- `chat`: result of `useAIChat` hook (handles all state and actions)
 
-```tsx
-<ChatContainer chat={chat} inputProps={{ value: input, onChange: setInput }} />
-```
+**Optional:**
+- `header`: title, subtitle, avatar, badge, actions, className
+- `ui`: placeholder, className, classes (`header`, `messages`, `message`, `input`, `assistantActions`), emptyState
+- `suggestions`: enabled, prompt, count
+- `commands`: enabled
+- `threads`: enabled
+- `assistantActions`: controls rendered beneath each assistant reply (`node` or `(message) => node`); always visible on the latest reply and revealed on hover/focus for earlier replies
+- `assistantLatestActions`: extra controls that attach only to the most recent assistant reply
+
+### ChatPopout
+
+Extends `ChatContainer` props with:
+- `popout`: position, mode, container, width, height, className
+- `button`: show, label, icon, className, container
+
+Both components now require the `chat` hook - no manual state management needed.
 
 Enable suggestions and commands:
 
@@ -424,7 +361,20 @@ Enable suggestions and commands:
   chat={chat}
   suggestions={{ enabled: true, count: 3 }}
   commands={{ enabled: true }}
+  threads={{ enabled: true }}
 />
+```
+
+Model selection and chain of thought:
+
+```tsx
+const chat = useAIChat({
+  api: "/api/chat",
+  models: [{ id: "gpt-4", name: "GPT-4" }, { id: "gpt-3.5-turbo", name: "GPT-3.5" }],
+  chainOfThoughtEnabled: true,
+});
+
+<ChatContainer chat={chat} />
 ```
 
 ## Tree-shaking

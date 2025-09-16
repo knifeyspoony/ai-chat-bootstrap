@@ -13,7 +13,8 @@
       "Bash(pnpm create:*)",
       "Bash(pnpm add:*)",
       "WebFetch(domain:mdxjs.com)",
-      "WebFetch(domain:shiki.style)"
+      "WebFetch(domain:shiki.style)",
+      "WebFetch(domain:ui.shadcn.com)"
     ],
     "deny": [],
     "ask": []

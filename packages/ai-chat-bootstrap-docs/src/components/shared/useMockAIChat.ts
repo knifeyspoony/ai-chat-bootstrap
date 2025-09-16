@@ -1,0 +1,137 @@
+import { type UIMessage } from "ai-chat-bootstrap";
+import { useState } from "react";
+
+interface MockChatOptions {
+  /**
+   * Custom response function for simulating AI responses
+   */
+  responseGenerator?: (userMessage: string) => string;
+  /**
+   * Delay in ms for simulating network latency
+   */
+  responseDelay?: number;
+  /**
+   * Custom initial messages
+   */
+  initialMessages?: UIMessage[];
+}
+
+// Mock useAIChat hook for demo purposes
+export function useMockAIChat(options: MockChatOptions = {}) {
+  const {
+    responseGenerator = (text) =>
+      `You said: "${text}". This is a mock response from the AI model.`,
+    responseDelay = 600,
+    initialMessages = [],
+  } = options;
+
+  const [messages, setMessages] = useState<UIMessage[]>(initialMessages);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | undefined>(undefined);
+
+  const sendMessageWithContext = (text: string) => {
+    if (!text.trim()) return;
+    const userMessage: UIMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      parts: [{ type: "text", text }],
+    };
+    setMessages((m) => [...m, userMessage]);
+    setIsLoading(true);
+
+    // Simulate AI response after delay
+    setTimeout(() => {
+      const assistantMessage: UIMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        parts: [
+          {
+            type: "text",
+            text: responseGenerator(text),
+          },
+        ],
+      };
+      setMessages((m) => [...m, assistantMessage]);
+      setIsLoading(false);
+    }, responseDelay);
+  };
+
+  // Mock functions to match useAIChat interface
+  const sendAICommandMessage = (
+    content: string,
+    _toolName: string,
+    _commandSystemPrompt?: string
+  ) => {
+    // For mock purposes, just use sendMessageWithContext
+    sendMessageWithContext(content);
+  };
+
+  const retryLastMessage = () => {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === "user") {
+      const textPart = lastMessage.parts?.find((part) => part.type === "text");
+      if (textPart && "text" in textPart) {
+        sendMessageWithContext(textPart.text);
+      }
+    }
+  };
+
+  const clearError = () => {
+    setError(undefined);
+  };
+
+  // Mock sendMessage function (from useChat) - matches the AI SDK interface
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sendMessage: any = (message?: any, options?: any): Promise<void> => {
+    if (message?.text) {
+      sendMessageWithContext(message.text);
+    }
+    return Promise.resolve();
+  };
+
+  return {
+    // From useChat (AI SDK)
+    id: "mock-chat-id",
+    messages,
+    status: isLoading ? ("streaming" as const) : ("ready" as const),
+    error,
+    sendMessage,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    regenerate: (() => Promise.resolve()) as any, // Mock function
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    stop: (() => Promise.resolve()) as any, // Mock function
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resumeStream: (() => Promise.resolve()) as any, // Mock function
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    addToolResult: (() => Promise.resolve()) as any, // Mock function
+    clearError,
+    setMessages,
+
+    // From useAIChat (our hook)
+    input,
+    setInput,
+    isLoading,
+    sendMessageWithContext,
+    sendAICommandMessage,
+    retryLastMessage,
+
+    // Store state properties
+    context: [],
+    availableTools: [],
+    tools: [],
+    focusItems: [],
+
+    // Configuration properties
+    models: [],
+    model: undefined,
+    setModel: () => {},
+    chainOfThoughtEnabled: false,
+    mcpEnabled: false,
+    threadId: undefined,
+    scopeKey: undefined,
+
+    // Utility functions for tests
+    setIsLoading,
+  };
+}

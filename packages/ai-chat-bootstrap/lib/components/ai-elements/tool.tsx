@@ -25,8 +25,8 @@ export const Tool = ({ className, ...props }: ToolProps) => (
   <Collapsible
     data-acb-part="tool"
     className={cn(
-      "not-prose mb-4 w-full rounded-md border",
-      "bg-[var(--acb-tool-bg)] border-[var(--acb-tool-border)] rounded-[var(--acb-tool-radius)]",
+      "not-prose mb-4 w-full rounded-lg border",
+      "bg-[var(--acb-tool-bg)] border-[var(--acb-tool-border)]",
       className
     )}
     {...props}
@@ -71,7 +71,7 @@ export const ToolHeader = ({
   <CollapsibleTrigger
     data-acb-part="tool-header"
     className={cn(
-      "flex w-full items-center justify-between gap-4 p-3",
+      "flex w-full items-center justify-between gap-4 p-3 rounded-t-lg",
       "bg-[var(--acb-tool-header-bg)] text-[var(--acb-tool-header-fg)]",
       className
     )}

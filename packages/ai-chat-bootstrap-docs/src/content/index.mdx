@@ -23,62 +23,38 @@ Required peers: `react`, `react-dom`, `ai`, `@ai-sdk/react`. Add one provider pa
 
 Upgrading from &lt;=0.2.x? Add `ai @ai-sdk/react` explicitly—they're now peers.
 
-## Styling Options
+## Styling
 
-There are **two mutually exclusive** ways to consume styles. Pick **one**:
+The library accepts **shadcn/ui** and **Tailwind** classes naturally, falling back to built-in styles. Two setup modes:
 
-### 1. Zero‑config (fastest)
-
-Drop in our tokens first (so CSS variables are defined), then optionally your own global utility layers, then our **minimal utility slice** (`ai-chat.css`).
+### Zero‑config (recommended)
 
 ```css
 /* globals.css */
-@import "ai-chat-bootstrap/tokens.css"; /* tokens & minimal globals */
-@import "tailwindcss";                  /* (optional) your existing base/util layers */
-@import "tw-animate-css";               /* (optional) any other libs */
-@import "ai-chat-bootstrap/ai-chat.css"; /* curated utility subset used by the library */
+@import "ai-chat-bootstrap/tokens.css";
+@import "ai-chat-bootstrap/ai-chat.css";
 ```
 
-No scanning, safelisting, or Tailwind config changes required. The shipped slice:
-
-- Has **preflight disabled** (won't stomp your base styles)
-- Includes **only** utilities referenced by the library
-- Avoids CSS bloat in multi‑app environments
-
-> To theme, override CSS custom properties *after* importing `tokens.css`.
-
+To theme, override CSS custom properties:
 ```css
 :root {
 	--radius: 0.75rem;
 	--primary: oklch(0.58 0.2 264);
-	--primary-foreground: oklch(0.985 0 0);
-}
-
-.dark {
-	--background: oklch(0.16 0 0);
-	--foreground: oklch(0.97 0 0);
 }
 ```
 
-### 2. Tailwind‑native (advanced / maximum dedupe)
-
-Let **your** Tailwind build emit utilities (enables cross‑library merging / purging). In this mode **do NOT import** `ai-chat.css`—instead add our preset and ensure both your app and the library source appear in `content`.
+### Tailwind‑native (advanced)
 
 ```ts
 // tailwind.config.ts
 import preset from "ai-chat-bootstrap/tailwind.preset";
-
 export default {
 	presets: [preset],
-	content: [
-		"./src/**/*.{js,ts,jsx,tsx}",
-		// If in a monorepo, include the library source so Tailwind sees usage
-		"../../packages/ai-chat-bootstrap/lib/**/*.{js,ts,jsx,tsx}",
-	],
+	content: ["./src/**/*.{js,ts,jsx,tsx}"],
 };
 ```
 
-> Start with Zero‑config. Only switch if you need utility deduplication at scale or centralized Tailwind tuning.
+Don't use both modes together.
 
 ## Quick Start
 
@@ -104,9 +80,30 @@ export function App() {
 
 For a full end‑to‑end example (including API route + streaming) see <Link href="/chat/basic-chat">Basic Chat</Link>.
 
+## Server Templates
+
+New helper functions make deploying API endpoints easier:
+
+```ts
+// app/api/chat/route.ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+  streamOptions: { temperature: 0.7 },
+});
+
+export { handler as POST };
+```
+
+Also available: `createSuggestionsHandler`, `createThreadTitleHandler`, `createMcpToolsHandler`.
+
 ## Features
 
 - Chat container + composable message primitives
+- **Model selection** dropdown with store management
+- **Chain of thought** reasoning display mode
 - Slash command system with parameter schemas (`zod`)
 - Frontend tool registration (client‑side function invocation)
 - Context sharing hooks (inject dynamic UI/app state into model context)

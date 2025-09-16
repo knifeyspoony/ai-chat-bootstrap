@@ -2,7 +2,12 @@ import type { UIMessage } from "ai";
 import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { fetchSuggestionsService } from "../services/suggestions-service";
-import { useAIContextStore, useAIFocusStore } from "../stores";
+import {
+  useAIContextStore,
+  useAIFocusStore,
+  useAIToolsStore,
+  useAIMCPServersStore,
+} from "../stores";
 import { useSuggestionsStore } from "../stores/suggestions";
 import type { Suggestion } from "../types/chat";
 
@@ -76,6 +81,12 @@ export function useSuggestions({
   const focusItemsMap = useAIFocusStore(
     useShallow((state) => state.focusItems)
   );
+  const toolsMap = useAIToolsStore(useShallow((state) => state.tools));
+  const mcpToolSummaries = useAIMCPServersStore(
+    useShallow((state) =>
+      Array.from(state.servers.values()).flatMap((server) => server.tools)
+    )
+  );
 
   // Fetch suggestions based on current chat state
   const handleFetchSuggestions = useCallback(async () => {
@@ -86,11 +97,33 @@ export function useSuggestions({
       .find((m) => m.role === "assistant");
     const focus = Array.from(focusItemsMap.values());
     const contextItems = Array.from(contextItemsMap.values());
+    const frontendTools = Array.from(toolsMap.values()).map<{
+      name: string;
+      description?: string;
+    }>((tool) => ({
+      name: tool.name,
+      description: tool.description,
+    }));
+    const toolSummaries = [...frontendTools];
+    const seenToolNames = new Set(toolSummaries.map((t) => t.name));
+    mcpToolSummaries.forEach((tool) => {
+      if (!tool?.name) return;
+      if (!seenToolNames.has(tool.name)) {
+        toolSummaries.push({
+          name: tool.name,
+          description: tool.description,
+        });
+        seenToolNames.add(tool.name);
+      }
+    });
     const keyParts = [
       lastAssistant?.id ?? "no-assistant",
       focus.length.toString(),
       contextItems.length.toString(),
       (prompt || "").slice(0, 32),
+      toolSummaries
+        .map((t) => `${t.name}:${t.description ?? ""}`)
+        .join("|"),
     ];
     const fetchKey = keyParts.join("|");
     if (fetchKey === lastFetchKeyRef.current) return; // dedupe
@@ -110,6 +143,7 @@ export function useSuggestions({
           messages,
           context: contextItems.length > 0 ? contextItems : undefined,
           focus: focus.length > 0 ? focus : undefined,
+          tools: toolSummaries.length > 0 ? toolSummaries : undefined,
           prompt,
         },
         { signal: controller.signal, numSuggestions, api }
@@ -123,7 +157,15 @@ export function useSuggestions({
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, messages, prompt, numSuggestions, api]);
+  }, [
+    enabled,
+    messages,
+    prompt,
+    numSuggestions,
+    api,
+    toolsMap,
+    mcpToolSummaries,
+  ]);
 
   // Handle suggestion click
   const handleSuggestionClick = useCallback(

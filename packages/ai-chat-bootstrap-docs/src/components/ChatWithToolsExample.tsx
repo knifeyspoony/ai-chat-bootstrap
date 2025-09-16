@@ -6,12 +6,9 @@ import {
 } from "ai-chat-bootstrap";
 import React, { useState } from "react";
 import { z } from "zod";
+import { useMockAIChat } from "./shared/useMockAIChat";
 
-// Demo component that uses frontend tools (for the live demo)
 export function ChatWithToolsExample() {
-  const [messages, setMessages] = useState<UIMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [counter, setCounter] = useState(0);
 
   // Register the counter increment tool
@@ -50,103 +47,49 @@ export function ChatWithToolsExample() {
     },
   });
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!input.trim()) return;
-
-    const userMessage: UIMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      parts: [{ type: "text", text: input }],
-    };
-    setMessages((m) => [...m, userMessage]);
-    const userInput = input;
-    setInput("");
-    setIsLoading(true);
-
-    // Simulate AI tool usage for demo
-    setTimeout(() => {
-      const responseText = `You said: "${userInput}".`;
-
-      // Check if user is asking about counter operations
-      if (
-        userInput.toLowerCase().includes("increment") ||
-        userInput.toLowerCase().includes("increase")
-      ) {
-        // Simulate tool call
-        const amount = parseInt(userInput.match(/\d+/)?.[0] || "1");
-        const newValue = counter + amount;
-        setCounter(newValue);
-
-        const toolMessage: UIMessage = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          parts: [
-            {
-              type: "tool-increment_counter" as const,
-              toolCallId: crypto.randomUUID(),
-              state: "output-available" as const,
-              input: { amount },
-              output: {
-                newValue,
-                amount,
-                message: `Counter incremented by ${amount}. New value: ${newValue}`,
-              },
-            },
-            {
-              type: "text",
-              text: `I've incremented the counter by ${amount}! The new value is ${newValue}.`,
-            },
-          ],
-        };
-        setMessages((m) => [...m, toolMessage]);
-      } else if (
-        userInput.toLowerCase().includes("decrement") ||
-        userInput.toLowerCase().includes("decrease")
-      ) {
-        // Simulate tool call
-        const amount = parseInt(userInput.match(/\d+/)?.[0] || "1");
-        const newValue = counter - amount;
-        setCounter(newValue);
-
-        const toolMessage: UIMessage = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          parts: [
-            {
-              type: "tool-decrement_counter" as const,
-              toolCallId: crypto.randomUUID(),
-              state: "output-available" as const,
-              input: { amount },
-              output: {
-                newValue,
-                amount,
-                message: `Counter decremented by ${amount}. New value: ${newValue}`,
-              },
-            },
-            {
-              type: "text",
-              text: `I've decremented the counter by ${amount}! The new value is ${newValue}.`,
-            },
-          ],
-        };
-        setMessages((m) => [...m, toolMessage]);
-      } else {
-        const assistantMessage: UIMessage = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          parts: [
-            {
-              type: "text",
-              text: `${responseText} I can help you control the counter above! Try saying "increment by 5" or "decrease by 2".`,
-            },
-          ],
-        };
-        setMessages((m) => [...m, assistantMessage]);
-      }
-      setIsLoading(false);
-    }, 800);
+  // Helper function to extract numbers from text
+  function extractNumber(text: string): number | null {
+    const match = text.match(/\d+/);
+    return match ? parseInt(match[0], 10) : null;
   }
+
+  // Create custom response generator with tool simulation
+  const toolAwareResponseGenerator = React.useCallback((text: string) => {
+    const lowerInput = text.toLowerCase();
+    let responseText = `You said: "${text}".`;
+
+    if (
+      lowerInput.includes("increment") ||
+      lowerInput.includes("increase") ||
+      lowerInput.includes("add") ||
+      lowerInput.includes("up")
+    ) {
+      const amount = extractNumber(text) || 1;
+      const newValue = counter + amount;
+      setCounter(newValue);
+      return `I'll increment the counter by ${amount}. Counter incremented by ${amount}. New value: ${newValue}`;
+    } else if (
+      lowerInput.includes("decrement") ||
+      lowerInput.includes("decrease") ||
+      lowerInput.includes("subtract") ||
+      lowerInput.includes("reduce")
+    ) {
+      const amount = extractNumber(text) || 1;
+      const newValue = counter - amount;
+      setCounter(newValue);
+      return `I'll decrement the counter by ${amount}. Counter decremented by ${amount}. New value: ${newValue}`;
+    } else {
+      return `${responseText} I can help you control the counter above! Try saying "increment by 5" or "decrease by 2".`;
+    }
+  }, [counter]);
+
+  // Create mock chat with tool-aware responses
+  const mockChat = useMockAIChat({
+    responseGenerator: toolAwareResponseGenerator,
+    responseDelay: 800,
+  });
+
+
 
   return (
     <div className="space-y-4">
@@ -161,17 +104,12 @@ export function ChatWithToolsExample() {
       {/* Chat Interface */}
       <div className="h-[420px] w-full">
         <ChatContainer
+          chat={mockChat}
           header={{
             title: "AI Assistant with Tools",
             subtitle: "Can control the counter above",
           }}
           ui={{ placeholder: "Try: 'increment by 3' or 'decrease by 2'" }}
-          state={{ messages, isLoading }}
-          inputProps={{
-            value: input,
-            onChange: setInput,
-            onSubmit: handleSubmit,
-          }}
         />
       </div>
     </div>
@@ -242,7 +180,7 @@ export function ChatWithTools() {
         <ChatContainer
           header={{ title: "AI Assistant with Tools", subtitle: "Can control the counter above" }}
           ui={{ placeholder: "Try: 'increment by 3' or 'decrease by 2'" }}
-          chat={chat}
+          chat={mockChat}
         />
       </div>
     </div>

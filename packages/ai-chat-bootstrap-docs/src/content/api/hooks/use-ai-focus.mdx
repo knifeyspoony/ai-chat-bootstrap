@@ -210,32 +210,21 @@ function MultiTypeSelector() {
 
 Focus items are included in the client-built `enrichedSystemPrompt`, so you should not rebuild or concatenate them again server-side:
 
-```tsx
-import { createAzure } from '@ai-sdk/azure';
-import { convertToModelMessages, streamText } from 'ai';
+```ts
+import { createAzure } from "@ai-sdk/azure";
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
 
 const azure = createAzure({
   resourceName: process.env.AZURE_RESOURCE_NAME!,
   apiKey: process.env.AZURE_API_KEY!,
-  apiVersion: process.env.AZURE_API_VERSION ?? 'preview',
+  apiVersion: process.env.AZURE_API_VERSION ?? "preview",
 });
 
 const model = azure(process.env.AZURE_DEPLOYMENT_ID!);
 
-export async function POST(request: Request) {
-  const { messages, enrichedSystemPrompt, tools } = await request.json();
-
-  const result = await streamText({
-    model,
-    messages: [
-      { role: 'system', content: enrichedSystemPrompt },
-      ...convertToModelMessages(messages),
-    ],
-    tools,
-  });
-
-  return result.toUIMessageStreamResponse();
-}
+export const POST = createAIChatHandler({
+  model,
+});
 ```
 
 > Note: Avoid concatenating focus items again; duplication wastes tokens and can degrade model performance.

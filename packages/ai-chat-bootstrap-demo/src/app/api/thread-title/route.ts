@@ -1,7 +1,6 @@
 import { createAzure } from "@ai-sdk/azure";
 import type { UIMessage } from "ai";
-import { generateObject } from "ai";
-import { z } from "zod";
+import { createThreadTitleHandler } from "ai-chat-bootstrap/server";
 
 // Reuse Azure config like the chat route
 const azure = createAzure({
@@ -26,124 +25,60 @@ function extractTextFromMessages(sliceToSummarize: UIMessage[]): string {
   return chunks.join("\n").trim();
 }
 
-function fallbackTitle(messages: UIMessage[]): string | undefined {
-  const firstUser = messages.find((m) => m.role === "user");
-  const txt = firstUser ? extractTextFromMessages([firstUser]) : "";
-  if (!txt) return undefined;
-  // Simple heuristic: sentence up to 6 words
-  const words = txt.replace(/\s+/g, " ").trim().split(" ");
-  const title = words.slice(0, 8).join(" ");
-  return sanitizeTitle(title);
-}
-
-function sanitizeTitle(s: string): string {
-  // Remove quotes and trailing punctuation, clamp length
-  let t = s.replace(/^\s*['"`]|['"`]\s*$/g, "").trim();
+function sanitizeTitle(text: string): string {
+  let t = text.replace(/^\s*['"`]|['"`]\s*$/g, "").trim();
   t = t.replace(/[\n\r]+/g, " ").replace(/\s+/g, " ");
   if (t.length > 60) t = t.slice(0, 60).replace(/\s+\S*$/, "");
   return t || "Untitled thread";
 }
 
-export async function POST(req: Request) {
-  try {
-    const body = (await req.json()) as {
-      messages?: UIMessage[];
-      previousTitle?: string;
-    };
-    const messages = Array.isArray(body?.messages) ? body.messages : [];
-    const previousTitle =
-      typeof body?.previousTitle === "string" ? body.previousTitle : undefined;
-
-    // If no provider configured, return a deterministic fallback
-    const hasAzureCreds =
-      !!process.env.AZURE_RESOURCE_NAME &&
-      !!process.env.AZURE_API_KEY &&
-      !!process.env.AZURE_DEPLOYMENT_ID;
-
-    if (!hasAzureCreds) {
-      const title = fallbackTitle(messages) ?? "Untitled thread";
-      return new Response(JSON.stringify({ title }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // dump messages for debugging in json
-    console.log(
-      "Generating thread title for messages:",
-      JSON.stringify(messages)
-    );
-    const excerpt = extractTextFromMessages(messages);
-    console.log("Excerpt to summarize:", excerpt);
-    const ThreadTitleSchema = z.object({
-      thread_title: z.string().min(1).max(120),
-    });
-
-    const result = await generateObject({
-      model,
-      schema: ThreadTitleSchema,
-      temperature: 0.2,
-      messages: [
-        {
-          role: "system",
-          content: `
-          # Persona
-          
-          You are an expert in summarization. 
-          
-          ## Task
-          
-          You generate short, descriptive chat thread titles based on recent chat history to help users recognize previous conversations 
-          in a thread list based on the subject of the conversation. Remember - you are NOT summarizing THIS conversation, rather the excerpt only!
-          
-          ## Requirements
-          
-          Consider the messages in the excerpt we will provide you. 
-          Keep your summary title to 3-8 words, no quotes, no trailing punctuation. Prefer clarity over cleverness.
-          For example, "Vacation ideas in Europe" is good, "Chat with user" is clearly very bad. 
-          
-          ## Previous Title
-
-          ${
-            previousTitle
-              ? `The current title of the thread is ${previousTitle}.`
-              : "There is no existing title for this thread."
-          }
-          
-          ## Excerpt
-
-          Here is the recent conversation excerpt we extracted from the thread:
-
-          ### BEGIN CHAT EXCERPT TO SUMMARIZE
-          
-          ${excerpt ? excerpt : "[No recent messages]"}
-
-          ### END CHAT EXCERPT TO SUMMARIZE
-
-          ## Output
-
-          Now, provide a concise thread title that summarizes the topic of the excerpt.
-          `,
-        },
-      ],
-    });
-
-    const title = sanitizeTitle(result.object.thread_title);
-    return new Response(JSON.stringify({ title }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch {
-    // On error, provide a safe fallback
-    try {
-      const body = (await req.json()) as { messages?: UIMessage[] };
-      const fallback = fallbackTitle(body?.messages ?? []);
-      return new Response(
-        JSON.stringify({ title: fallback ?? "Untitled thread" }),
-        { headers: { "Content-Type": "application/json" } }
-      );
-    } catch {
-      return new Response(JSON.stringify({ title: "Untitled thread" }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-  }
+function fallbackTitle(messages: UIMessage[]): string | undefined {
+  const excerpt = extractTextFromMessages(messages);
+  if (!excerpt) return undefined;
+  const words = excerpt.replace(/\s+/g, " ").trim().split(" ");
+  return sanitizeTitle(words.slice(0, 8).join(" "));
 }
+
+const THREAD_TITLE_PROMPT = `
+# Persona
+You are an expert summarizer.
+
+## Task
+Create short, descriptive chat thread titles using the recent conversation excerpt. You are summarizing the excerpt only.
+
+## Requirements
+- 3-8 words
+- No quotes or trailing punctuation
+- Prefer clarity over cleverness
+
+## Output
+Return only the final title.
+`.trim();
+
+const hasAzureCreds =
+  !!process.env.AZURE_RESOURCE_NAME &&
+  !!process.env.AZURE_API_KEY &&
+  !!process.env.AZURE_DEPLOYMENT_ID;
+
+export const POST = createThreadTitleHandler({
+  model: hasAzureCreds ? model : undefined,
+  systemPrompt: THREAD_TITLE_PROMPT,
+  fallback: fallbackTitle,
+  buildGenerateOptions: ({
+    messages,
+    previousTitle,
+  }: {
+    messages: UIMessage[];
+    previousTitle?: string;
+  }) => {
+    if (process.env.NODE_ENV !== "production") {
+      const excerpt = extractTextFromMessages(messages);
+      console.log("[thread-title] excerpt:", excerpt);
+      console.log("[thread-title] previous title:", previousTitle);
+    }
+    return {};
+  },
+  onError: (error: unknown) => {
+    console.error("Thread title API error:", error);
+  },
+});

@@ -17,6 +17,7 @@ export async function fetchSuggestionsService(
     originalSystemPrompt: request.prompt,
     context: request.context,
     focus: request.focus,
+    tools: request.tools,
     numSuggestions,
   });
 

@@ -17,12 +17,7 @@ if (!existsSync(distDir)) {
 }
 
 // Copy token layers
-const tokenFiles = [
-  "tokens.css",
-  "tokens.primitives.css",
-  "tokens.semantic.css",
-  "tokens.dark.css",
-];
+const tokenFiles = ["tokens.css", "tokens.primitives.css", "tokens.dark.css"];
 
 function copyTokenFile(file) {
   const input = join(packageRoot, "lib", file);

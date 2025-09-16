@@ -1,19 +1,76 @@
 ---
 title: ChatInput
-description: Standalone input component for chat interfaces.
+description: Standalone input component for chat interfaces with model selection support.
 ---
 
 # ChatInput
 
-Standalone input component for chat interfaces.
+Standalone input component for chat interfaces. Includes automatic model selection dropdown when multiple models are provided.
+
+## Props
 
 ```tsx
 interface ChatInputProps {
-  input: string;
-  onInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  value: string;
+  onChange: (value: string) => void;
   onSubmit: (e?: FormEvent) => void;
-  isLoading?: boolean;
+  disabled?: boolean;
   placeholder?: string;
   className?: string;
+
+  // Model selection
+  models?: ChatModelOption[];
+  selectedModelId?: string;
+  onModelChange?: (modelId: string) => void;
+
+  // Suggestions
+  enableSuggestions?: boolean;
+  suggestions?: Suggestion[];
+  onSuggestionClick?: (suggestion: Suggestion) => void;
+
+  // Commands
+  enableCommands?: boolean;
+  onCommandExecute?: (commandName: string, args?: string) => void;
+  onAICommandExecute?: (message: string, toolName: string, systemPrompt?: string) => void;
 }
 ```
+
+## Usage
+
+```tsx
+import { ChatInput } from "ai-chat-bootstrap";
+
+export function MyInput() {
+  const [input, setInput] = useState("");
+  const [selectedModel, setSelectedModel] = useState("gpt-4");
+
+  const models = [
+    { id: "gpt-4", name: "GPT-4" },
+    { id: "gpt-3.5-turbo", name: "GPT-3.5" }
+  ];
+
+  return (
+    <ChatInput
+      value={input}
+      onChange={setInput}
+      onSubmit={(e) => {
+        e?.preventDefault();
+        console.log("Submitted:", input);
+        setInput("");
+      }}
+      models={models}
+      selectedModelId={selectedModel}
+      onModelChange={setSelectedModel}
+      placeholder="Type your message..."
+    />
+  );
+}
+```
+
+## Features
+
+- **Model Selection**: Dropdown automatically appears when multiple models are provided
+- **Suggestions**: AI-generated follow-up suggestions when enabled
+- **Commands**: Slash command support when enabled
+- **Auto-resize**: Textarea grows with content
+- **Keyboard Shortcuts**: Enter to submit, Shift+Enter for new line

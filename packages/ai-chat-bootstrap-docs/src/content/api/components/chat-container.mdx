@@ -5,19 +5,113 @@ description: Main chat interface component with message display and input.
 
 # ChatContainer
 
-Main chat interface component with message display and input.
+Main chat interface component with message display and input. Requires the `useAIChat` hook.
+
+## Props
 
 ```tsx
 interface ChatContainerProps {
-  title?: string;
-  subtitle?: string;
-  messages: UIMessage[];
-  input: string;
-  onInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onSubmit: (e?: FormEvent) => void;
-  isLoading?: boolean;
-  error?: Error | null;
-  placeholder?: string;
-  className?: string;
+  // Required
+  chat: ReturnType<typeof useAIChat>;
+
+  // Optional
+  header?: {
+    title?: string;
+    subtitle?: string;
+    avatar?: React.ReactNode;
+    badge?: React.ReactNode;
+    actions?: React.ReactNode;
+    className?: string;
+  };
+  ui?: {
+    placeholder?: string;
+    className?: string;
+    classes?: {
+      header?: string;
+      messages?: string;
+      message?: string;
+      input?: string;
+      assistantActions?: string;
+    };
+    emptyState?: React.ReactNode;
+  };
+  suggestions?: {
+    enabled?: boolean;
+    prompt?: string;
+    count?: number;
+  };
+  commands?: {
+    enabled?: boolean;
+  };
+  threads?: {
+    enabled?: boolean;
+  };
+  assistantActions?: React.ReactNode | ((message: UIMessage) => React.ReactNode);
+  assistantLatestActions?: React.ReactNode | ((message: UIMessage) => React.ReactNode);
 }
+```
+
+## Usage
+
+```tsx
+import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+
+export function MyChat() {
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You are a helpful assistant.",
+  });
+
+  return (
+    <ChatContainer
+      chat={chat}
+      header={{ title: "AI Assistant", subtitle: "Connected" }}
+      ui={{ placeholder: "Ask me anything..." }}
+      suggestions={{ enabled: true, count: 3 }}
+      commands={{ enabled: true }}
+    />
+  );
+}
+```
+
+## Features
+
+- **Model Selection**: Dropdown automatically appears when multiple models are configured
+- **Chain of Thought**: Reasoning display when enabled in the chat hook
+- **Assistant Actions**: Custom controls under assistant replies
+- **Suggestions**: AI-generated follow-up suggestions
+- **Commands**: Slash command system
+- **Threads**: Thread management when enabled
+
+## Assistant Actions
+
+```tsx
+// Static actions
+<ChatContainer
+  chat={chat}
+  assistantActions={
+    <div>
+      <button>Copy</button>
+      <button>Share</button>
+    </div>
+  }
+/>
+
+// Dynamic actions based on message
+<ChatContainer
+  chat={chat}
+  assistantActions={(message) => (
+    <button onClick={() => copyToClipboard(message.text)}>
+      Copy
+    </button>
+  )}
+  assistantLatestActions={(_message) => (
+    <div className="flex gap-2">
+      <button onClick={() => regenerate()}>Retry</button>
+      <button onClick={() => handleSummarize()}>Summarize</button>
+    </div>
+  )}
+/>
+
+> `assistantActions` renders beneath every assistant message (always visible on the latest reply and revealed on hover/focus for older messages). Use `assistantLatestActions` for controls that only make sense on the newest response, such as retry buttons.
 ```

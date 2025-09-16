@@ -1,0 +1,546 @@
+---
+title: createAIChatHandler
+description: Pre-built handler for AI chat API routes with automatic system prompt enrichment, tool integration, and streaming support.
+---
+
+# createAIChatHandler
+
+Creates a complete API route handler for AI chat with automatic system prompt enrichment, tool integration, context processing, and streaming responses.
+
+## Import
+
+```ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+```
+
+## Syntax
+
+```ts
+function createAIChatHandler(options: AIChatHandlerOptions): RequestHandler
+```
+
+## Parameters
+
+```ts
+interface AIChatHandlerOptions {
+  // Required
+  model: LanguageModel;
+
+  // Optional configuration
+  streamOptions?: StreamingOptions;
+  onSystemPrompt?: (enrichedPrompt: string, originalPrompt?: string, context?: RequestContext) => string;
+  onToolCall?: (toolCall: ToolCall, context: RequestContext) => ToolCall | Promise<ToolCall>;
+  onError?: (error: Error, context: RequestContext) => Response | Promise<Response>;
+  validateRequest?: (request: Request) => boolean | Promise<boolean>;
+}
+
+interface StreamingOptions {
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  [key: string]: any;
+}
+```
+
+## Basic Usage
+
+### OpenAI
+
+```ts
+// app/api/chat/route.ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createAIChatHandler({
+  model: openai("gpt-4o"),
+  streamOptions: {
+    temperature: 0.7,
+    maxTokens: 1000,
+  }
+});
+
+export { handler as POST };
+```
+
+### Azure OpenAI
+
+```ts
+// app/api/chat/route.ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { createAzure } from "@ai-sdk/azure";
+
+const azure = createAzure({
+  resourceName: process.env.AZURE_RESOURCE_NAME!,
+  apiKey: process.env.AZURE_API_KEY!,
+  apiVersion: process.env.AZURE_API_VERSION!,
+});
+
+const handler = createAIChatHandler({
+  model: azure(process.env.AZURE_DEPLOYMENT_ID!),
+  streamOptions: {
+    temperature: 0.7,
+  }
+});
+
+export { handler as POST };
+```
+
+### Anthropic Claude
+
+```ts
+// app/api/chat/route.ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { anthropic } from "@ai-sdk/anthropic";
+
+const handler = createAIChatHandler({
+  model: anthropic("claude-3-sonnet-20240229"),
+  streamOptions: {
+    temperature: 0.7,
+    maxTokens: 1000,
+  }
+});
+
+export { handler as POST };
+```
+
+## Advanced Configuration
+
+### Custom System Prompt Processing
+
+```ts
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+  onSystemPrompt: (enrichedPrompt, originalPrompt, context) => {
+    // Add custom instructions to the enriched prompt
+    return `${enrichedPrompt}
+
+Additional Guidelines:
+- Always be concise and helpful
+- Use bullet points for lists
+- Provide code examples when relevant
+- Ask clarifying questions if the request is ambiguous`;
+  }
+});
+```
+
+### Custom Tool Call Processing
+
+```ts
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+  onToolCall: async (toolCall, context) => {
+    // Log tool usage for analytics
+    console.log(`Tool called: ${toolCall.name}`, {
+      userId: context.userId,
+      timestamp: new Date().toISOString(),
+      parameters: toolCall.parameters,
+    });
+
+    // Validate tool permissions
+    if (!hasToolPermission(context.userId, toolCall.name)) {
+      throw new Error(`User ${context.userId} does not have permission to use ${toolCall.name}`);
+    }
+
+    return toolCall;
+  }
+});
+```
+
+### Custom Error Handling
+
+```ts
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+  onError: async (error, context) => {
+    // Log error details
+    console.error("Chat handler error:", {
+      error: error.message,
+      stack: error.stack,
+      userId: context.userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Send error to monitoring service
+    await logError(error, context);
+
+    // Return custom error response
+    if (error.message.includes("rate limit")) {
+      return new Response("Too many requests. Please try again later.", {
+        status: 429,
+        headers: { "Retry-After": "60" }
+      });
+    }
+
+    if (error.message.includes("authentication")) {
+      return new Response("Authentication failed", { status: 401 });
+    }
+
+    // Generic error response
+    return new Response("Chat service temporarily unavailable", {
+      status: 503,
+      headers: { "Content-Type": "text/plain" }
+    });
+  }
+});
+```
+
+### Request Validation
+
+```ts
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+  validateRequest: async (request) => {
+    // Check authentication
+    const authHeader = request.headers.get("Authorization");
+    if (!authHeader) {
+      return false;
+    }
+
+    // Validate API key or JWT token
+    const isValid = await validateAuthToken(authHeader);
+    return isValid;
+  }
+});
+```
+
+## Request Processing
+
+The handler automatically processes incoming requests and extracts:
+
+### Standard Fields
+```ts
+interface ChatRequest {
+  messages: UIMessage[];
+  systemPrompt?: string;           // Original system prompt (optional)
+  enrichedSystemPrompt: string;    // Auto-generated enhanced prompt
+  tools?: Record<string, ToolDefinition>;
+  context?: ContextItem[];
+  focus?: FocusItem[];
+  selectedModelId?: string;
+  chainOfThoughtEnabled?: boolean;
+  mcpEnabled?: boolean;
+}
+```
+
+### System Prompt Enrichment
+
+The handler automatically prefers `enrichedSystemPrompt` over `systemPrompt`. The enriched prompt includes:
+
+1. **Preamble**: Standard introduction about AI capabilities
+2. **Tools Section**: Lists available tools (if any)
+3. **Context Section**: Current context items (if any)
+4. **Focus Section**: Focused items (if any)
+5. **Original Prompt**: Your custom system prompt (if provided)
+
+Example enriched prompt:
+```
+You are an AI assistant running in an enhanced environment with the following capabilities:
+
+Available tools:
+- increment_counter: Increment a counter by a specified amount
+- fetch_weather: Get current weather for a location
+
+Current context:
+- User Profile: {"name": "Alice", "role": "admin", "plan": "pro"}
+- App Settings: {"theme": "dark", "language": "en"}
+
+User is currently focusing on:
+- Project Documentation: Development guidelines and API references
+
+---
+You are a helpful assistant specializing in software development.
+```
+
+## Response Streaming
+
+The handler returns streaming responses using the Vercel AI SDK:
+
+```ts
+// Automatic conversion to UIMessage stream
+return result.toUIMessageStreamResponse();
+```
+
+This enables real-time streaming of:
+- Text content
+- Tool calls and results
+- Reasoning blocks (chain of thought)
+- Error messages
+
+## Tool Integration
+
+### Frontend Tools
+Frontend tools registered with `useAIFrontendTool` are automatically included:
+
+```tsx
+// Frontend
+useAIFrontendTool({
+  name: "increment_counter",
+  description: "Increment a counter",
+  parameters: z.object({
+    amount: z.number().default(1)
+  }),
+  execute: async ({ amount }) => {
+    setCounter(prev => prev + amount);
+    return { newValue: counter + amount };
+  }
+});
+```
+
+```ts
+// Backend - tools are automatically available
+const handler = createAIChatHandler({
+  model: openai("gpt-4"), // Tools are automatically included
+});
+```
+
+### MCP Server Tools
+MCP (Model Context Protocol) server tools are also automatically integrated when `mcpEnabled: true`.
+
+## Context and Focus Integration
+
+### Context Items
+Context from `useAIContext` is automatically included:
+
+```tsx
+// Frontend
+useAIContext({
+  description: "User Profile",
+  value: { name: "Alice", role: "admin" },
+  priority: 100
+});
+```
+
+### Focus Items
+Focus items from `useAIFocus` are automatically included:
+
+```tsx
+// Frontend
+const { setFocus } = useAIFocus();
+setFocus("doc-1", {
+  id: "doc-1",
+  label: "API Documentation",
+  description: "REST API endpoints and authentication",
+  data: { type: "documentation", url: "/docs/api" }
+});
+```
+
+## Model Selection
+
+Support dynamic model switching:
+
+```ts
+const handler = createAIChatHandler({
+  model: (selectedModelId: string) => {
+    switch (selectedModelId) {
+      case "gpt-4":
+        return openai("gpt-4");
+      case "gpt-3.5-turbo":
+        return openai("gpt-3.5-turbo");
+      case "claude-3-sonnet":
+        return anthropic("claude-3-sonnet-20240229");
+      default:
+        return openai("gpt-4"); // fallback
+    }
+  }
+});
+```
+
+## Error Handling
+
+The handler includes automatic error handling for:
+
+| Error Type | Status Code | Description |
+|------------|-------------|-------------|
+| Invalid Request | 400 | Malformed request body |
+| Authentication | 401 | Missing or invalid auth |
+| Rate Limit | 429 | Too many requests |
+| Model Error | 500 | AI model error |
+| Network Timeout | 503 | Service unavailable |
+
+## Performance Considerations
+
+### Streaming Optimization
+```ts
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+  streamOptions: {
+    temperature: 0.7,
+    maxTokens: 1000, // Limit response length
+    stream: true,    // Enable streaming
+  }
+});
+```
+
+### Caching
+```ts
+// Add caching for expensive operations
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+  onSystemPrompt: (enrichedPrompt, originalPrompt, context) => {
+    const cacheKey = hashPrompt(enrichedPrompt, context);
+    return getCachedPrompt(cacheKey) || enrichedPrompt;
+  }
+});
+```
+
+## Environment Variables
+
+Required environment variables:
+
+```bash
+# OpenAI
+OPENAI_API_KEY=sk-...
+
+# Azure OpenAI
+AZURE_RESOURCE_NAME=your-resource
+AZURE_API_KEY=your-key
+AZURE_API_VERSION=2024-02-15-preview
+AZURE_DEPLOYMENT_ID=gpt-4
+
+# Anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+## Complete Examples
+
+### Production-Ready Handler
+
+```ts
+// app/api/chat/route.ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+import { validateApiKey, logUsage, rateLimitCheck } from "../../../lib/auth";
+
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+
+  streamOptions: {
+    temperature: 0.7,
+    maxTokens: 2000,
+  },
+
+  validateRequest: async (request) => {
+    const apiKey = request.headers.get("x-api-key");
+    return apiKey && await validateApiKey(apiKey);
+  },
+
+  onSystemPrompt: (enrichedPrompt, originalPrompt, context) => {
+    // Add organization-specific guidelines
+    return `${enrichedPrompt}
+
+Company Guidelines:
+- Follow our brand voice and tone
+- Prioritize data privacy and security
+- Provide accurate technical information
+- Escalate complex issues to human support`;
+  },
+
+  onToolCall: async (toolCall, context) => {
+    // Log tool usage for billing/analytics
+    await logUsage({
+      userId: context.userId,
+      toolName: toolCall.name,
+      timestamp: new Date(),
+    });
+
+    // Check rate limits per tool
+    const allowed = await rateLimitCheck(context.userId, toolCall.name);
+    if (!allowed) {
+      throw new Error("Rate limit exceeded for this tool");
+    }
+
+    return toolCall;
+  },
+
+  onError: async (error, context) => {
+    // Log errors to monitoring service
+    console.error("Chat error:", {
+      error: error.message,
+      userId: context.userId,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Return user-friendly error messages
+    if (error.message.includes("rate limit")) {
+      return new Response("Too many requests. Please wait a moment and try again.", {
+        status: 429,
+        headers: { "Retry-After": "60" }
+      });
+    }
+
+    return new Response("I'm temporarily unavailable. Please try again in a moment.", {
+      status: 503
+    });
+  }
+});
+
+export { handler as POST };
+```
+
+### Multi-Model Handler
+
+```ts
+// app/api/chat/route.ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+import { anthropic } from "@ai-sdk/anthropic";
+
+const handler = createAIChatHandler({
+  model: (selectedModelId: string) => {
+    switch (selectedModelId) {
+      case "gpt-4o":
+        return openai("gpt-4o");
+      case "gpt-4":
+        return openai("gpt-4");
+      case "gpt-3.5-turbo":
+        return openai("gpt-3.5-turbo");
+      case "claude-3-opus":
+        return anthropic("claude-3-opus-20240229");
+      case "claude-3-sonnet":
+        return anthropic("claude-3-sonnet-20240229");
+      default:
+        return openai("gpt-4o"); // Default model
+    }
+  },
+
+  streamOptions: {
+    temperature: 0.7,
+    maxTokens: 2000,
+  },
+
+  onSystemPrompt: (enrichedPrompt, originalPrompt, context) => {
+    // Add model-specific instructions
+    const modelId = context.selectedModelId || "gpt-4o";
+
+    if (modelId.startsWith("claude")) {
+      return `${enrichedPrompt}\n\nNote: You are Claude, an AI assistant created by Anthropic.`;
+    }
+
+    return enrichedPrompt;
+  }
+});
+
+export { handler as POST };
+```
+
+## Best Practices
+
+1. **Always validate requests** in production environments
+2. **Log tool usage** for analytics and billing
+3. **Implement rate limiting** to prevent abuse
+4. **Use environment variables** for API keys
+5. **Handle errors gracefully** with user-friendly messages
+6. **Monitor performance** and optimize as needed
+7. **Cache expensive operations** when possible
+8. **Use HTTPS** in production
+9. **Validate tool permissions** based on user roles
+10. **Log errors** to monitoring services
+
+## See Also
+
+- [Server Templates Overview](/api/server-templates)
+- [useAIChat Hook](/api/hooks/use-ai-chat)
+- [Basic Chat Guide](/chat/basic-chat)
+- [Frontend Tools](/api/hooks/use-ai-frontend-tool)

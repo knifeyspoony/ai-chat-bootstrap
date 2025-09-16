@@ -1,4 +1,3 @@
-import type { UIMessage } from "ai";
 import { GripVerticalIcon, MessageCircleIcon, XIcon } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -6,21 +5,9 @@ import {
   type ChatContainerProps,
 } from "../../components/chat/chat-container";
 import { Button } from "../../components/ui/button";
-import { useAIChat } from "../../hooks";
 import { cn } from "../../utils";
 
 export interface ChatPopoutProps extends ChatContainerProps {
-  // If no chat is provided via ChatContainerProps, the popout can create one
-  chatOptions?: {
-    api?: string;
-    systemPrompt?: string;
-    onToolCall?: (toolCall: unknown) => void;
-    initialMessages?: UIMessage[];
-  };
-
-  // Convenience callback that receives the raw input text when submitting
-  onSubmit?: (input: string) => void;
-
   // Popout shell (layout, sizing, positioning)
   popout?: {
     isOpen?: boolean;
@@ -33,6 +20,7 @@ export interface ChatPopoutProps extends ChatContainerProps {
     height?: string | number;
     className?: string; // outer fixed panel
     contentClassName?: string; // inner content wrapper
+    permanent?: boolean;
   };
 
   // Toggle button
@@ -48,15 +36,14 @@ export interface ChatPopoutProps extends ChatContainerProps {
 
 export function ChatPopout(props: ChatPopoutProps) {
   const {
-    chat: providedChat,
-    chatOptions,
-    onSubmit,
+    chat,
     header,
     ui,
-    inputProps,
     suggestions,
     commands,
-    state,
+    threads,
+    assistantActions,
+    assistantLatestActions,
     popout,
     button,
   } = props;
@@ -72,6 +59,7 @@ export function ChatPopout(props: ChatPopoutProps) {
   const height = popout?.height ?? "100%";
   const popoutClassName = popout?.className;
   const contentClassName = popout?.contentClassName;
+  const isPermanent = popout?.permanent ?? false;
 
   // Button config with defaults
   const showToggleButton = button?.show ?? true;
@@ -89,63 +77,17 @@ export function ChatPopout(props: ChatPopoutProps) {
   const [width, setWidth] = useState(defaultWidth);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Manage our own input value so we can provide onSubmit(input: string)
-  const [input, setInput] = useState("");
-
-  // Always initialize an internal chat hook (safe, side-effect free until used)
-  const generatedChat = useAIChat({
-    systemPrompt: chatOptions?.systemPrompt,
-    api: chatOptions?.api,
-    onToolCall: chatOptions?.onToolCall,
-    initialMessages: chatOptions?.initialMessages,
-    onFinish: () => {
-      // Trigger suggestions refresh when assistant finishes - with debouncing
-      if (suggestions?.enabled && triggerSuggestionsRef.current) {
-        const now = Date.now();
-        if (now - lastSuggestionCallTime.current > 100) {
-          lastSuggestionCallTime.current = now;
-          triggerSuggestionsRef.current();
-        }
-      }
-    },
-  });
-
-  // Use provided chat if available; otherwise only use generatedChat when chatOptions were passed
-  const chat = providedChat ?? (chatOptions ? generatedChat : undefined);
-
-  // Store suggestions fetch trigger
-  const triggerSuggestionsRef = useRef<(() => void) | null>(null);
-  const lastSuggestionCallTime = useRef<number>(0);
 
   // Refs for resizing
   const popoutRef = useRef<HTMLDivElement>(null);
   const startXRef = useRef<number>(0);
   const startWidthRef = useRef<number>(0);
 
-  const effectiveIsOpen = isOpen;
-
-  const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      const text = (input ?? "").toString();
-      if (!text.trim()) return;
-      chat?.sendMessageWithContext(text);
-      setInput("");
-      onSubmit?.(text);
-      // Also call any parent-provided inputProps.onSubmit
-      inputProps?.onSubmit?.(e);
-    },
-    [chat, input, onSubmit, inputProps]
-  );
-
-  // Resolve input handlers/values once and reuse in both modes
-  const resolvedValue = inputProps?.value ?? input;
-  const resolvedOnChange = inputProps?.onChange ?? setInput;
-  const resolvedOnSubmit = inputProps?.onSubmit ?? (chat ? handleSubmit : undefined);
+  const effectiveIsOpen = isPermanent ? true : isOpen;
 
   // Reusable toggle button element (used in both modes)
   const ToggleButton =
-    showToggleButton && !effectiveIsOpen ? (
+    showToggleButton && !isPermanent && !effectiveIsOpen ? (
       <Button
         onClick={() => setIsOpen(true)}
         className={cn(
@@ -163,14 +105,10 @@ export function ChatPopout(props: ChatPopoutProps) {
     ) : null;
 
   // Helper to build shared ChatContainer props with minimal duplication
-  const getChatContainerProps = (includeContentClassInUI: boolean): ChatContainerProps => ({
+  const getChatContainerProps = (
+    includeContentClassInUI: boolean
+  ): ChatContainerProps => ({
     chat,
-    inputProps: {
-      value: resolvedValue,
-      onChange: resolvedOnChange,
-      onSubmit: resolvedOnSubmit,
-      onAttach: inputProps?.onAttach,
-    },
     header: {
       ...header,
       actions: (
@@ -191,26 +129,23 @@ export function ChatPopout(props: ChatPopoutProps) {
       placeholder: ui?.placeholder,
       emptyState: ui?.emptyState,
       classes: ui?.classes,
-      className: cn("h-full", ui?.className, includeContentClassInUI ? contentClassName : undefined),
+      className: cn(
+        "h-full",
+        ui?.className,
+        includeContentClassInUI ? contentClassName : undefined
+      ),
     },
     suggestions: {
       enabled: suggestions?.enabled,
       prompt: suggestions?.prompt,
       count: suggestions?.count,
-      onAssistantFinish: (triggerFetch) => {
-        triggerSuggestionsRef.current = triggerFetch;
-      },
-      onSendMessage: (message: string) => {
-        if (chat) chat.sendMessageWithContext(message);
-        else suggestions?.onSendMessage?.(message);
-      },
     },
     commands: {
       enabled: commands?.enabled,
-      onExecute: commands?.onExecute,
-      onAICommandExecute: commands?.onAICommandExecute,
     },
-    state,
+    threads,
+    assistantActions,
+    assistantLatestActions,
   });
 
   // Handle resize drag

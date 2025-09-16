@@ -1,21 +1,30 @@
 "use client";
 
+import { useEphemeralChatThreads } from "@/hooks/use-ephemeral-chat-threads";
 import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
-import { useState } from "react";
+
+const DEMO_MODELS = [
+  { id: "gpt-4o", label: "GPT-4o" },
+  { id: "gpt-4.1", label: "GPT-4.1" },
+  { id: "gpt-5", label: "GPT-5" },
+];
 
 export default function BasicChatPage() {
+  useEphemeralChatThreads();
+
   // Optional: keep a scope key to partition threads in this demo route
   const scopeKey = "basic-demo";
-  const [threadId, setThreadId] = useState<string | undefined>(undefined);
 
   const chat = useAIChat({
     api: "/api/chat",
     systemPrompt:
       "You are a helpful assistant. Answer as concisely as possible.",
-    threadId,
     scopeKey,
     autoCreateThread: true,
     threadTitleApi: "/api/thread-title",
+    enableChainOfThought: true,
+    models: DEMO_MODELS,
+    model: "gpt-4o",
   });
 
   return (
@@ -28,8 +37,6 @@ export default function BasicChatPage() {
         }}
         threads={{
           enabled: true,
-          scopeKey,
-          onThreadChange: setThreadId,
         }}
       />
     </div>

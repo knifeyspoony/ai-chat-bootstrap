@@ -23,10 +23,13 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 // AI Components from the library
-import { ChatPopout } from "ai-chat-bootstrap";
+import { Action, Actions, ChatPopout, useAIChat } from "ai-chat-bootstrap";
+import type { UIMessage } from "ai-chat-bootstrap";
 
 // Custom hook with all AI logic
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useDemoAI } from "@/hooks/use-demo-ai";
+import { useEphemeralChatThreads } from "@/hooks/use-ephemeral-chat-threads";
 import {
   CalculatorIcon,
   CheckCircle2,
@@ -39,69 +42,25 @@ import {
   Sparkles,
   User as UserIcon,
   Zap,
+  CopyIcon,
+  RefreshCcwIcon,
+  BookOpen,
 } from "lucide-react";
+
+const DEMO_MODELS = [
+  { id: "gpt-4o", label: "GPT-4o" },
+  { id: "gpt-4.1", label: "GPT-4.1" },
+  { id: "gpt-5", label: "GPT-5" },
+];
 
 export default function Home() {
   // Demo state
+  useEphemeralChatThreads();
   const [counter, setCounter] = useState(0);
   const [calculation, setCalculation] = useState<string | null>(null);
   const [selectedSystemPrompt, setSelectedSystemPrompt] =
     useState<string>("default");
   const [chatMode, setChatMode] = useState<"overlay" | "inline">("inline");
-  // theme: light | dark | system | alt
-  const [theme, setTheme] = useState<string>(() => {
-    if (typeof window === "undefined") return "system";
-    try {
-      return localStorage.getItem("acb-theme") || "system";
-    } catch {
-      return "system";
-    }
-  });
-
-  // Theme side effects
-  React.useEffect(() => {
-    try {
-      localStorage.setItem("acb-theme", theme);
-    } catch {}
-    const body = document.body;
-    const rootHtml = document.documentElement;
-    // reset classes first
-    body.classList.remove("demo-alt");
-    rootHtml.classList.remove("dark");
-
-    const applySystem = () => {
-      const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      ).matches;
-      if (prefersDark) rootHtml.classList.add("dark");
-    };
-
-    switch (theme) {
-      case "light":
-        // nothing (ensures no dark class)
-        break;
-      case "dark":
-        rootHtml.classList.add("dark");
-        break;
-      case "alt":
-        // alt builds on dark palette for contrast
-        rootHtml.classList.add("dark");
-        body.classList.add("demo-alt");
-        break;
-      case "system":
-      default:
-        applySystem();
-        break;
-    }
-
-    // listen for system changes if on system
-    if (theme === "system") {
-      const mq = window.matchMedia("(prefers-color-scheme: dark)");
-      const handler = () => applySystem();
-      mq.addEventListener("change", handler);
-      return () => mq.removeEventListener("change", handler);
-    }
-  }, [theme]);
 
   // AI integration - all AI logic is handled by the custom hook
   const {
@@ -111,6 +70,7 @@ export default function Home() {
     getFocus,
     userProfile,
     dbSettings,
+    mcpStatus,
   } = useDemoAI({
     counter,
     setCounter,
@@ -293,6 +253,23 @@ export default function Home() {
       "You are a creative AI assistant. When users interact with the demo, suggest interesting and creative ways to use the tools and features. Be imaginative and inspiring.",
   };
 
+  // Create chat hook with dynamic system prompt
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt:
+      systemPrompts[selectedSystemPrompt as keyof typeof systemPrompts],
+    initialMessages: sampleMessages,
+    enableChainOfThought: true,
+    mcp: {
+      enabled: true,
+    },
+    models: DEMO_MODELS,
+    model: "gpt-4o",
+  });
+
+  const { retryLastMessage } = chat;
+  const isChatLoading = chat.isLoading;
+
   // FocusableCard component
   const FocusableCard = ({
     id,
@@ -359,13 +336,24 @@ export default function Home() {
 
   const pageContent = (
     <>
+      {/* Header */}
+      <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <Sparkles className="h-6 w-6 text-primary" />
+            <h1 className="text-lg font-semibold">AI SDK Chat Demo</h1>
+          </div>
+          <ThemeToggle />
+        </div>
+      </header>
+
       {/* Hero Section */}
-      <div className="text-center mb-16">
+      <div className="text-center mb-16 pt-12">
         <div className="flex items-center justify-center gap-3 mb-4">
-          <Sparkles className="h-8 w-8 text-primary" />
-          <h1 className="text-5xl font-bold text-foreground">
-            AI SDK Chat Demo
-          </h1>
+          <Zap className="h-8 w-8 text-primary" />
+          <h2 className="text-5xl font-bold text-foreground">
+            Interactive Demo
+          </h2>
           <Zap className="h-8 w-8 text-primary" />
         </div>
         <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
@@ -428,21 +416,6 @@ export default function Home() {
               Inline
             </span>
           </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <span className="font-medium">Theme:</span>
-          <Select value={theme} onValueChange={setTheme}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="light">Light</SelectItem>
-              <SelectItem value="dark">Dark</SelectItem>
-              <SelectItem value="system">System</SelectItem>
-              <SelectItem value="alt">Alt</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </div>
 
@@ -559,7 +532,20 @@ export default function Home() {
                   {toolsCount} registered
                 </Badge>
               </div>
+              <div>
+                <span className="font-medium">MCP:</span>
+                <Badge variant="outline" className="ml-2">
+                  {mcpStatus.isLoading
+                    ? "loading"
+                    : `${mcpStatus.tools.length} remote`}
+                </Badge>
+              </div>
             </div>
+            {mcpStatus.error && (
+              <p className="text-xs text-destructive mt-2">
+                MCP tools unavailable: {mcpStatus.error}
+              </p>
+            )}
           </div>
         </FocusableCard>
 
@@ -659,6 +645,103 @@ export default function Home() {
     </>
   );
 
+  const handleSummarizeFocus = React.useCallback(() => {
+    if (isChatLoading) return;
+    const focusText =
+      focusedIds.length > 0
+        ? `The focused widgets are: ${focusedIds.join(", ")}.`
+        : "There are currently no focused widgets.";
+    chat.sendMessageWithContext(
+      `Summarize the current state of the demo for the user and suggest a next step. ${focusText}`
+    );
+  }, [chat, focusedIds, isChatLoading]);
+
+  const handleTourPrompt = React.useCallback(() => {
+    if (isChatLoading) return;
+    chat.sendMessageWithContext(
+      "Give me a quick tour of the available demo tools and how they work together."
+    );
+  }, [chat, isChatLoading]);
+
+  const handleOpenDocs = React.useCallback(() => {
+    window.open(
+      "https://ai-sdk.dev/elements/components/actions",
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }, []);
+
+  const buildSharedAssistantActions = React.useCallback(
+    (message: UIMessage) => {
+      const textParts = message.parts?.filter(
+        (part): part is { type: "text"; text: string } =>
+          part.type === "text" && typeof part.text === "string"
+      );
+      const combinedText = textParts
+        ?.map((part) => part.text.trim())
+        .filter(Boolean)
+        .join("\n\n");
+
+      const handleCopy = () => {
+        if (!combinedText) return;
+        void navigator?.clipboard?.writeText(combinedText);
+      };
+
+      if (!combinedText) {
+        return null;
+      }
+
+      return (
+        <Actions className="justify-start">
+          <Action
+            tooltip="Copy response"
+            label="Copy"
+            onClick={handleCopy}
+            disabled={!combinedText}
+          >
+            <CopyIcon className="h-3 w-3" />
+          </Action>
+        </Actions>
+      );
+    },
+    []
+  );
+
+  const buildLatestAssistantActions = React.useCallback(
+    (_message: UIMessage) => (
+      <Actions className="justify-start">
+        <Action
+          tooltip="Retry response"
+          label="Retry"
+          onClick={() => retryLastMessage?.()}
+          disabled={isChatLoading || !retryLastMessage}
+        >
+          <RefreshCcwIcon className="h-3 w-3" />
+        </Action>
+        <Action
+          tooltip="Summarize focus"
+          label="Summarize"
+          onClick={handleSummarizeFocus}
+          disabled={isChatLoading}
+        >
+          <Focus className="h-3 w-3" />
+        </Action>
+        <Action
+          tooltip="Ask for a tour"
+          label="Tour"
+          onClick={handleTourPrompt}
+          disabled={isChatLoading}
+        >
+          <Sparkles className="h-3 w-3" />
+        </Action>
+        <Action tooltip="Open docs" label="Docs" onClick={handleOpenDocs}>
+          <BookOpen className="h-3 w-3" />
+        </Action>
+      </Actions>
+    ),
+    [isChatLoading, retryLastMessage, handleSummarizeFocus, handleTourPrompt, handleOpenDocs]
+  );
+
   return (
     <div
       className={cn(
@@ -668,7 +751,7 @@ export default function Home() {
     >
       {chatMode === "inline" ? (
         <ScrollArea className="flex-1">
-          <div className="px-4 py-12">{pageContent}</div>
+          <div className="px-4 py-2">{pageContent}</div>
         </ScrollArea>
       ) : (
         <div className="container mx-auto px-4 py-12 max-w-7xl">
@@ -678,11 +761,7 @@ export default function Home() {
 
       {/* Chat Interface */}
       <ChatPopout
-        chatOptions={{
-          systemPrompt:
-            systemPrompts[selectedSystemPrompt as keyof typeof systemPrompts],
-          initialMessages: sampleMessages,
-        }}
+        chat={chat}
         header={{
           title: "AI Assistant",
           subtitle: `${selectedSystemPrompt} mode • ${focusedIds.length} focused • ${chatMode}`,
@@ -704,12 +783,9 @@ export default function Home() {
         }}
         commands={{
           enabled: true,
-          onExecute: (command: string, args?: string) => {
-            console.log(
-              `Executed command: /${command}${args ? ` ${args}` : ""}`
-            );
-          },
         }}
+        assistantActions={buildSharedAssistantActions}
+        assistantLatestActions={buildLatestAssistantActions}
       />
     </div>
   );

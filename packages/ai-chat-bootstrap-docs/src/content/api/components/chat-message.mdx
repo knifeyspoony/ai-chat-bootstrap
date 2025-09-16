@@ -1,15 +1,67 @@
 ---
 title: ChatMessage
-description: Individual message component with support for different message types.
+description: Individual message component with support for different message types including chain of thought reasoning.
 ---
 
 # ChatMessage
 
-Individual message component with support for different message types.
+Individual message component with support for different message types including text, reasoning (chain of thought), tool calls, files, and sources.
+
+## Props
 
 ```tsx
 interface ChatMessageProps {
   message: UIMessage;
   className?: string;
+  useChainOfThought?: boolean;
+  renderAssistantActions?: (message: UIMessage) => React.ReactNode;
+  renderAssistantLatestActions?: (message: UIMessage) => React.ReactNode;
+  threadId?: string;
 }
 ```
+
+## Usage
+
+```tsx
+import { ChatMessage } from "ai-chat-bootstrap";
+
+const message: UIMessage = {
+  id: "1",
+  role: "assistant",
+  parts: [
+    {
+      type: "reasoning",
+      text: "Let me think about this step by step..."
+    },
+    {
+      type: "text",
+      text: "Based on my analysis, I believe the answer is..."
+    }
+  ]
+};
+
+<ChatMessage
+  message={message}
+  useChainOfThought={true}
+  renderAssistantActions={(msg) => (
+    <button onClick={() => copyMessage(msg)}>Copy</button>
+  )}
+/>
+```
+
+## Supported Message Parts
+
+- **Text**: Regular text content
+- **Reasoning**: Chain of thought reasoning (when `useChainOfThought` is enabled)
+- **Tool Calls**: Function invocation display
+- **Files**: File attachments with preview
+- **Sources**: Referenced URLs and documents
+- **Code Blocks**: Syntax-highlighted code with copy functionality
+
+## Features
+
+- **Chain of Thought**: Automatic reasoning block display when enabled
+- **Assistant Actions**: Custom controls under assistant messages
+- **Role-based Styling**: Different styling for user, assistant, and system messages
+- **Markdown Rendering**: Rich text formatting with syntax highlighting
+- **Streaming Support**: Real-time message part rendering

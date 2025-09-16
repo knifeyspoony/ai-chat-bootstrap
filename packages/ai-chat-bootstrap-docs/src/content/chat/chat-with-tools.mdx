@@ -139,9 +139,9 @@ export function ChatWithTools() {
 
 The backend automatically receives registered tools and can execute them:
 
-```tsx
+```ts
 import { createAzure } from "@ai-sdk/azure";
-import { convertToModelMessages, streamText } from "ai";
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
 
 const azure = createAzure({
   resourceName: process.env.AZURE_RESOURCE_NAME!,
@@ -151,20 +151,9 @@ const azure = createAzure({
 
 const model = azure(process.env.AZURE_DEPLOYMENT_ID!);
 
-export async function POST(req: Request) {
-  const { messages, enrichedSystemPrompt, tools } = await req.json();
-
-  const result = await streamText({
-    model,
-    messages: [
-      { role: "system", content: enrichedSystemPrompt },
-      ...convertToModelMessages(messages),
-    ],
-    tools,
-  });
-
-  return result.toUIMessageStreamResponse();
-}
+export const POST = createAIChatHandler({
+  model,
+});
 ```
 
 > Note: `useAIChat` automatically sends `enrichedSystemPrompt` with a standardized preamble plus conditional Tools / Context / Focus sections, then appends your original `systemPrompt` (if any). Do not rebuild those sections on the server to avoid duplication.

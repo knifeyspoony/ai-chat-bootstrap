@@ -1,0 +1,216 @@
+---
+title: Server Templates
+description: Pre-built server handlers that simplify backend API route implementation for chat, suggestions, and MCP tools.
+---
+
+# Server Templates
+
+Server templates provide pre-built handlers that simplify creating backend API routes for your AI chat application. Instead of manually implementing streaming, tool handling, and context processing, you can use these templates to get started quickly.
+
+## Available Templates
+
+| Template | Purpose | Import |
+|----------|---------|---------|
+| [createAIChatHandler](/api/server-templates/create-ai-chat-handler) | Main chat API route | `ai-chat-bootstrap/server` |
+| [createSuggestionsHandler](/api/server-templates/create-suggestions-handler) | Generate contextual suggestions | `ai-chat-bootstrap/server` |
+| [createThreadTitleHandler](/api/server-templates/create-thread-title-handler) | Auto-generate thread titles | `ai-chat-bootstrap/server` |
+| [createMcpToolsHandler](/api/server-templates/create-mcp-tools-handler) | MCP server tool integration | `ai-chat-bootstrap/server` |
+
+## Quick Start
+
+### Basic Chat Handler
+
+```ts
+// app/api/chat/route.ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+  streamOptions: { temperature: 0.7 },
+});
+
+export { handler as POST };
+```
+
+### With Azure OpenAI
+
+```ts
+// app/api/chat/route.ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { createAzure } from "@ai-sdk/azure";
+
+const azure = createAzure({
+  resourceName: process.env.AZURE_RESOURCE_NAME!,
+  apiKey: process.env.AZURE_API_KEY!,
+});
+
+const handler = createAIChatHandler({
+  model: azure("gpt-4"),
+  streamOptions: { temperature: 0.7 },
+});
+
+export { handler as POST };
+```
+
+## What Server Templates Handle
+
+Server templates automatically handle:
+
+### Request Processing
+- **System Prompt Enrichment**: Prefer `enrichedSystemPrompt` over raw `systemPrompt`
+- **Tool Integration**: Merge frontend tools and MCP server tools
+- **Context Processing**: Include context items from `useAIContext`
+- **Focus Items**: Include focused items from `useAIFocus`
+
+### Response Streaming
+- **Real-time Streaming**: Stream responses back to the frontend
+- **Tool Call Handling**: Execute tools and stream results
+- **Error Handling**: Graceful error responses
+- **Format Conversion**: Convert between AI SDK and UI formats
+
+### Advanced Features
+- **Model Selection**: Support dynamic model switching
+- **Chain of Thought**: Handle reasoning blocks
+- **File Attachments**: Process file uploads
+- **Thread Management**: Handle thread persistence
+
+## System Prompt Enrichment
+
+All templates automatically use the `enrichedSystemPrompt` from the frontend, which includes:
+
+```
+You are an AI assistant running in an enhanced environment with the following capabilities:
+
+[Tools section - if tools are available]
+Available tools:
+- tool_name: Tool description
+
+[Context section - if context items exist]
+Current context:
+- Description: Context data
+
+[Focus section - if items are focused]
+User is currently focusing on:
+- Item: Focus data
+
+[Original system prompt - if provided]
+---
+Your original system prompt here
+```
+
+This structure ensures the AI has full awareness of available capabilities without you needing to manually construct prompts.
+
+## Custom Configuration
+
+You can customize any template:
+
+```ts
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+  streamOptions: {
+    temperature: 0.7,
+    maxTokens: 1000,
+  },
+
+  // Custom system prompt processing
+  onSystemPrompt: (enrichedPrompt, originalPrompt, context) => {
+    return `${enrichedPrompt}\n\nAdditional instructions: Be concise.`;
+  },
+
+  // Custom tool processing
+  onToolCall: (toolCall, context) => {
+    console.log(`Tool called: ${toolCall.name}`);
+    return toolCall;
+  },
+
+  // Custom error handling
+  onError: (error, context) => {
+    console.error("Chat error:", error);
+    return new Response("Chat service temporarily unavailable", { status: 503 });
+  }
+});
+```
+
+## Environment Variables
+
+Common environment variables used by templates:
+
+```bash
+# OpenAI
+OPENAI_API_KEY=your_openai_key
+
+# Azure OpenAI
+AZURE_RESOURCE_NAME=your_azure_resource
+AZURE_API_KEY=your_azure_key
+AZURE_API_VERSION=2024-02-15-preview
+AZURE_DEPLOYMENT_ID=your_deployment_id
+
+# MCP Servers (if using)
+MCP_SERVER_URLS=http://localhost:3001,http://localhost:3002
+```
+
+## Error Handling
+
+Templates include built-in error handling:
+
+```ts
+// Automatic error responses for:
+// - Invalid requests (400)
+// - Authentication failures (401)
+// - Rate limits (429)
+// - Model errors (500)
+// - Network timeouts (503)
+```
+
+## Best Practices
+
+1. **Environment Variables**: Store API keys and configuration in environment variables
+2. **Error Monitoring**: Add logging and monitoring to track API usage
+3. **Rate Limiting**: Implement rate limiting for production deployments
+4. **Caching**: Consider caching responses for repeated queries
+5. **Security**: Validate inputs and sanitize responses
+6. **Performance**: Monitor response times and optimize as needed
+
+## Migration from Manual Implementation
+
+If you have existing manual API routes, you can migrate to templates:
+
+### Before (Manual)
+```ts
+export async function POST(req: NextRequest) {
+  const { messages, systemPrompt, tools } = await req.json();
+
+  const result = streamText({
+    model: openai("gpt-4"),
+    system: systemPrompt,
+    messages: convertToCoreMessages(messages),
+    tools,
+  });
+
+  return result.toUIMessageStreamResponse();
+}
+```
+
+### After (Template)
+```ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+export const POST = createAIChatHandler({
+  model: openai("gpt-4"),
+});
+```
+
+The template automatically handles:
+- System prompt enrichment
+- Tool integration
+- Context processing
+- Error handling
+- Response formatting
+
+## See Also
+
+- [createAIChatHandler](/api/server-templates/create-ai-chat-handler) - Main chat handler
+- [Basic Chat Guide](/chat/basic-chat) - Frontend implementation
+- [useAIChat Hook](/api/hooks/use-ai-chat) - Frontend hook reference

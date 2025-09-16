@@ -1,0 +1,567 @@
+---
+title: createSuggestionsHandler
+description: Pre-built handler for generating contextual suggestions based on conversation history and available tools.
+---
+
+# createSuggestionsHandler
+
+Creates an API route handler that generates contextual suggestions based on the current conversation, available tools, and user context. Suggestions help users discover functionality and continue conversations naturally.
+
+## Import
+
+```ts
+import { createSuggestionsHandler } from "ai-chat-bootstrap/server";
+```
+
+## Syntax
+
+```ts
+function createSuggestionsHandler(options: SuggestionsHandlerOptions): RequestHandler
+```
+
+## Parameters
+
+```ts
+interface SuggestionsHandlerOptions {
+  // Required
+  model: LanguageModel;
+
+  // Optional configuration
+  maxSuggestions?: number;
+  suggestionTypes?: SuggestionType[];
+  onSuggestionGenerated?: (suggestion: Suggestion, context: RequestContext) => Suggestion | Promise<Suggestion>;
+  onError?: (error: Error, context: RequestContext) => Response | Promise<Response>;
+  validateRequest?: (request: Request) => boolean | Promise<boolean>;
+}
+
+interface SuggestionType {
+  type: "question" | "action" | "exploration" | "follow-up";
+  weight?: number;
+  enabled?: boolean;
+}
+```
+
+## Basic Usage
+
+### Simple Setup
+
+```ts
+// app/api/suggestions/route.ts
+import { createSuggestionsHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createSuggestionsHandler({
+  model: openai("gpt-4o-mini"), // Use faster model for suggestions
+  maxSuggestions: 3,
+});
+
+export { handler as POST };
+```
+
+### With Custom Configuration
+
+```ts
+// app/api/suggestions/route.ts
+import { createSuggestionsHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createSuggestionsHandler({
+  model: openai("gpt-4o-mini"),
+  maxSuggestions: 4,
+  suggestionTypes: [
+    { type: "question", weight: 1.0, enabled: true },
+    { type: "action", weight: 0.8, enabled: true },
+    { type: "exploration", weight: 0.6, enabled: true },
+    { type: "follow-up", weight: 0.4, enabled: false },
+  ],
+});
+
+export { handler as POST };
+```
+
+## Frontend Integration
+
+Enable suggestions in your chat component:
+
+```tsx
+// Frontend component
+import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+
+function ChatWithSuggestions() {
+  const chat = useAIChat({
+    api: "/api/chat",
+    systemPrompt: "You are a helpful assistant.",
+  });
+
+  return (
+    <ChatContainer
+      chat={chat}
+      suggestions={{
+        enabled: true,
+        api: "/api/suggestions",
+        count: 3,
+        showOnEmpty: true,
+        showAfterResponse: true,
+      }}
+    />
+  );
+}
+```
+
+## Request Processing
+
+The handler processes requests containing:
+
+```ts
+interface SuggestionsRequest {
+  messages: UIMessage[];
+  context?: ContextItem[];
+  focus?: FocusItem[];
+  tools?: Record<string, ToolDefinition>;
+  maxSuggestions?: number;
+  suggestionTypes?: SuggestionType[];
+}
+```
+
+## Response Format
+
+The handler returns structured suggestions:
+
+```ts
+interface SuggestionsResponse {
+  suggestions: Suggestion[];
+  generated_at: string;
+  context_hash: string;
+}
+
+interface Suggestion {
+  id: string;
+  type: "question" | "action" | "exploration" | "follow-up";
+  text: string;
+  confidence: number;
+  reasoning?: string;
+}
+```
+
+## Suggestion Types
+
+### Question Suggestions
+Help users ask relevant questions:
+
+```json
+{
+  "id": "q1",
+  "type": "question",
+  "text": "What are the main features of this API?",
+  "confidence": 0.9,
+  "reasoning": "User seems interested in API capabilities"
+}
+```
+
+### Action Suggestions
+Suggest actions users can take:
+
+```json
+{
+  "id": "a1",
+  "type": "action",
+  "text": "Create a chart with this data",
+  "confidence": 0.8,
+  "reasoning": "Data visualization tool is available"
+}
+```
+
+### Exploration Suggestions
+Encourage deeper exploration:
+
+```json
+{
+  "id": "e1",
+  "type": "exploration",
+  "text": "Explore advanced configuration options",
+  "confidence": 0.7,
+  "reasoning": "User completed basic setup"
+}
+```
+
+### Follow-up Suggestions
+Continue the current topic:
+
+```json
+{
+  "id": "f1",
+  "type": "follow-up",
+  "text": "Can you show me an example?",
+  "confidence": 0.6,
+  "reasoning": "Following up on explanation"
+}
+```
+
+## Advanced Configuration
+
+### Custom Suggestion Processing
+
+```ts
+const handler = createSuggestionsHandler({
+  model: openai("gpt-4o-mini"),
+  maxSuggestions: 3,
+
+  onSuggestionGenerated: async (suggestion, context) => {
+    // Filter inappropriate suggestions
+    if (containsInappropriateContent(suggestion.text)) {
+      return null; // Exclude this suggestion
+    }
+
+    // Add custom metadata
+    return {
+      ...suggestion,
+      metadata: {
+        userId: context.userId,
+        timestamp: new Date().toISOString(),
+        source: "ai-generated",
+      }
+    };
+  }
+});
+```
+
+### Request Validation
+
+```ts
+const handler = createSuggestionsHandler({
+  model: openai("gpt-4o-mini"),
+
+  validateRequest: async (request) => {
+    // Check if user has suggestion permissions
+    const userId = getUserIdFromRequest(request);
+    return await hasFeatureAccess(userId, "suggestions");
+  }
+});
+```
+
+### Error Handling
+
+```ts
+const handler = createSuggestionsHandler({
+  model: openai("gpt-4o-mini"),
+
+  onError: async (error, context) => {
+    console.error("Suggestions error:", error);
+
+    // Return empty suggestions on error
+    return new Response(JSON.stringify({
+      suggestions: [],
+      generated_at: new Date().toISOString(),
+      error: "Unable to generate suggestions at this time"
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  }
+});
+```
+
+## Context-Aware Suggestions
+
+The handler automatically considers:
+
+### Conversation History
+Recent messages inform suggestion relevance:
+
+```ts
+// Considers last 5 messages by default
+// Suggests based on conversation flow and topics
+```
+
+### Available Tools
+Suggestions include tool-related actions:
+
+```tsx
+// Frontend
+useAIFrontendTool({
+  name: "create_chart",
+  description: "Create data visualizations",
+  // ...
+});
+
+// Suggestions might include:
+// "Create a chart with your data"
+// "Visualize these results"
+```
+
+### User Context
+Context items influence suggestions:
+
+```tsx
+// Frontend
+useAIContext({
+  description: "User Role",
+  value: { role: "admin" },
+  priority: 100
+});
+
+// Admin users might see:
+// "Manage user permissions"
+// "View system analytics"
+```
+
+### Focus Items
+Focused content affects suggestions:
+
+```tsx
+// Frontend
+const { setFocus } = useAIFocus();
+setFocus("doc-1", {
+  label: "API Documentation",
+  description: "REST API guide",
+  data: { type: "documentation" }
+});
+
+// Documentation focus might suggest:
+// "Ask about authentication"
+// "See code examples"
+```
+
+## Performance Optimization
+
+### Use Faster Models
+Suggestions should be fast:
+
+```ts
+const handler = createSuggestionsHandler({
+  model: openai("gpt-4o-mini"), // Faster than gpt-4
+  maxSuggestions: 3, // Fewer suggestions = faster
+});
+```
+
+### Caching
+Cache suggestions for similar contexts:
+
+```ts
+const handler = createSuggestionsHandler({
+  model: openai("gpt-4o-mini"),
+
+  onSuggestionGenerated: async (suggestion, context) => {
+    const cacheKey = generateCacheKey(context);
+    await cacheService.set(cacheKey, suggestion, 300); // 5 min cache
+    return suggestion;
+  }
+});
+```
+
+### Debounced Requests
+Frontend should debounce suggestion requests:
+
+```tsx
+const chat = useAIChat({
+  api: "/api/chat",
+  suggestions: {
+    enabled: true,
+    api: "/api/suggestions",
+    debounceMs: 500, // Wait 500ms after last message
+  }
+});
+```
+
+## Production Examples
+
+### Basic E-commerce Suggestions
+
+```ts
+// app/api/suggestions/route.ts
+import { createSuggestionsHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createSuggestionsHandler({
+  model: openai("gpt-4o-mini"),
+  maxSuggestions: 3,
+
+  suggestionTypes: [
+    { type: "question", weight: 1.0 },
+    { type: "action", weight: 0.9 },
+    { type: "exploration", weight: 0.7 },
+  ],
+
+  onSuggestionGenerated: async (suggestion, context) => {
+    // E-commerce specific filtering
+    const userRole = context.userRole || "customer";
+
+    if (userRole === "customer") {
+      // Filter admin-only suggestions
+      if (suggestion.text.includes("admin") || suggestion.text.includes("manage")) {
+        return null;
+      }
+    }
+
+    return suggestion;
+  }
+});
+
+export { handler as POST };
+```
+
+### Documentation Assistant
+
+```ts
+// app/api/suggestions/route.ts
+import { createSuggestionsHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createSuggestionsHandler({
+  model: openai("gpt-4o-mini"),
+  maxSuggestions: 4,
+
+  onSuggestionGenerated: async (suggestion, context) => {
+    // Documentation-focused suggestions
+    const hasCodeContext = context.messages?.some(msg =>
+      msg.parts.some(part =>
+        part.type === 'text' && part.text.includes('```')
+      )
+    );
+
+    if (hasCodeContext && suggestion.type === "action") {
+      // Prioritize code-related actions
+      suggestion.confidence += 0.1;
+    }
+
+    return suggestion;
+  }
+});
+
+export { handler as POST };
+```
+
+### Multi-tenant SaaS
+
+```ts
+// app/api/suggestions/route.ts
+import { createSuggestionsHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createSuggestionsHandler({
+  model: openai("gpt-4o-mini"),
+
+  validateRequest: async (request) => {
+    const tenantId = request.headers.get("x-tenant-id");
+    const userId = request.headers.get("x-user-id");
+
+    return tenantId && userId && await validateTenantAccess(tenantId, userId);
+  },
+
+  onSuggestionGenerated: async (suggestion, context) => {
+    const tenantId = context.tenantId;
+    const tenantSettings = await getTenantSettings(tenantId);
+
+    // Filter suggestions based on tenant features
+    if (suggestion.text.includes("analytics") && !tenantSettings.analyticsEnabled) {
+      return null;
+    }
+
+    if (suggestion.text.includes("export") && !tenantSettings.exportEnabled) {
+      return null;
+    }
+
+    return suggestion;
+  }
+});
+
+export { handler as POST };
+```
+
+## Best Practices
+
+### Performance
+1. **Use fast models** like `gpt-4o-mini` for suggestions
+2. **Limit suggestion count** to 3-4 for quick responses
+3. **Cache suggestions** for similar contexts
+4. **Debounce requests** on the frontend
+
+### Quality
+1. **Filter inappropriate content** in suggestion processing
+2. **Consider user permissions** and available features
+3. **Weight suggestion types** based on your use case
+4. **Validate suggestions** before returning them
+
+### User Experience
+1. **Show suggestions contextually** based on conversation state
+2. **Make suggestions actionable** and specific
+3. **Avoid repetitive suggestions** in the same session
+4. **Provide clear suggestion categories** (questions, actions, etc.)
+
+### Security
+1. **Validate requests** in production environments
+2. **Filter sensitive suggestions** based on user roles
+3. **Log suggestion usage** for analytics and abuse detection
+4. **Rate limit suggestion requests** to prevent abuse
+
+## Common Patterns
+
+### Conditional Suggestions
+
+```ts
+const handler = createSuggestionsHandler({
+  model: openai("gpt-4o-mini"),
+
+  onSuggestionGenerated: async (suggestion, context) => {
+    // Only suggest advanced features to experienced users
+    if (suggestion.text.includes("advanced") && !context.userProfile?.isExperienced) {
+      return null;
+    }
+
+    // Personalize suggestions based on user preferences
+    if (context.userProfile?.preferredActions?.includes(suggestion.type)) {
+      suggestion.confidence += 0.1;
+    }
+
+    return suggestion;
+  }
+});
+```
+
+### Domain-Specific Suggestions
+
+```ts
+// For a code assistance tool
+const handler = createSuggestionsHandler({
+  model: openai("gpt-4o-mini"),
+
+  suggestionTypes: [
+    { type: "question", weight: 0.8 },
+    { type: "action", weight: 1.0 }, // Prioritize actionable suggestions
+    { type: "exploration", weight: 0.6 },
+  ],
+
+  onSuggestionGenerated: async (suggestion, context) => {
+    const hasCodeInConversation = context.messages?.some(msg =>
+      msg.parts.some(part => part.type === 'text' && part.text.includes('```'))
+    );
+
+    if (hasCodeInConversation && suggestion.type === "action") {
+      // Suggest code-related actions
+      const codeActions = [
+        "Explain this code",
+        "Optimize this function",
+        "Add error handling",
+        "Write tests for this code"
+      ];
+
+      if (codeActions.some(action => suggestion.text.includes(action))) {
+        suggestion.confidence += 0.2;
+      }
+    }
+
+    return suggestion;
+  }
+});
+```
+
+## Environment Variables
+
+No additional environment variables required beyond those for the AI model.
+
+## See Also
+
+- [Server Templates Overview](/api/server-templates)
+- [createAIChatHandler](/api/server-templates/create-ai-chat-handler)
+- [ChatContainer Suggestions](/api/components/chat-container#suggestions)
+- [useAIChat Hook](/api/hooks/use-ai-chat)

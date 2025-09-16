@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
 import type { UIMessage } from "ai";
+import React, { useEffect, useMemo, useState } from "react";
 import { CommandDropdown } from "../../components/ui/chat-command";
 import { CommandParameterInfo } from "../../components/ui/command-parameter-info";
 import { useChatStore } from "../../stores/chat";
+import { useChatThreadsStore } from "../../stores/chat-threads";
 import {
   useAIChatCommandsStore,
   type ChatCommand,
@@ -14,9 +15,7 @@ import {
   parseArgsToParams,
 } from "../../utils/command-utils";
 import { ChatInput, type ChatInputProps } from "./chat-input";
-import { useChatThreadsStore } from "../../stores/chat-threads";
 
-// Stable empty array to avoid creating a new reference on each selector call
 const EMPTY_UI_MESSAGES: UIMessage[] = [];
 
 export interface ChatInputWithCommandsProps extends ChatInputProps {
@@ -40,9 +39,11 @@ const ChatInputWithCommandsImpl = ({
   ...props
 }: ChatInputWithCommandsProps) => {
   const setError = useChatStore((state) => state.setError);
+
   // Local draft state for uncontrolled usage
   const [draft, setDraft] = useState("");
-  const isControlled = typeof value === "string" && typeof onChange === "function";
+  const isControlled =
+    typeof value === "string" && typeof onChange === "function";
   const currentValue = isControlled ? (value as string) : draft;
   const updateValue = (next: string) => {
     if (isControlled) {
@@ -71,7 +72,6 @@ const ChatInputWithCommandsImpl = ({
   const executeCommand = useAIChatCommandsStore((s) => s.executeCommand);
   const getCommand = useAIChatCommandsStore((s) => s.getCommand);
 
-  // --- Input history state ---
   // Index into user message history (0..n-1). null when not navigating history.
   const [historyIndex, setHistoryIndex] = useState<number | null>(null);
   // Preserve the user's current draft before history navigation begins.
@@ -103,7 +103,10 @@ const ChatInputWithCommandsImpl = ({
         const content = (m as any).content as any;
         if (typeof content === "string") return content;
         if (Array.isArray(content))
-          return content.map((c) => String(c?.text ?? "")).join(" ").trim();
+          return content
+            .map((c) => String(c?.text ?? ""))
+            .join(" ")
+            .trim();
         return "";
       })
       .filter((t) => t.length > 0);
@@ -164,7 +167,11 @@ const ChatInputWithCommandsImpl = ({
   // Handle keyboard events
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // Only intercept keys when we're actively typing a command (starts with '/')
-    if (showCommands && matchingCommands.length > 0 && currentValue.startsWith("/")) {
+    if (
+      showCommands &&
+      matchingCommands.length > 0 &&
+      currentValue.startsWith("/")
+    ) {
       if (e.key === "Escape") {
         setShowCommands(false);
         setSelectedCommandIndex(0);
@@ -220,7 +227,8 @@ const ChatInputWithCommandsImpl = ({
       const caretStart = el?.selectionStart ?? 0;
       const caretEnd = el?.selectionEnd ?? 0;
       const atStart = caretStart === 0 && caretEnd === 0;
-      const atEnd = caretStart === (currentValue?.length ?? 0) && caretEnd === caretStart;
+      const atEnd =
+        caretStart === (currentValue?.length ?? 0) && caretEnd === caretStart;
 
       if (e.key === "ArrowUp" && atStart && userHistory.length > 0) {
         e.preventDefault();
@@ -332,7 +340,11 @@ const ChatInputWithCommandsImpl = ({
   // Handle form submission - prevent if showing commands
   const handleSubmit = async (e: React.FormEvent) => {
     // Only prevent form submission if we're actively typing a command
-    if (showCommands && matchingCommands.length > 0 && currentValue.startsWith("/")) {
+    if (
+      showCommands &&
+      matchingCommands.length > 0 &&
+      currentValue.startsWith("/")
+    ) {
       e.preventDefault();
       handleCommandSelect(
         matchingCommands[selectedCommandIndex] || matchingCommands[0]

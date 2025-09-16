@@ -1,7 +1,7 @@
 "use client";
 
 import { ChatContainer, type UIMessage, useAIFocus } from "ai-chat-bootstrap";
-import React from "react";
+import { useMockAIChat } from "./shared/useMockAIChat";
 
 // Sample items that can be focused
 const sampleItems = [
@@ -148,11 +148,7 @@ function FocusItemsList() {
 
 export function FocusItemsExample() {
   const { focusedIds, allFocusItems } = useAIFocus();
-
-  // Local mock chat state (pattern like BasicChatExample) ------------------
-  const [messages, setMessages] = React.useState<UIMessage[]>([]);
-  const [input, setInput] = React.useState("");
-  const [isLoading, setIsLoading] = React.useState(false);
+  const mockChat = useMockAIChat();
 
   function buildAssistantReply(userText: string): string {
     if (allFocusItems.length > 0) {
@@ -168,29 +164,32 @@ export function FocusItemsExample() {
     return `You asked: "${userText}". You currently have no focused items. Select some from the panel so I can give more contextual answers.`;
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const trimmed = input.trim();
-    if (!trimmed) return;
+  // Override the sendMessageWithContext to add our custom logic
+  const sendMessageWithContext = (text: string) => {
+    if (!text.trim()) return;
     const userMessage: UIMessage = {
       id: crypto.randomUUID(),
       role: "user",
-      parts: [{ type: "text", text: trimmed }],
+      parts: [{ type: "text", text }],
     };
-    setMessages((m) => [...m, userMessage]);
-    setInput("");
-    setIsLoading(true);
-    const userText = trimmed;
+    mockChat.setMessages((m) => [...m, userMessage]);
+    mockChat.setIsLoading(true);
+
     setTimeout(() => {
       const assistantMessage: UIMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
-        parts: [{ type: "text", text: buildAssistantReply(userText) }],
+        parts: [{ type: "text", text: buildAssistantReply(text) }],
       };
-      setMessages((m) => [...m, assistantMessage]);
-      setIsLoading(false);
+      mockChat.setMessages((m) => [...m, assistantMessage]);
+      mockChat.setIsLoading(false);
     }, 800);
-  }
+  };
+
+  const chat = {
+    ...mockChat,
+    sendMessageWithContext,
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[500px]">
@@ -199,6 +198,7 @@ export function FocusItemsExample() {
       </div>
       <div className="border rounded-lg">
         <ChatContainer
+          chat={chat}
           header={{
             title: "AI Assistant",
             subtitle:
@@ -209,12 +209,6 @@ export function FocusItemsExample() {
                 : "No items focused",
           }}
           ui={{ placeholder: "Ask about your focused items..." }}
-          state={{ messages, isLoading }}
-          inputProps={{
-            value: input,
-            onChange: setInput,
-            onSubmit: handleSubmit,
-          }}
         />
       </div>
     </div>

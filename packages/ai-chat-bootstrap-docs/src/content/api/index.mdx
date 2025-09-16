@@ -72,7 +72,7 @@ Frontend tools execute in the browser and allow the AI to:
   @import "ai-chat-bootstrap/tokens.css";
   @import "ai-chat-bootstrap/ai-chat.css";
   ```
-  Tailwind-native (no ai-chat.css): add preset in tailwind config and include library source in content.
+  Tailwind-native: add preset in tailwind config.
 
 3. **Use the main chat hook**:
    ```tsx
@@ -103,6 +103,25 @@ function MyChat() {
 }
 ```
 
+### With Model Selection & Chain of Thought
+
+```tsx
+import { useAIChat, ChatContainer } from 'ai-chat-bootstrap';
+
+function ChatWithFeatures() {
+  const chat = useAIChat({
+    api: '/api/chat',
+    models: [
+      { id: 'gpt-4', name: 'GPT-4' },
+      { id: 'gpt-3.5-turbo', name: 'GPT-3.5' }
+    ],
+    chainOfThoughtEnabled: true,
+  });
+
+  return <ChatContainer chat={chat} />;
+}
+```
+
 ### With Context
 
 ```tsx
@@ -110,12 +129,12 @@ import { useAIChat, useAIContext } from 'ai-chat-bootstrap';
 
 function ChatWithContext() {
   const [user] = useState({ name: 'Alice', role: 'admin' });
-  
+
   // Share user context with AI
   useAIContext({ description: 'User Profile', value: user });
 
   const chat = useAIChat({ api: '/api/chat' });
-  
+
   return <ChatContainer chat={chat} />;
 }
 ```
@@ -157,25 +176,25 @@ function ChatWithTools() {
 
 ### ChatContainer
 
-Main chat interface component with messages UI and input. Prefer passing the hook result via the `chat` prop.
+Main chat interface component with messages UI and input. Requires the `chat` hook.
 
 ```ts
 type ChatContainerProps = {
-  // Preferred
-  chat?: ReturnType<typeof useAIChat>;
+  // Required
+  chat: ReturnType<typeof useAIChat>;
 
-  // Optional: group overrides when not using `chat`
-  state?: { messages?: UIMessage[]; isLoading?: boolean; status?: ChatStatus };
-  inputProps?: { value?: string; onChange?: (v: string) => void; onSubmit?: (e: FormEvent) => void; onAttach?: () => void };
+  // Optional
   header?: { title?: string; subtitle?: string; avatar?: React.ReactNode; badge?: React.ReactNode; actions?: React.ReactNode; className?: string };
-  ui?: { placeholder?: string; className?: string; classes?: { header?: string; messages?: string; message?: string; input?: string }; emptyState?: React.ReactNode };
-  suggestions?: { enabled?: boolean; prompt?: string; count?: number; api?: string; onAssistantFinish?: (cb: () => void) => void; onSendMessage?: (message: string) => void };
-  commands?: { enabled?: boolean; onExecute?: (commandName: string, args?: string) => void; onAICommandExecute?: (message: string, toolName: string, systemPrompt?: string) => void };
-  threads?: { enabled?: boolean; scopeKey?: string; threadId?: string; onThreadChange?: (id: string) => void };
+  ui?: { placeholder?: string; className?: string; classes?: { header?: string; messages?: string; message?: string; input?: string; assistantActions?: string }; emptyState?: React.ReactNode };
+  suggestions?: { enabled?: boolean; prompt?: string; count?: number };
+  commands?: { enabled?: boolean };
+  threads?: { enabled?: boolean };
+  assistantActions?: React.ReactNode | ((message: UIMessage) => React.ReactNode);
+  assistantLatestActions?: React.ReactNode | ((message: UIMessage) => React.ReactNode);
 };
 ```
 
-Why: Groups keep layout independent from hook wiring and avoid prop soup while still allowing targeted overrides.
+Simplified props - the hook handles all state management.
 
 ### ChatMessage
 
@@ -271,35 +290,47 @@ interface ChatRequestPayload {
 }
 ```
 
-### Example API Route (Next.js)
+### Server Templates
 
-```tsx
-import { createAzure } from '@ai-sdk/azure';
-import { convertToModelMessages, streamText } from 'ai';
+New helper functions make deploying API endpoints easier:
 
-const azure = createAzure({
-  resourceName: process.env.AZURE_RESOURCE_NAME!,
-  apiKey: process.env.AZURE_API_KEY!,
-  apiVersion: process.env.AZURE_API_VERSION ?? 'preview',
+```ts
+// app/api/chat/route.ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createAIChatHandler({
+  model: openai("gpt-4"),
+  streamOptions: { temperature: 0.7 },
 });
 
-const model = azure(process.env.AZURE_DEPLOYMENT_ID!);
-
-export async function POST(req: Request) {
-  const { messages, enrichedSystemPrompt, tools } = await req.json();
-
-  const result = await streamText({
-    model,
-    messages: [
-      { role: 'system', content: enrichedSystemPrompt },
-      ...convertToModelMessages(messages),
-    ],
-    tools,
-  });
-
-  return result.toUIMessageStreamResponse();
-}
+export { handler as POST };
 ```
+
+### Available Handlers
+
+```ts
+import {
+  createAIChatHandler,
+  createSuggestionsHandler,
+  createThreadTitleHandler,
+  createMcpToolsHandler,
+} from "ai-chat-bootstrap/server";
+
+// Main chat streaming
+export const POST = createAIChatHandler({ model });
+
+// AI-generated suggestions
+export const POST = createSuggestionsHandler({ model });
+
+// Auto thread titles
+export const POST = createThreadTitleHandler({ model });
+
+// MCP server tools
+export const POST = createMcpToolsHandler();
+```
+
+Each handler accepts model configuration and error handling options.
 
 ## Best Practices
 

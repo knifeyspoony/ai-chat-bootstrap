@@ -18,6 +18,9 @@
     "jsx": "react-jsx",
     "incremental": true,
     "baseUrl": ".",
+    "paths": {
+      "ai-chat-bootstrap/server": ["./lib/server.ts"]
+    }
   },
   "include": [
     "lib/**/*",

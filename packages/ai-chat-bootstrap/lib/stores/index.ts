@@ -3,5 +3,7 @@ export * from "./chat-threads";
 export * from "./commands";
 export * from "./context";
 export * from "./focus";
+export * from "./models";
+export * from "./mcp";
 export * from "./suggestions";
 export * from "./tools";

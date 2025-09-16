@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Oxanium, Merriweather, Fira_Code } from "next/font/google";
 import React from "react";
 import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -10,6 +11,23 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+// Solar Dusk theme fonts
+const oxanium = Oxanium({
+  variable: "--font-oxanium",
+  subsets: ["latin"],
+});
+
+const merriweather = Merriweather({
+  variable: "--font-merriweather",
+  subsets: ["latin"],
+  weight: ["300", "400", "700", "900"],
+});
+
+const firaCode = Fira_Code({
+  variable: "--font-fira-code",
   subsets: ["latin"],
 });
 
@@ -47,16 +65,18 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        suppressHydrationWarning
-        className={`${geistSans.variable} ${geistMono.variable} antialiased pre-theme`}
+        className={`${geistSans.variable} ${geistMono.variable} ${oxanium.variable} ${merriweather.variable} ${firaCode.variable} antialiased`}
       >
-        <script
-          // Inline script to prevent theme flash. Runs immediately.
-          dangerouslySetInnerHTML={{
-            __html: `(() => {try { const stored = localStorage.getItem('acb-theme') || 'system'; const html = document.documentElement; const body = document.body; const apply = (th) => { html.classList.remove('dark'); body.classList.remove('demo-alt'); if (th === 'dark') { html.classList.add('dark'); } else if (th === 'alt') { html.classList.add('dark'); body.classList.add('demo-alt'); } else if (th === 'system') { if (window.matchMedia('(prefers-color-scheme: dark)').matches) html.classList.add('dark'); } }; apply(stored); body.classList.remove('pre-theme'); if (stored === 'system') { const mq = window.matchMedia('(prefers-color-scheme: dark)'); mq.addEventListener('change', () => apply('system')); } } catch(e) { document.body && document.body.classList.remove('pre-theme'); } })();`,
-          }}
-        />
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+          themes={['light', 'dark', 'system', 'solar-dusk', 'solar-dusk-dark', 'alt']}
+          storageKey="acb-theme"
+        >
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -31,8 +31,6 @@ import {
 
 export interface ChatThreadsButtonProps {
   scopeKey?: string;
-  onSelectThread?: (threadId: string) => void;
-  onCreateThread?: (threadId: string) => void;
   className?: string;
   label?: string;
 }
@@ -50,8 +48,6 @@ function formatTitle(raw?: string) {
 
 export function ChatThreadsButton({
   scopeKey,
-  onSelectThread,
-  onCreateThread,
   className,
   label = "Threads",
 }: ChatThreadsButtonProps) {
@@ -78,11 +74,10 @@ export function ChatThreadsButton({
 
   const handleNew = () => {
     const t = createThread({ scopeKey });
-    onCreateThread?.(t.id);
+    setActiveThread(t.id);
   };
   const handleSelect = (id: string) => {
     setActiveThread(id);
-    onSelectThread?.(id);
   };
   const handleRename = (id: string) => {
     const current = threads.find((t) => t.id === id);
@@ -130,15 +125,10 @@ export function ChatThreadsButton({
         .deleteThread(deleteId)
         .then(() => {
           // If we deleted active, emit selection for new active id
-          if (wasActive) {
-            const nextActive = useChatThreadsStore.getState().activeThreadId;
-            if (nextActive) onSelectThread?.(nextActive);
-          }
+          // Active thread automatically managed by store
         })
         .catch(() => {
-          // On failure, still try to reflect current active
-          const nextActive = useChatThreadsStore.getState().activeThreadId;
-          if (nextActive) onSelectThread?.(nextActive);
+          // Active thread automatically managed by store
         });
     }
     setDeleteId(undefined);

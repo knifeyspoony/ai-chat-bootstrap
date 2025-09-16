@@ -1,13 +1,7 @@
-import { getToolName, type ToolUIPart, type UIMessage } from "ai";
+import { type UIMessage } from "ai";
 import { MessageSquare, UserIcon } from "lucide-react";
-import React, {
-  forwardRef,
-  ReactNode,
-  useImperativeHandle,
-  useMemo,
-} from "react";
+import React, { forwardRef, useImperativeHandle, useMemo } from "react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
-import { CodeBlock } from "../../components/ai-elements/code-block";
 import {
   Conversation,
   ConversationContent,
@@ -19,19 +13,11 @@ import {
   MessageAvatar,
   MessageContent,
 } from "../../components/ai-elements/message";
-import { Reasoning } from "../../components/ai-elements/reasoning";
-import { Response } from "../../components/ai-elements/response";
-import { Source } from "../../components/ai-elements/sources";
-import {
-  Tool,
-  ToolContent,
-  ToolHeader,
-  ToolInput,
-  ToolOutput,
-} from "../../components/ai-elements/tool";
 import { Badge } from "../../components/ui/badge";
-import { AnyFrontendTool, useAIToolsStore } from "../../stores";
+import { useAIToolsStore } from "../../stores";
 import { cn } from "../../utils";
+import { AssistantMessage } from "./assistant-message";
+import { ChatMessagePart } from "./chat-message-part";
 
 export interface ChatMessagesProps {
   messages: UIMessage[];
@@ -41,6 +27,11 @@ export interface ChatMessagesProps {
   className?: string;
   messageClassName?: string;
   emptyState?: React.ReactNode;
+  threadId?: string;
+  useChainOfThought?: boolean; // Feature flag to toggle between old and new UI
+  renderAssistantActions?: (message: UIMessage) => React.ReactNode;
+  renderAssistantLatestActions?: (message: UIMessage) => React.ReactNode;
+  assistantActionsClassName?: string;
 }
 
 export interface ChatMessagesHandle {
@@ -57,6 +48,10 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
       emptyState,
       assistantAvatar = "/acb.png",
       userAvatar,
+      threadId,
+      renderAssistantActions,
+      renderAssistantLatestActions,
+      assistantActionsClassName,
     },
     ref
   ) => {
@@ -86,7 +81,8 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
             (part) =>
               (part.type === "text" && part.text?.trim()) ||
               (part.type === "reasoning" && part.text?.trim()) ||
-              part.type?.startsWith("tool-") ||
+              (part.type?.startsWith("tool-") &&
+                !part.type?.startsWith("tool-acb")) ||
               part.type?.startsWith("data-") ||
               part.type === "file" ||
               part.type === "source-url" ||
@@ -97,6 +93,15 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
         return true;
       });
     }, [messages]);
+
+    const latestAssistantIndex = useMemo(() => {
+      for (let i = filteredMessages.length - 1; i >= 0; i -= 1) {
+        if (filteredMessages[i]?.role === "assistant") {
+          return i;
+        }
+      }
+      return -1;
+    }, [filteredMessages]);
 
     const lastMessage = messages[messages.length - 1];
 
@@ -110,6 +115,29 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                   isLoading &&
                   message === lastMessage &&
                   message.role === "assistant";
+
+                if (message.role === "assistant") {
+                  const sharedActions = renderAssistantActions?.(message);
+                  const isLatestAssistantMessage =
+                    index === latestAssistantIndex;
+                  const latestOnlyActions = isLatestAssistantMessage
+                    ? renderAssistantLatestActions?.(message)
+                    : undefined;
+                  return (
+                    <AssistantMessage
+                      key={message.id ?? index}
+                      message={message}
+                      isStreaming={isStreamingLast}
+                      assistantAvatar={assistantAvatar}
+                      messageClassName={messageClassName}
+                      isLastMessage={index === filteredMessages.length - 1}
+                      actions={sharedActions}
+                      latestActions={latestOnlyActions}
+                      isLatestAssistant={isLatestAssistantMessage}
+                      actionsClassName={assistantActionsClassName}
+                    />
+                  );
+                }
                 return (
                   <ChatMessageItem
                     key={message.id ?? index}
@@ -118,7 +146,6 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                     assistantAvatar={assistantAvatar}
                     userAvatar={userAvatar}
                     messageClassName={messageClassName}
-                    getTool={getTool}
                   />
                 );
               })}
@@ -174,15 +201,12 @@ export const ChatMessages = React.memo(ChatMessagesInner);
 
 ChatMessagesInner.displayName = "ChatMessages";
 
-type AnyUIPart = UIMessage["parts"][number];
-
 interface ChatMessageItemProps {
   message: UIMessage;
   isStreaming: boolean;
   assistantAvatar?: string;
   userAvatar?: string;
   messageClassName?: string;
-  getTool: (name: string) => AnyFrontendTool | undefined;
 }
 
 const ChatMessageItem = React.memo(function ChatMessageItem({
@@ -191,7 +215,6 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
   assistantAvatar,
   userAvatar,
   messageClassName,
-  getTool,
 }: ChatMessageItemProps) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
@@ -230,11 +253,10 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
         className={cn("rounded-[var(--acb-chat-message-radius)]")}
       >
         {message.parts?.map((part, partIndex: number) => (
-          <MessagePart
+          <ChatMessagePart
             key={partIndex}
             part={part}
             streaming={isStreaming}
-            getTool={getTool}
           />
         ))}
       </MessageContent>
@@ -259,118 +281,4 @@ function areEqualChatMessageItem(
     prev.userAvatar === next.userAvatar &&
     prev.messageClassName === next.messageClassName
   );
-}
-
-function MessagePart({
-  part,
-  streaming = false,
-  getTool,
-}: {
-  part: AnyUIPart;
-  streaming?: boolean;
-  getTool: (name: string) => AnyFrontendTool | undefined;
-}) {
-  // Remove unused streaming parameter for now
-  void streaming;
-  switch (part.type) {
-    case "text":
-      return <Response>{part.text}</Response>;
-
-    case "reasoning":
-      return <Reasoning>{part.text}</Reasoning>;
-
-    case "source-url":
-      return <Source href={part.url} title={part.title} />;
-
-    case "source-document":
-      return <Source href={"#"} title={part.title} />;
-
-    case "file":
-      return (
-        <div className="rounded-lg border p-3 bg-accent">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">{part.filename}</span>
-            <span className="text-xs text-muted-foreground">
-              {part.mediaType}
-            </span>
-          </div>
-        </div>
-      );
-
-    default:
-      // Handle tool-* parts (data-* could be added later)
-      if (part.type?.startsWith("tool-")) {
-        const toolPart = part as ToolUIPart;
-        // Extract the base tool name (library helper handles variations)
-        const baseName = getToolName(toolPart);
-
-        // Lookup registered frontend tool to see if it defines a custom render
-        const toolStoreTool = getTool(baseName);
-
-        // Attempt custom render ONLY when output is available
-        let customRendered: ReactNode | undefined;
-        let customRenderError: unknown;
-        if (
-          toolStoreTool?.render &&
-          toolPart.state === "output-available" &&
-          toolPart.output
-        ) {
-          try {
-            customRendered = toolStoreTool.render(toolPart.output as any);
-          } catch (err) {
-            customRenderError = err;
-          }
-        }
-
-        // If custom render succeeded, show only that (no default chrome)
-        if (customRendered) {
-          return <>{customRendered}</>;
-        }
-
-        // Build fallback output (default tool chrome)
-        const fallbackOutput = toolPart.output ? (
-          typeof toolPart.output === "string" ? (
-            toolPart.output
-          ) : (
-            <CodeBlock
-              code={JSON.stringify(toolPart.output, null, 2)}
-              language="json"
-            />
-          )
-        ) : undefined;
-
-        const combinedErrorText =
-          toolPart.errorText || customRenderError
-            ? [
-                toolPart.errorText,
-                customRenderError
-                  ? `Custom render error: ${
-                      (customRenderError as any)?.message || customRenderError
-                    }`
-                  : undefined,
-              ]
-                .filter(Boolean)
-                .join("\n")
-            : undefined;
-
-        return (
-          <Tool>
-            <ToolHeader
-              type={toolPart.type}
-              state={toolPart.state || "input-streaming"}
-            />
-            <ToolContent>
-              {Boolean(toolPart.input) && <ToolInput input={toolPart.input} />}
-              {(toolPart.output || combinedErrorText) && (
-                <ToolOutput
-                  output={fallbackOutput}
-                  errorText={combinedErrorText}
-                />
-              )}
-            </ToolContent>
-          </Tool>
-        );
-      }
-      return null;
-  }
 }

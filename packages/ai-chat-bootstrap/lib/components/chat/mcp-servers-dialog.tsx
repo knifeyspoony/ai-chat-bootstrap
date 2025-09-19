@@ -1,15 +1,8 @@
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "../../components/ui/sheet";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import {
@@ -19,14 +12,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "../../components/ui/sheet";
 import { Textarea } from "../../components/ui/textarea";
-import { Plus, Pencil, Trash2 } from "lucide-react";
 import type {
+  MCPServerEntry,
   MCPServerTransport,
-  MCPToolSummary,
   SerializedMCPServer,
 } from "../../stores/mcp";
-import { v4 as uuidv4 } from "uuid";
 
 export interface McpServersDialogProps {
   open: boolean;
@@ -34,7 +34,7 @@ export interface McpServersDialogProps {
   configs: SerializedMCPServer[];
   onSave: (server: SerializedMCPServer) => void;
   onRemove: (id: string) => void;
-  serversMap: Map<string, unknown>;
+  serversMap: Map<string, MCPServerEntry> | Record<string, MCPServerEntry>;
 }
 
 const EMPTY_FORM = {
@@ -44,7 +44,7 @@ const EMPTY_FORM = {
   headers: "",
 };
 
-export function McpServersDialog({
+function McpServersDialogImpl({
   open,
   onOpenChange,
   configs,
@@ -106,11 +106,7 @@ export function McpServersDialog({
     if (form.headers.trim()) {
       try {
         const parsed = JSON.parse(form.headers);
-        if (
-          parsed &&
-          typeof parsed === "object" &&
-          !Array.isArray(parsed)
-        ) {
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
           headers = parsed as Record<string, string>;
         } else {
           throw new Error("Headers must be a JSON object");
@@ -125,9 +121,11 @@ export function McpServersDialog({
       }
     }
 
-    const id = editingId ?? (typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : uuidv4());
+    const id =
+      editingId ??
+      (typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : uuidv4());
 
     onSave({
       id,
@@ -148,21 +146,24 @@ export function McpServersDialog({
     }
   };
 
-  const activeServerEntries = useMemo(() =>
-    configs.map((cfg) => ({
-      config: cfg,
-      status: serversMap.get(cfg.id) as {
-        tools?: MCPToolSummary[];
-        isLoading?: boolean;
-        error?: string | null;
-        lastLoadedAt?: number;
-      } | undefined,
-    })),
-  [configs, serversMap]);
+  const activeServerEntries = useMemo(() => {
+    return configs.map((cfg) => {
+      const status =
+        serversMap instanceof Map ? serversMap.get(cfg.id) : serversMap[cfg.id];
+
+      return {
+        config: cfg,
+        status,
+      };
+    });
+  }, [configs, serversMap]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[800px] max-w-[90vw] sm:max-w-[800px]">
+      <SheetContent
+        side="right"
+        className="w-[800px] max-w-[90vw] sm:max-w-[800px]"
+      >
         <SheetHeader>
           <SheetTitle>MCP servers</SheetTitle>
           <SheetDescription>
@@ -175,13 +176,12 @@ export function McpServersDialog({
               <div>
                 <h3 className="text-lg font-semibold">Configured servers</h3>
                 <p className="text-sm text-muted-foreground">
-                  {activeServerEntries.length === 0 
+                  {activeServerEntries.length === 0
                     ? "No MCP servers configured yet. Click the button below to add your first server."
-                    : "Edit, remove, or inspect existing MCP server connections."
-                  }
+                    : "Edit, remove, or inspect existing MCP server connections."}
                 </p>
               </div>
-              
+
               {activeServerEntries.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-8 text-center">
                   No MCP servers configured yet.
@@ -244,7 +244,11 @@ export function McpServersDialog({
 
             <div className="space-y-4 pt-4">
               {!showForm && (
-                <Button variant="outline" onClick={createNew} className="w-full">
+                <Button
+                  variant="outline"
+                  onClick={createNew}
+                  className="w-full"
+                >
                   <Plus className="mr-2 h-4 w-4" /> Add New Server
                 </Button>
               )}
@@ -262,7 +266,10 @@ export function McpServersDialog({
                         id="mcp-name-input"
                         value={form.name}
                         onChange={(event) =>
-                          setForm((prev) => ({ ...prev, name: event.target.value }))
+                          setForm((prev) => ({
+                            ...prev,
+                            name: event.target.value,
+                          }))
                         }
                         placeholder="Optional name"
                       />
@@ -275,7 +282,10 @@ export function McpServersDialog({
                           id="mcp-url-input"
                           value={form.url}
                           onChange={(event) =>
-                            setForm((prev) => ({ ...prev, url: event.target.value }))
+                            setForm((prev) => ({
+                              ...prev,
+                              url: event.target.value,
+                            }))
                           }
                           placeholder="https://example.com/mcp"
                           required
@@ -288,7 +298,8 @@ export function McpServersDialog({
                           onValueChange={(value) =>
                             setForm((prev) => ({
                               ...prev,
-                              transportType: value as MCPServerTransport["type"],
+                              transportType:
+                                value as MCPServerTransport["type"],
                             }))
                           }
                         >
@@ -296,7 +307,9 @@ export function McpServersDialog({
                             <SelectValue placeholder="Select transport" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="sse">Server-sent events</SelectItem>
+                            <SelectItem value="sse">
+                              Server-sent events
+                            </SelectItem>
                             <SelectItem value="streamable-http">
                               Streamable HTTP
                             </SelectItem>
@@ -311,7 +324,10 @@ export function McpServersDialog({
                         id="mcp-headers-input"
                         value={form.headers}
                         onChange={(event) =>
-                          setForm((prev) => ({ ...prev, headers: event.target.value }))
+                          setForm((prev) => ({
+                            ...prev,
+                            headers: event.target.value,
+                          }))
                         }
                         placeholder='{ "Authorization": "Bearer ..." }'
                         rows={4}
@@ -321,7 +337,9 @@ export function McpServersDialog({
                       </p>
                     </div>
 
-                    {error && <p className="text-sm text-destructive">{error}</p>}
+                    {error && (
+                      <p className="text-sm text-destructive">{error}</p>
+                    )}
                   </form>
                 </div>
               )}
@@ -345,3 +363,83 @@ export function McpServersDialog({
     </Sheet>
   );
 }
+
+// Optimized with React.memo to prevent re-renders during streaming
+export const McpServersDialog = React.memo(
+  McpServersDialogImpl,
+  (prev, next) => {
+    // Check scalar props first - if open changed, component must re-render
+    if (prev.open !== next.open) return false;
+    if (prev.onOpenChange !== next.onOpenChange) return false;
+    if (prev.onSave !== next.onSave) return false;
+    if (prev.onRemove !== next.onRemove) return false;
+
+    // Fast path: reference equality for data
+    if (prev.configs === next.configs && prev.serversMap === next.serversMap) {
+      return true;
+    }
+
+    // Compare configs array by length and content
+    if (prev.configs.length !== next.configs.length) return false;
+    for (let i = 0; i < prev.configs.length; i++) {
+      const prevConfig = prev.configs[i];
+      const nextConfig = next.configs[i];
+      if (
+        prevConfig.id !== nextConfig.id ||
+        prevConfig.name !== nextConfig.name ||
+        prevConfig.transport.url !== nextConfig.transport.url ||
+        prevConfig.transport.type !== nextConfig.transport.type
+      ) {
+        return false;
+      }
+    }
+
+    // Compare serversMap by content, not reference
+    const prevIsMap = prev.serversMap instanceof Map;
+    const nextIsMap = next.serversMap instanceof Map;
+
+    if (prevIsMap !== nextIsMap) return false;
+
+    const compareStatus = (
+      prevStatus?: MCPServerEntry,
+      nextStatus?: MCPServerEntry
+    ) => {
+      if (!prevStatus && !nextStatus) return true;
+      if (!prevStatus || !nextStatus) return false;
+
+      return (
+        prevStatus.isLoading === nextStatus.isLoading &&
+        prevStatus.error === nextStatus.error &&
+        prevStatus.tools.length === nextStatus.tools.length &&
+        prevStatus.lastLoadedAt === nextStatus.lastLoadedAt
+      );
+    };
+
+    if (prevIsMap && nextIsMap) {
+      // Both are Maps
+      if (prev.serversMap.size !== next.serversMap.size) return false;
+      for (const [key, prevValue] of prev.serversMap) {
+        const nextValue = next.serversMap.get(key);
+        if (!compareStatus(prevValue, nextValue)) {
+          return false;
+        }
+      }
+    } else {
+      // Both are Records
+      const prevRecord = prev.serversMap as Record<string, MCPServerEntry>;
+      const nextRecord = next.serversMap as Record<string, MCPServerEntry>;
+
+      const prevKeys = Object.keys(prevRecord);
+      const nextKeys = Object.keys(nextRecord);
+      if (prevKeys.length !== nextKeys.length) return false;
+
+      for (const key of prevKeys) {
+        if (!compareStatus(prevRecord[key], nextRecord[key])) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+);

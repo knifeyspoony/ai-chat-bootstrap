@@ -1,6 +1,6 @@
 {
   "name": "ai-chat-bootstrap",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "React UI + hooks for building modern AI chat interfaces fast. Based on AISDK and AISDK Elements",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -50,8 +50,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ai-sdk/provider-utils": "^3.0.4",
-    "@modelcontextprotocol/sdk": "^1.2.0",
+    "@ai-sdk/provider-utils": "^3.0.9",
+    "@modelcontextprotocol/sdk": "^1.18.1",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-collapsible": "^1.1.12",
@@ -74,6 +74,7 @@
     "cmdk": "^1.1.1",
     "embla-carousel-react": "^8.6.0",
     "eventsource": "^2.0.2",
+    "fast-deep-equal": "^3.1.3",
     "highlight.js": "^11.11.1",
     "lucide-react": "^0.544.0",
     "react-markdown": "^10.1.0",
@@ -96,8 +97,7 @@
     "react-dom": ">=18"
   },
   "devDependencies": {
-    "@ai-sdk/azure": "^2.0.16",
-    "@ai-sdk/react": "^2.0.18",
+    "@ai-sdk/azure": "^2.0.32",
     "@eslint/eslintrc": "^3",
     "@testing-library/react": "^16.0.0",
     "@types/eventsource": "^1.1.11",
@@ -107,7 +107,6 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "@vitest/browser": "^3.2.4",
     "@vitest/coverage-v8": "^3.2.4",
-    "ai": "^5.0.18",
     "autoprefixer": "^10.4.0",
     "eslint": "^9",
     "jsdom": "^25.0.0",

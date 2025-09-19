@@ -1,6 +1,10 @@
 "use client";
 
-import { ChatContainer, type UIMessage, useAIFocus } from "ai-chat-bootstrap";
+import {
+  MockChatContainer,
+  type UIMessage,
+  useAIFocus,
+} from "ai-chat-bootstrap";
 import { useMockAIChat } from "./shared/useMockAIChat";
 
 // Sample items that can be focused
@@ -172,7 +176,7 @@ export function FocusItemsExample() {
       role: "user",
       parts: [{ type: "text", text }],
     };
-    mockChat.setMessages((m) => [...m, userMessage]);
+    mockChat.setMessages((m: UIMessage[]) => [...m, userMessage]);
     mockChat.setIsLoading(true);
 
     setTimeout(() => {
@@ -181,7 +185,7 @@ export function FocusItemsExample() {
         role: "assistant",
         parts: [{ type: "text", text: buildAssistantReply(text) }],
       };
-      mockChat.setMessages((m) => [...m, assistantMessage]);
+      mockChat.setMessages((m: UIMessage[]) => [...m, assistantMessage]);
       mockChat.setIsLoading(false);
     }, 800);
   };
@@ -197,7 +201,7 @@ export function FocusItemsExample() {
         <FocusItemsList />
       </div>
       <div className="border rounded-lg">
-        <ChatContainer
+        <MockChatContainer
           chat={chat}
           header={{
             title: "AI Assistant",
@@ -217,7 +221,7 @@ export function FocusItemsExample() {
 
 // Source code exports for documentation
 export const FOCUS_ITEMS_FRONTEND_SOURCE = `import React from "react";
-import { ChatContainer, useAIChat, useAIFocus } from "ai-chat-bootstrap";
+import { ChatContainer, useAIFocus } from "ai-chat-bootstrap";
 
 function DocumentSelector({ documents }: { documents: Document[] }) {
   const { setFocus, clearFocus, focusedIds } = useAIFocus();
@@ -262,22 +266,20 @@ function DocumentSelector({ documents }: { documents: Document[] }) {
 export function ChatWithFocus() {
   const { allFocusItems } = useAIFocus();
   
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant with access to the user's focused documents."
-  });
 
   return (
     <div className="grid grid-cols-2 gap-4">
       <DocumentSelector documents={myDocuments} />
       <ChatContainer
-        title="AI Assistant"
-        subtitle={\`\${allFocusItems.length} items in focus\`}
-        messages={chat.messages}
-        input={chat.input}
-        onInputChange={chat.handleInputChange}
-        onSubmit={chat.handleSubmit}
-        isLoading={chat.isLoading}
+        transport={{ api: "/api/chat" }}
+        messages={{
+          systemPrompt: "You are a helpful assistant with access to the user's focused documents.",
+        }}
+        header={{
+          title: "AI Assistant",
+          subtitle: \`\${allFocusItems.length} items in focus\`
+        }}
+        ui={{ placeholder: "Ask me about the focused documents" }}
       />
     </div>
   );

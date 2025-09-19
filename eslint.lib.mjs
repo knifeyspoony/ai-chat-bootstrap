@@ -17,7 +17,7 @@ export default [
   })),
   // Additional JS/TS (including .jsx) adjustments
   {
-    files: ["packages/ai-chat-bootstrap/**/*.{js,jsx,ts,tsx}"],
+    files: ["packages/ai-chat-bootstrap/**/*.{ts,tsx,cts,mts}"],
     plugins: {
       "react-hooks": reactHooks,
       "@next/next": nextPlugin,

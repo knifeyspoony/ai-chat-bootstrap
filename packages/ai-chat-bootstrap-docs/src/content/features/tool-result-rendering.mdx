@@ -56,8 +56,8 @@ Here's a full example showing tools with custom rendering:
 
 ```tsx
 "use client";
-import React, { useState } from "react";
-import { ChatContainer, useAIChat, useAIFrontendTool } from "ai-chat-bootstrap";
+import React from "react";
+import { ChatContainer, useAIFrontendTool } from "ai-chat-bootstrap";
 import { z } from "zod";
 
 // Custom Chart Component
@@ -124,14 +124,13 @@ export function ToolRenderingDemo() {
     ),
   });
 
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You can create charts using the create_chart tool when users request data visualizations."
-  });
-
   return (
     <ChatContainer
-      chat={chat}
+      transport={{ api: "/api/chat" }}
+      messages={{
+        systemPrompt:
+          "You can create charts using the create_chart tool when users request data visualizations.",
+      }}
       header={{ title: "AI with Custom Rendering" }}
       ui={{ placeholder: "Ask me to create a chart!" }}
     />
@@ -230,4 +229,4 @@ render: (result) => (
 
 ## Next
 
-Continue to [Sharing Context →](/chat/ai-context)
+Continue to [Sharing Context →](/features/ai-context)

@@ -221,17 +221,27 @@ execute: async (params) => {
 ```tsx
 "use client";
 import React, { useState } from "react";
-import { 
-  ChatContainer, 
-  useAIChat, 
-  useUIChatCommand 
+import {
+  MockChatContainer,
+  useAIChat,
+  useUIChatCommand,
 } from "ai-chat-bootstrap";
+import { toast } from "sonner";
 import { z } from "zod";
 
 export function ChatWithUICommands() {
-  const [messages, setMessages] = useState([]);
   const [theme, setTheme] = useState("light");
   const [debugMode, setDebugMode] = useState(false);
+
+  const chat = useAIChat({
+    transport: { api: "/api/chat" },
+    messages: {
+      systemPrompt:
+        "You are a helpful assistant that supports slash commands for app control.",
+    },
+  });
+
+  const messages = chat.messages;
 
   // Clear command
   useUIChatCommand({
@@ -239,7 +249,7 @@ export function ChatWithUICommands() {
     description: "Clear all chat messages",
     parameters: z.object({}),
     execute: async () => {
-      setMessages([]);
+      chat.setMessages([]);
       toast.success("Chat cleared");
     }
   });
@@ -320,7 +330,7 @@ export function ChatWithUICommands() {
 
   return (
     <div className="h-[600px] w-full">
-      <ChatContainer
+      <MockChatContainer
         chat={chat}
         header={{ title: "Chat with UI Commands", subtitle: "Try: /clear, /theme dark, /debug true" }}
         ui={{ placeholder: "Type / to see available commands" }}
@@ -461,17 +471,6 @@ useUIChatCommand({
 });
 ```
 
-## Best Practices
-
-1. **Instant Feedback**: Provide immediate visual feedback for command execution
-2. **Error Handling**: Always handle potential errors gracefully
-3. **Validation**: Use Zod schemas to validate parameters before execution
-4. **State Management**: Keep UI state in sync with command effects
-5. **Documentation**: Provide clear descriptions for all parameters
-6. **Undo Support**: Consider implementing undo for destructive operations
-7. **Accessibility**: Ensure commands don't break keyboard navigation
-8. **Performance**: Avoid heavy computations in synchronous execute functions
-
 ## TypeScript Interface
 
 ```typescript
@@ -544,6 +543,6 @@ execute: async (params) => {
 ## See Also
 
 - [useAIChatCommand](/api/hooks/use-ai-chat-command) - Register AI commands that use the LLM
-- [Commands Guide](/chat/commands) - Complete guide to using commands
+- [Commands Guide](/features/commands) - Complete guide to using commands
 - [useAIChat](/api/hooks/use-ai-chat) - Main chat hook
 - [useAIFrontendTool](/api/hooks/use-ai-frontend-tool) - Register tools for AI commands

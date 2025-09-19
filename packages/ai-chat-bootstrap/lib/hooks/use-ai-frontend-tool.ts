@@ -46,7 +46,7 @@ export function useAIFrontendTool<
 
   // Use single ref for all tool data to minimize hook count
   const toolDataRef = useRef<{
-    tool: AnyFrontendTool;
+    tool: FrontendTool<P, R>;
     signature: string;
   }>({
     tool,
@@ -70,15 +70,15 @@ export function useAIFrontendTool<
 
   useEffect(() => {
     // Create a wrapper that always calls the latest execute function
-    const stableExecute = async (params: unknown) => {
-      return toolDataRef.current.tool.execute(params);
+    const stableExecute: AnyFrontendTool["execute"] = async (params) => {
+      return toolDataRef.current.tool.execute(params as z.infer<P>);
     };
 
-    const stableRender = toolDataRef.current.tool.render
-      ? (props: unknown) => {
-          return toolDataRef.current.tool.render?.(props) || null;
-        }
-      : undefined;
+    const stableRender: AnyFrontendTool["render"] | undefined =
+      toolDataRef.current.tool.render
+        ? (result) =>
+            toolDataRef.current.tool.render?.(result as R) ?? null
+        : undefined;
 
     const stableTool: AnyFrontendTool = {
       name: tool.name,

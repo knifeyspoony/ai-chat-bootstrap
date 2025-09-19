@@ -1,0 +1,63 @@
+---
+title: Theme System
+description: Understand how AI Chat Bootstrap inherits shadcn/Tailwind design tokens, ships a default palette, and how to override them.
+---
+
+import { ThemePlayground } from "../../components/ThemePlayground";
+
+# Theme System
+
+AI Chat Bootstrap leans on the same CSS custom properties used by **shadcn/ui** (for example `--background`, `--foreground`, `--card`, `--border`). When those variables exist—because you are using Tailwind with the shadcn preset—the chat components inherit the palette automatically. If they are missing, the library falls back to bundled defaults so you still get a polished experience without Tailwind.
+
+## Default Tokens & Fallbacks
+
+- `tokens.primitives.css` defines the base palette (`--acb-default-*` variables) covering light and dark modes.
+- `tokens.css` layers the shadcn-compatible semantic tokens over the primitives and exports component-level variables used by the chat UI.
+- `ai-chat.css` contains the precompiled component styles that consume the tokens.
+
+If you only import `tokens.css` + `ai-chat.css`, the primitives supply a **neutral light/dark theme**. Any shadcn/Tailwind variables that do exist are preferred, so you can gradually override them without touching generated CSS.
+
+```css
+/* globals.css */
+@import "ai-chat-bootstrap/tokens.css";
+@import "ai-chat-bootstrap/ai-chat.css";
+
+:root {
+  --radius: 0.875rem;
+  --primary: oklch(0.6 0.2 265);
+}
+```
+
+The example above keeps everything zero-config while nudging the brand radius and primary color.
+
+## Tailwind Integration
+
+When you are already using Tailwind (or shadcn/ui), add the published preset to surface the tokens as Tailwind theme values:
+
+```ts
+// tailwind.config.ts
+import preset from "ai-chat-bootstrap/tailwind.preset";
+
+export default {
+  presets: [preset],
+  content: ["./src/**/*.{ts,tsx,mdx}"],
+};
+```
+
+The preset wires common keys (`background`, `foreground`, `border`, etc.) and exposes helper utilities so you can stay in Tailwind land. This mode also plays nicely with shadcn components because everything references the same CSS variables.
+
+> Avoid mixing preset + zero-config imports in the same build. Choose either Tailwind-native **or** the bundled CSS pipeline.
+
+## Theme Playground
+
+Use the header theme selector to toggle palettes and watch the chat below restyle instantly. The control updates CSS variables on `document.documentElement`, exactly how you would theme your own app.
+
+<ThemePlayground />
+
+## Shipping Your Own Palette
+
+- Override the semantic tokens (`--background`, `--foreground`, `--primary`, etc.) on `:root`, `[data-theme="dark"]`, or any scoped element.
+- For multi-theme apps, toggle a class or `data-theme` attribute on `html`/`body` and let the tokens cascade—no need to touch component code.
+- Extend tokens for custom surfaces via `--acb-chat-*` variables whenever you need granular control (see `tokens.css` for the full list).
+
+Because the components resolve every color through CSS variables, you can safely layer design systems on top of AI Chat Bootstrap without forking styles.

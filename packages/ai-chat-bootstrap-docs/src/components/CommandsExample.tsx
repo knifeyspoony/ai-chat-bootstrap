@@ -1,6 +1,6 @@
 "use client";
 import {
-  ChatContainer,
+  MockChatContainer,
   useAIChatCommand,
   useAIFrontendTool,
   useUIChatCommand,
@@ -16,6 +16,14 @@ export function CommandsExample() {
   const [theme, setTheme] = useState("light");
   const [debugMode, setDebugMode] = useState(false);
   const [counter, setCounter] = useState(0);
+
+  const themeCommandSchema = z.object({
+    mode: z.enum(["light", "dark", "auto"]).describe("Theme mode"),
+  });
+
+  const debugCommandSchema = z.object({
+    enabled: z.boolean().optional().describe("Enable or disable debug mode"),
+  });
 
   // Register frontend tool for AI commands
   useAIFrontendTool({
@@ -134,10 +142,9 @@ export function CommandsExample() {
   useUIChatCommand({
     name: "theme",
     description: "Change the application theme",
-    parameters: z.object({
-      mode: z.enum(["light", "dark", "auto"]).describe("Theme mode"),
-    }),
-    execute: async ({ mode }: { mode: string }) => {
+    parameters: themeCommandSchema,
+    execute: async (params) => {
+      const { mode } = themeCommandSchema.parse(params);
       setTheme(mode);
       // In a real app, you'd update the actual theme
       console.log(`Theme changed to ${mode}`);
@@ -157,10 +164,9 @@ export function CommandsExample() {
   useUIChatCommand({
     name: "debug",
     description: "Toggle debug mode",
-    parameters: z.object({
-      enabled: z.boolean().optional().describe("Enable or disable debug mode"),
-    }),
-    execute: async ({ enabled }: { enabled?: boolean }) => {
+    parameters: debugCommandSchema,
+    execute: async (params) => {
+      const { enabled } = debugCommandSchema.parse(params);
       const newState = enabled !== undefined ? enabled : !debugMode;
       setDebugMode(newState);
       console.log(`Debug mode: ${newState ? "ON" : "OFF"}`);
@@ -188,7 +194,7 @@ export function CommandsExample() {
       role: "user",
       parts: [{ type: "text", text }],
     };
-    mockChat.setMessages((prev) => [...prev, userMessage]);
+    mockChat.setMessages((prev: UIMessage[]) => [...prev, userMessage]);
     mockChat.setIsLoading(true);
 
     // Simulate AI response for demo
@@ -203,7 +209,7 @@ export function CommandsExample() {
           },
         ],
       };
-      mockChat.setMessages((prev) => [...prev, aiMessage]);
+      mockChat.setMessages((prev: UIMessage[]) => [...prev, aiMessage]);
       mockChat.setIsLoading(false);
     }, 1000);
   };
@@ -224,8 +230,8 @@ export function CommandsExample() {
       </div>
 
       {/* Chat Interface */}
-      <div className="h-[400px] w-full">
-        <ChatContainer
+      <div className="h-[600px] w-full">
+        <MockChatContainer
           chat={chat}
           header={{
             title: "Commands Demo",
@@ -267,12 +273,11 @@ export function CommandsExample() {
 // Source code for the chat component with commands
 export const COMMANDS_CHAT_SOURCE = `"use client";
 import React, { useState } from "react";
-import { 
-  ChatContainer, 
-  useAIChat, 
+import {
+  ChatContainer,
   useAIChatCommand,
   useUIChatCommand,
-  useAIFrontendTool 
+  useAIFrontendTool
 } from "ai-chat-bootstrap";
 import { z } from "zod";
 
@@ -347,19 +352,16 @@ export function ChatWithCommands() {
     }
   });
 
-  const chat = useAIChat({
-    api: "/api/chat",
-    messages,
-    onMessagesChange: setMessages,
-  });
 
   return (
     <div className="space-y-4">
       <div className="h-[500px] w-full">
         <ChatContainer
+          transport={{ api: "/api/chat" }}
+          messages={messages}
+          onMessagesChange={setMessages}
           header={{ title: "Chat with Commands", subtitle: "Try AI: /analyze or UI: /theme, /clear, /debug" }}
           ui={{ placeholder: "Type / to see available commands" }}
-          chat={chat}
         />
       </div>
       

@@ -11,7 +11,7 @@ Complete API documentation for all hooks, components, and TypeScript interfaces 
 
 ### Chat Management
 
-- **[useAIChat](/api/hooks/use-ai-chat)** - Main hook for managing chat state and AI interactions with automatic context and tool integration
+- **[useAIChat](/api/hooks/use-ai-chat)** - Advanced hook for custom chat state management (most users should use ChatContainer/ChatPopout components directly)
 
 ### Context & Focus
 
@@ -74,11 +74,18 @@ Frontend tools execute in the browser and allow the AI to:
   ```
   Tailwind-native: add preset in tailwind config.
 
-3. **Use the main chat hook**:
+3. **Render the chat container**:
    ```tsx
-   import { useAIChat } from 'ai-chat-bootstrap';
-   
-   const chat = useAIChat({ api: '/api/chat' });
+   import { ChatContainer } from 'ai-chat-bootstrap';
+
+   export function AppChat() {
+     return (
+      <ChatContainer
+        transport={{ api: "/api/chat" }}
+        messages={{ systemPrompt: "You are a helpful assistant." }}
+      />
+     );
+   }
    ```
 
 ## Quick Examples
@@ -86,87 +93,84 @@ Frontend tools execute in the browser and allow the AI to:
 ### Basic Chat
 
 ```tsx
-import { ChatContainer, useAIChat } from 'ai-chat-bootstrap';
+import { ChatContainer } from 'ai-chat-bootstrap';
 
 function MyChat() {
-  const chat = useAIChat({
-    api: '/api/chat',
-    systemPrompt: 'You are a helpful assistant.'
-  });
-
   return (
     <ChatContainer
-      chat={chat}
+      transport={{ api: "/api/chat" }}
+      messages={{ systemPrompt: "You are a helpful assistant." }}
       header={{ title: 'My Chat' }}
+      ui={{ placeholder: 'Ask me anything…' }}
     />
   );
 }
 ```
 
-### With Model Selection & Chain of Thought
+### Model Selection & Chain of Thought
 
 ```tsx
-import { useAIChat, ChatContainer } from 'ai-chat-bootstrap';
+import { ChatContainer } from 'ai-chat-bootstrap';
 
 function ChatWithFeatures() {
-  const chat = useAIChat({
-    api: '/api/chat',
-    models: [
-      { id: 'gpt-4', name: 'GPT-4' },
-      { id: 'gpt-3.5-turbo', name: 'GPT-3.5' }
-    ],
-    chainOfThoughtEnabled: true,
-  });
-
-  return <ChatContainer chat={chat} />;
+  return (
+    <ChatContainer
+      transport={{ api: "/api/chat" }}
+      models={[
+        { id: 'gpt-4', label: 'GPT-4' },
+        { id: 'gpt-4o-mini', label: 'GPT-4o mini' }
+      ]}
+      features={{ chainOfThought: true }}
+    />
+  );
 }
 ```
 
-### With Context
+### Sharing Context
 
 ```tsx
-import { useAIChat, useAIContext } from 'ai-chat-bootstrap';
+import { ChatContainer, useAIContext } from 'ai-chat-bootstrap';
 
 function ChatWithContext() {
-  const [user] = useState({ name: 'Alice', role: 'admin' });
+  const user = { name: 'Alice', role: 'admin' };
 
-  // Share user context with AI
-  useAIContext({ description: 'User Profile', value: user });
+  useAIContext({ description: 'User Profile', value: user, priority: 100 });
 
-  const chat = useAIChat({ api: '/api/chat' });
-
-  return <ChatContainer chat={chat} />;
+  return (
+    <ChatContainer
+      transport={{ api: "/api/chat" }}
+      messages={{ systemPrompt: "You are a helpful assistant." }}
+    />
+  );
 }
 ```
 
-### With Tools
+### Frontend Tools
 
 ```tsx
-import { useAIChat, useAIFrontendTool } from 'ai-chat-bootstrap';
+import React, { useState } from 'react';
+import { ChatContainer, useAIFrontendTool } from 'ai-chat-bootstrap';
 import { z } from 'zod';
 
 function ChatWithTools() {
   const [count, setCount] = useState(0);
 
-  // Register a tool the AI can use
   useAIFrontendTool({
     name: 'increment',
     description: 'Increment the counter',
     parameters: z.object({
-      amount: z.number().default(1)
+      amount: z.number().default(1),
     }),
     execute: async ({ amount }) => {
-      setCount(prev => prev + amount);
+      setCount((prev) => prev + amount);
       return { newValue: count + amount };
-    }
+    },
   });
 
-  const chat = useAIChat({ api: '/api/chat' });
-  
   return (
-    <div>
+    <div className="space-y-2">
       <div>Count: {count}</div>
-      <ChatContainer chat={chat} />
+      <ChatContainer transport={{ api: "/api/chat" }} />
     </div>
   );
 }
@@ -176,25 +180,9 @@ function ChatWithTools() {
 
 ### ChatContainer
 
-Main chat interface component with messages UI and input. Requires the `chat` hook.
+Main chat interface component with built-in `useAIChat` state. It accepts all `UseAIChatOptions` (via `transport`, `messages`, `thread`, `features`, `models`, `mcp`) plus UI configuration groups such as `header`, `ui`, `suggestions`, `commands`, `threads`, and `assistantActions`. Always prefer the structured configuration groups when wiring new code.
 
-```ts
-type ChatContainerProps = {
-  // Required
-  chat: ReturnType<typeof useAIChat>;
-
-  // Optional
-  header?: { title?: string; subtitle?: string; avatar?: React.ReactNode; badge?: React.ReactNode; actions?: React.ReactNode; className?: string };
-  ui?: { placeholder?: string; className?: string; classes?: { header?: string; messages?: string; message?: string; input?: string; assistantActions?: string }; emptyState?: React.ReactNode };
-  suggestions?: { enabled?: boolean; prompt?: string; count?: number };
-  commands?: { enabled?: boolean };
-  threads?: { enabled?: boolean };
-  assistantActions?: React.ReactNode | ((message: UIMessage) => React.ReactNode);
-  assistantLatestActions?: React.ReactNode | ((message: UIMessage) => React.ReactNode);
-};
-```
-
-Simplified props - the hook handles all state management.
+See the dedicated [ChatContainer API](/api/components/chat-container) for the complete prop interface and examples.
 
 ### ChatMessage
 
@@ -332,26 +320,6 @@ export const POST = createMcpToolsHandler();
 
 Each handler accepts model configuration and error handling options.
 
-## Best Practices
-
-### Performance
-
-- Use `useMemo` for expensive context computations
-- Limit message history in long conversations
-- Follow Zustand patterns to avoid re-render loops
-
-### Security
-
-- Never share sensitive data in context or focus items
-- Validate all tool parameters
-- Sanitize user inputs
-
-### User Experience
-
-- Provide clear loading states
-- Handle errors gracefully with user-friendly messages
-- Show visual feedback for focused items and active context
-
 ## Migration from Other Libraries
 
 The AI Chat Bootstrap library is designed to work seamlessly with the Vercel AI SDK while adding powerful context and tool management capabilities. If you're migrating from other chat libraries, the `useAIChat` hook provides a familiar interface while adding automatic integration with context, focus, and tools.
@@ -360,8 +328,8 @@ The AI Chat Bootstrap library is designed to work seamlessly with the Vercel AI 
 
 - [Basic Chat](/chat/basic-chat) - Simple chat implementation
 - [Chat with Tools](/chat/chat-with-tools) - Adding frontend tools  
-- [Sharing Context](/chat/ai-context) - Using ambient context
-- [Focus Items](/chat/focus-items) - User-controlled focus
+- [Sharing Context](/features/ai-context) - Using ambient context
+- [Focus Items](/features/focus-items) - User-controlled focus
 
 ## Support
 

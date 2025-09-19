@@ -163,52 +163,6 @@ Templates include built-in error handling:
 // - Network timeouts (503)
 ```
 
-## Best Practices
-
-1. **Environment Variables**: Store API keys and configuration in environment variables
-2. **Error Monitoring**: Add logging and monitoring to track API usage
-3. **Rate Limiting**: Implement rate limiting for production deployments
-4. **Caching**: Consider caching responses for repeated queries
-5. **Security**: Validate inputs and sanitize responses
-6. **Performance**: Monitor response times and optimize as needed
-
-## Migration from Manual Implementation
-
-If you have existing manual API routes, you can migrate to templates:
-
-### Before (Manual)
-```ts
-export async function POST(req: NextRequest) {
-  const { messages, systemPrompt, tools } = await req.json();
-
-  const result = streamText({
-    model: openai("gpt-4"),
-    system: systemPrompt,
-    messages: convertToCoreMessages(messages),
-    tools,
-  });
-
-  return result.toUIMessageStreamResponse();
-}
-```
-
-### After (Template)
-```ts
-import { createAIChatHandler } from "ai-chat-bootstrap/server";
-import { openai } from "@ai-sdk/openai";
-
-export const POST = createAIChatHandler({
-  model: openai("gpt-4"),
-});
-```
-
-The template automatically handles:
-- System prompt enrichment
-- Tool integration
-- Context processing
-- Error handling
-- Response formatting
-
 ## See Also
 
 - [createAIChatHandler](/api/server-templates/create-ai-chat-handler) - Main chat handler

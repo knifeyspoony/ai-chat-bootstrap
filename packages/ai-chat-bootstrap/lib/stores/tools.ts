@@ -21,7 +21,7 @@ export interface FrontendTool<
 }
 
 // Convenience alias for internal non-generic storage usage
-export type AnyFrontendTool = FrontendTool<z.ZodTypeAny, any>;
+export type AnyFrontendTool = FrontendTool<z.ZodTypeAny, unknown>;
 
 export interface SerializedTool {
   name: string;
@@ -74,7 +74,7 @@ export const useAIToolsStore = create<AIToolsStore>((set, get) => ({
       // Validate parameters
       const validatedParams = tool.parameters.parse(params);
       // validatedParams now matches z.infer<typeof tool.parameters>
-      return await tool.execute(validatedParams as any);
+      return await tool.execute(validatedParams);
     } catch {
       throw new Error(`Error executing tool "${name}"`);
     }

@@ -4,12 +4,12 @@ import { create } from "zustand";
 export interface BaseChatCommand {
   name: string;
   description: string;
-  parameters: z.ZodSchema;
+  parameters: z.ZodTypeAny;
 }
 
 export interface UIChatCommand extends BaseChatCommand {
   type: "ui";
-  execute: (params: any) => void | Promise<void>;
+  execute: (params: unknown) => void | Promise<void>;
 }
 
 export interface AIChatCommand extends BaseChatCommand {
@@ -26,7 +26,7 @@ export interface AIChatCommandsStore {
   unregisterCommand: (name: string) => void;
   getCommand: (name: string) => ChatCommand | undefined;
   getAllCommands: () => ChatCommand[];
-  executeCommand: (name: string, params: any) => Promise<void>;
+  executeCommand: (name: string, params: unknown) => Promise<void>;
   getMatchingCommands: (input: string) => ChatCommand[];
 }
 
@@ -56,7 +56,7 @@ export const useAIChatCommandsStore = create<AIChatCommandsStore>(
       return Array.from(get().commands.values());
     },
 
-    executeCommand: async (name: string, params: any) => {
+    executeCommand: async (name: string, params: unknown) => {
       const command = get().commands.get(name);
       if (!command) {
         throw new Error(`Command "${name}" not found`);

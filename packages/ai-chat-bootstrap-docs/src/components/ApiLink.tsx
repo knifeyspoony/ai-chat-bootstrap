@@ -21,38 +21,59 @@ const API_MAP: Record<string, ApiMeta> = {
     route: "/api/hooks/use-ai-chat",
     description:
       "Main hook for managing chat state and AI interactions with automatic context and tool integration.",
-    signature: `function useAIChat(options: {
-  api: string;
-  systemPrompt?: string;
-  initialMessages?: UIMessage[];
-  onFinish?: (message: UIMessage) => void;
-  onError?: (error: Error) => void;
+    signature: `function useAIChat(options?: {
+  transport?: { api?: string };
+  messages?: { systemPrompt?: string; initial?: UIMessage[] };
+  thread?: {
+    id?: string;
+    scopeKey?: string;
+    autoCreate?: boolean;
+    warnOnMissing?: boolean;
+    title?: { api?: string; sampleCount?: number };
+  };
+  features?: { chainOfThought?: boolean };
+  mcp?: {
+    enabled?: boolean;
+    api?: string;
+    servers?: SerializedMCPServer[];
+  };
+  models?: { available?: ChatModelOption[]; initial?: string };
 }): UseAIChatReturn`,
     params: [
       {
-        name: "api",
-        type: "string",
+        name: "transport.api",
+        type: "string?",
         description: "API endpoint for chat requests",
       },
       {
-        name: "systemPrompt",
+        name: "messages.systemPrompt",
         type: "string?",
-        description: "System prompt for the AI",
+        description: "System prompt appended to the enriched prompt",
       },
       {
-        name: "initialMessages",
+        name: "messages.initial",
         type: "UIMessage[]?",
-        description: "Initial chat messages",
+        description: "Initial chat transcript",
       },
       {
-        name: "onFinish",
-        type: "(message: UIMessage) => void?",
-        description: "Callback when a message is completed",
+        name: "thread",
+        type: "{ id?: string; scopeKey?: string; ... }?",
+        description: "Thread id/scope plus auto-create and title configuration",
       },
       {
-        name: "onError",
-        type: "(error: Error) => void?",
-        description: "Error callback",
+        name: "features.chainOfThought",
+        type: "boolean?",
+        description: "Enable reasoning capture and display",
+      },
+      {
+        name: "mcp",
+        type: "{ enabled?: boolean; api?: string; servers?: SerializedMCPServer[] }?",
+        description: "Register MCP servers and default endpoint",
+      },
+      {
+        name: "models",
+        type: "{ available?: ChatModelOption[]; initial?: string }?",
+        description: "Expose selectable chat models and a preferred default",
       },
     ],
   },

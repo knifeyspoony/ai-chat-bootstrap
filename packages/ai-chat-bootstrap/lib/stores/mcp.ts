@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import { useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 export interface MCPToolSummary {
   name: string;
@@ -23,7 +25,7 @@ export interface SerializedMCPServer {
   transport: MCPServerTransport;
 }
 
-interface MCPServerEntry {
+export interface MCPServerEntry {
   id: string;
   name?: string;
   transport: MCPServerTransport;
@@ -58,6 +60,7 @@ interface MCPServersStore {
   removeConfiguration: (id: string) => void;
   setDefaultApi: (api: string) => void;
   setEnabled: (enabled: boolean) => void;
+  getServersAsStableObject: () => Record<string, MCPServerEntry>;
 }
 
 export interface MCPServerToolsRequest {
@@ -216,4 +219,26 @@ export const useAIMCPServersStore = create<MCPServersStore>((set, get) => ({
   setEnabled: (enabled) => {
     set({ enabled });
   },
+
+  getServersAsStableObject: () => {
+    const { servers } = get();
+    const result: Record<string, MCPServerEntry> = {};
+    for (const [key, value] of servers) {
+      result[key] = value;
+    }
+    return result;
+  },
 }));
+
+// Stable selector hook that returns servers as an object with stable references
+export function useStableMCPServers() {
+  const servers = useAIMCPServersStore(useShallow((state) => state.servers));
+
+  return useMemo(() => {
+    const result: Record<string, MCPServerEntry> = {};
+    for (const [key, value] of servers) {
+      result[key] = value;
+    }
+    return result;
+  }, [servers]);
+}

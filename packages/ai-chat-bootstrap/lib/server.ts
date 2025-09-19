@@ -14,7 +14,7 @@ export {
   createSuggestionsHandler,
   createThreadTitleHandler,
   createMcpToolsHandler,
-} from "./server-handlers";
+} from "./handlers";
 
 // Re-export types & schemas (pure TypeScript / zod, no React)
 export { SuggestionsSchema } from "./types/chat";

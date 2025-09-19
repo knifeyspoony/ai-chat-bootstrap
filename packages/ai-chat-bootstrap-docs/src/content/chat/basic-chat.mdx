@@ -17,22 +17,18 @@ This example shows the **minimal setup** needed for an AI chat interface. The de
 
 ## Frontend Implementation
 
-The frontend uses the <API name="useAIChat" /> hook to handle all message state, streaming, and API communication:
+The frontend uses the `ChatContainer` component which handles all message state, streaming, and API communication internally:
 
 ```tsx
 import React from "react";
-import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+import { ChatContainer } from "ai-chat-bootstrap";
 
 export function BasicChat() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful AI assistant."
-  });
-
   return (
-    <div className="h-[420px] w-full">
+    <div className="h-[600px] w-full">
       <ChatContainer
-        chat={chat}
+        transport={{ api: "/api/chat" }}
+        messages={{ systemPrompt: "You are a helpful AI assistant." }}
         header={{ title: "AI Assistant", subtitle: "Connected to AI" }}
         ui={{ placeholder: "Ask me anything..." }}
       />
@@ -80,7 +76,7 @@ export { handler as POST };
 
 ## How it works
 
-1. **Frontend**: The <API name="useAIChat" /> hook manages message state and automatically posts to `/api/chat`
+1. **Frontend**: The `ChatContainer` component manages message state and automatically posts to `/api/chat`
 2. **Backend**: The API route receives messages and streams responses using the Vercel AI SDK
 3. **Streaming**: Responses are streamed back to the frontend and rendered in real-time
 4. **State Management**: All message history and loading states are handled automatically

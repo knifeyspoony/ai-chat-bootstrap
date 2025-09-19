@@ -1,9 +1,15 @@
 import type { Config } from "tailwindcss";
+import defaultTheme from "tailwindcss/defaultTheme";
 
 const config: Config = {
   content: ["./lib/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--acb-font-sans)", ...defaultTheme.fontFamily.sans],
+        serif: ["var(--acb-font-serif)", ...defaultTheme.fontFamily.serif],
+        mono: ["var(--acb-font-mono)", ...defaultTheme.fontFamily.mono],
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",

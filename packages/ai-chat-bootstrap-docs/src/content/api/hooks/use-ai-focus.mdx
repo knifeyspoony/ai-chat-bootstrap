@@ -62,7 +62,7 @@ interface FocusItem {
 
 ```tsx
 import React from "react";
-import { ChatContainer, useAIChat, useAIFocus } from "ai-chat-bootstrap";
+import { ChatContainer, useAIFocus } from "ai-chat-bootstrap";
 
 function DocumentSelector({ documents }: { documents: Document[] }) {
   const { setFocus, clearFocus, focusedIds } = useAIFocus();
@@ -110,18 +110,21 @@ function DocumentSelector({ documents }: { documents: Document[] }) {
 ```tsx
 export function ChatWithFocus() {
   const { allFocusItems } = useAIFocus();
-  
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant with access to the user's focused documents."
-  });
 
   return (
     <div className="grid grid-cols-2 gap-4">
       <DocumentSelector documents={myDocuments} />
       <ChatContainer
-        chat={chat}
-        header={{ title: "AI Assistant", subtitle: `${allFocusItems.length} items in focus` }}
+        transport={{ api: "/api/chat" }}
+        messages={{
+          systemPrompt:
+            "You are a helpful assistant with access to the user's focused documents.",
+        }}
+        header={{
+          title: "AI Assistant",
+          subtitle: `${allFocusItems.length} items in focus`,
+        }}
+        threads={{ enabled: true }}
       />
     </div>
   );
@@ -236,65 +239,6 @@ export const POST = createAIChatHandler({
 3. **AI Context**: Focused items are automatically included in chat requests to provide relevant context
 4. **Dynamic Management**: Users can add/remove items from focus at any time
 
-## Best Practices
-
-### 1. Meaningful Labels and Descriptions
-
-```tsx
-setFocus(doc.id, {
-  id: doc.id,
-  label: doc.title,                    // User-friendly display name
-  description: `Document: ${doc.title}`, // Context for the AI
-  data: { ... }                        // Full structured data
-});
-```
-
-### 2. Include Relevant Data
-
-```tsx
-// Good: Include the data the AI needs
-setFocus(note.id, {
-  id: note.id,
-  label: note.title,
-  data: {
-    type: 'note',
-    title: note.title,
-    content: note.content,
-    tags: note.tags,
-    createdAt: note.createdAt
-  }
-});
-
-// Less helpful: Minimal data
-setFocus(note.id, {
-  id: note.id,
-  label: note.title
-});
-```
-
-### 3. Visual Feedback
-
-Always provide clear visual indicators for focused items:
-- Chips/badges showing focused items with remove buttons
-- Different styling for focused vs unfocused items in lists
-- Counter showing number of focused items
-
-### 4. Avoiding Re-render Loops
-
-Follow the Zustand patterns:
-
-```tsx
-// ✅ Correct - stable dependencies
-const setFocus = useAIFocus(state => state.setFocus);
-
-useEffect(() => {
-  if (shouldFocusDocument) {
-    setFocus(docId, focusItem);
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps  
-}, [docId, shouldFocusDocument]); // Only data dependencies
-```
-
 ## Common Use Cases
 
 - **Document Editor**: Users select which documents are relevant to their current editing task
@@ -329,7 +273,7 @@ interface UseAIFocusReturn {
 
 ## See Also
 
-- [Focus Items guide](/chat/focus-items) - Complete tutorial with live examples
+- [Focus Items guide](/features/focus-items) - Complete tutorial with live examples
 - [useAIContext](/api/hooks/use-ai-context) - For automatic context sharing
 - [useAIChat](/api/hooks/use-ai-chat) - Main chat hook
 
@@ -346,7 +290,7 @@ interface UseAIFocusReturn {
 | User explicitly selects an item once and wants a stable snapshot | `setFocus` (manual) |
 | Item content changes as the user edits and AI should see latest | `useAIFocusItem` |
 | Need historical reproducibility of the exact original data | Manual snapshot |
-| Low‑friction always-fresh focus for an open editor | `useAIFocusItem` |
+| Low-friction always-fresh focus for an open editor | `useAIFocusItem` |
 | Performance sensitive; avoid rapid updates | Debounced `useAIFocusItem` or manual |
 
 ## API
@@ -439,35 +383,3 @@ useAIFocusItem(
   [source.title, debouncedBody]
 );
 ```
-
-## Migration Guidance
-
-| Old Pattern | New Reactive Equivalent |
-|-------------|-------------------------|
-| `setFocus(id, item)` after each edit | One `useAIFocusItem` with `deps` |
-| Clear on component unmount | Return `null` when condition false |
-| Manual re-sync button | Remove; reactive keeps it fresh |
-
-## Best Practices
-1. Keep `deps` minimal; pass only values that influence the built focus payload.
-2. Return `null` early for cheap pruning if not focused.
-3. Avoid recreating large objects unnecessarily—derive only the fields the model needs.
-4. For auditability, snapshot `allFocusItems` at send time if you need an immutable record.
-
-## Anti-Patterns
-| Anti-Pattern | Why | Fix |
-|--------------|-----|-----|
-| Rebuilding huge payloads every keystroke | Performance churn | Debounce or narrow data |
-| Returning new objects when nothing semantically changed | Noise | Add a shallow hash check |
-| Depending on unstable inline functions in `deps` | Infinite updates risk | Memoize helpers |
-
-## Combining Snapshot + Reactive
-You can mix both approaches: use `useAIFocusItem` during active editing, then at the moment of “commit” (e.g. sending a chat) copy current focus items into a per-message snapshot for traceability.
-
-```ts
-const { allFocusItems } = useAIFocus();
-sendMessage({ focus: [...allFocusItems] }); // immutable snapshot
-```
-
-## Summary
-`useAIFocusItem` reduces boilerplate and keeps focused data fresh while preserving deliberate user control. Use it when freshness matters; fall back to manual `setFocus` for intentional snapshot semantics or strict reproducibility.

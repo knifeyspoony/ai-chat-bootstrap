@@ -85,6 +85,7 @@
   --chart-4: hsl(43 74% 66%);
   --chart-5: hsl(27 87% 67%);
   --radius: 0.5rem;
+  --font-family: var(--font-sans, ui-sans-serif);
 }
 
 /* Dark theme (for system dark mode and explicit dark theme) */
@@ -115,69 +116,6 @@
   --chart-5: hsl(340 75% 55%);
 }
 
-/* Solar Dusk light theme */
-.solar-dusk {
-  --background: hsl(40.0000 60.0000% 98.0392%);
-  --foreground: hsl(20.8696 18.4000% 24.5098%);
-  --card: hsl(36.0000 41.6667% 95.2941%);
-  --card-foreground: hsl(20.8696 18.4000% 24.5098%);
-  --popover: hsl(36.0000 41.6667% 95.2941%);
-  --popover-foreground: hsl(20.8696 18.4000% 24.5098%);
-  --primary: hsl(25.9649 90.4762% 37.0588%);
-  --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(34.2857 60.8696% 72.9412%);
-  --secondary-foreground: hsl(33.3333 5.4545% 32.3529%);
-  --muted: hsl(39.1304 45.0980% 90.0000%);
-  --muted-foreground: hsl(25.0000 5.2632% 44.7059%);
-  --accent: hsl(34.2857 68.2927% 83.9216%);
-  --accent-foreground: hsl(33.3333 5.4545% 32.3529%);
-  --destructive: hsl(0 70% 35.2941%);
-  --destructive-foreground: hsl(0 0% 100%);
-  --border: hsl(43.5000 42.5532% 81.5686%);
-  --input: hsl(43.5000 42.5532% 81.5686%);
-  --ring: hsl(25.9649 90.4762% 37.0588%);
-  --chart-1: hsl(25.9649 90.4762% 37.0588%);
-  --chart-2: hsl(25.0000 5.2632% 44.7059%);
-  --chart-3: hsl(35.4545 91.6667% 32.9412%);
-  --chart-4: hsl(25.0000 5.2632% 44.7059%);
-  --chart-5: hsl(40.6061 96.1165% 40.3922%);
-  --radius: 0.3rem;
-  --font-sans: var(--font-oxanium), var(--font-geist-sans), sans-serif;
-  --font-serif: var(--font-merriweather), serif;
-  --font-mono: var(--font-fira-code), var(--font-geist-mono), monospace;
-}
-
-/* Solar Dusk dark theme */
-.solar-dusk-dark {
-  --background: hsl(24 9.8039% 10%);
-  --foreground: hsl(60 4.7619% 95.8824%);
-  --card: hsl(12.0000 6.4935% 15.0980%);
-  --card-foreground: hsl(60 4.7619% 95.8824%);
-  --popover: hsl(12.0000 6.4935% 15.0980%);
-  --popover-foreground: hsl(60 4.7619% 95.8824%);
-  --primary: hsl(24.5815 94.9791% 53.1373%);
-  --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(33.3333 5.4545% 32.3529%);
-  --secondary-foreground: hsl(20 5.8824% 90%);
-  --muted: hsl(12.0000 6.4935% 15.0980%);
-  --muted-foreground: hsl(24.0000 5.4348% 63.9216%);
-  --accent: hsl(198.4615 46.4286% 21.9608%);
-  --accent-foreground: hsl(20 5.8824% 90%);
-  --destructive: hsl(0 72.2222% 50.5882%);
-  --destructive-foreground: hsl(0 0% 100%);
-  --border: hsl(30 6.2500% 25.0980%);
-  --input: hsl(30 6.2500% 25.0980%);
-  --ring: hsl(24.5815 94.9791% 53.1373%);
-  --chart-1: hsl(24.5815 94.9791% 53.1373%);
-  --chart-2: hsl(198.6301 88.6640% 48.4314%);
-  --chart-3: hsl(45.3982 93.3884% 47.4510%);
-  --chart-4: hsl(24.0000 5.4348% 63.9216%);
-  --chart-5: hsl(25.0000 5.2632% 44.7059%);
-  --font-sans: var(--font-oxanium), var(--font-geist-sans), sans-serif;
-  --font-serif: var(--font-merriweather), serif;
-  --font-mono: var(--font-fira-code), var(--font-geist-mono), monospace;
-}
-
 /* Alt theme */
 .alt {
   --background: oklch(0.16 0.05 300);
@@ -199,6 +137,7 @@
   --input: oklch(0.32 0.02 300);
   --ring: oklch(0.7 0.18 310);
   --radius: 1rem;
+  --font-family: var(--font-sans, ui-sans-serif);
 }
 
 @layer components {

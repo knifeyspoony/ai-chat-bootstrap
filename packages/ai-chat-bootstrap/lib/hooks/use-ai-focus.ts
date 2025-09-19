@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useAIFocusStore } from "../stores";
 
@@ -48,11 +49,11 @@ export function useAIFocus() {
     }))
   );
 
-  // Derive computed values from the stable Map reference (no additional hooks)
-  const focusedIds = Array.from(focusItemsMap.keys());
-  const allFocusItems = Array.from(focusItemsMap.values());
+  // Memoize derived values to prevent unnecessary re-renders
+  const focusedIds = useMemo(() => Array.from(focusItemsMap.keys()), [focusItemsMap]);
+  const allFocusItems = useMemo(() => Array.from(focusItemsMap.values()), [focusItemsMap]);
   const hasFocusedItems = focusItemsMap.size > 0;
-  const focusItemsRecord = Object.fromEntries(focusItemsMap.entries());
+  const focusItemsRecord = useMemo(() => Object.fromEntries(focusItemsMap.entries()), [focusItemsMap]);
 
   return {
     // Actions

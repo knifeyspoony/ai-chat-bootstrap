@@ -187,11 +187,11 @@ systemPrompt: "You are a senior software architect. Focus on design patterns, sc
 ```tsx
 "use client";
 import React from "react";
-import { 
-  ChatContainer, 
-  useAIChat, 
+import {
+  MockChatContainer,
+  useAIChat,
   useAIChatCommand,
-  useAIFrontendTool 
+  useAIFrontendTool,
 } from "ai-chat-bootstrap";
 import { z } from "zod";
 
@@ -247,13 +247,16 @@ export function ChatWithAICommands() {
   });
 
   const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant with access to specialized commands.",
+    transport: { api: "/api/chat" },
+    messages: {
+      systemPrompt:
+        "You are a helpful assistant with access to specialized commands.",
+    },
   });
 
   return (
     <div className="h-[600px] w-full">
-      <ChatContainer
+      <MockChatContainer
         chat={chat}
         header={{
           title: "AI Assistant with Commands",
@@ -277,16 +280,6 @@ graph LR
     E --> F[AI Processes Result]
     F --> G[Generate Response]
 ```
-
-## Best Practices
-
-1. **Clear Naming**: Use descriptive command names that indicate their purpose
-2. **Parameter Descriptions**: Add clear descriptions for all parameters
-3. **System Prompts**: Craft specific prompts for each command's intended behavior
-4. **Tool Alignment**: Ensure the tool name matches a registered frontend tool
-5. **Error Handling**: Tools should handle errors gracefully
-6. **Validation**: Use strict Zod schemas to validate input
-7. **Documentation**: Document available commands for users
 
 ## TypeScript Interface
 
@@ -325,5 +318,5 @@ type CommandRegistration = Omit<AIChatCommand, 'type'>;
 
 - [useUIChatCommand](/api/hooks/use-ui-chat-command) - Register UI commands for direct execution
 - [useAIFrontendTool](/api/hooks/use-ai-frontend-tool) - Register tools that commands can use
-- [Commands Guide](/chat/commands) - Complete guide to using commands
+- [Commands Guide](/features/commands) - Complete guide to using commands
 - [useAIChat](/api/hooks/use-ai-chat) - Main chat hook

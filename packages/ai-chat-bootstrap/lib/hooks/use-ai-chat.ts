@@ -4,106 +4,117 @@ import {
   lastAssistantMessageIsCompleteWithToolCalls,
   UIMessage,
 } from "ai";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 // z import removed - no longer needed without planning schemas
 import { useShallow } from "zustand/react/shallow";
 import {
   useAIContextStore,
   useAIFocusStore,
-  useAIModelsStore,
   useAIMCPServersStore,
+  useAIModelsStore,
   useAIToolsStore,
   useChatThreadsStore,
 } from "../stores";
 import { useChatStore } from "../stores/";
 import type { SerializedMCPServer } from "../stores/mcp";
+import type { SerializedTool } from "../stores/tools";
 // Planning types and schemas removed - using flow capture instead
-import type { ChatModelOption } from "../types/chat";
+import type { ChatModelOption, ChatRequest } from "../types/chat";
 import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
 import { useChainOfThought } from "./use-chain-of-thought";
 
 const EMPTY_MODEL_OPTIONS: ChatModelOption[] = [];
 
-// Planning schemas removed - using simplified flow capture approach
-
-// All planning schemas removed - flow capture handles planning automatically
-
-/**
- * Enhanced chat hook that integrates with AI SDK and our Zustand stores.
- * Automatically includes context, focus, tools and sends an enrichedSystemPrompt.
- *
- * Enriched System Prompt Strategy:
- *  - Always generated on each request (fresh snapshot of context/focus/tools)
- *  - Can be overridden per-call by providing body.enrichedSystemPrompt when sending a message
- *  - Original consumer-provided systemPrompt becomes the "originalSystemPrompt" appended in the enrichment
- */
-export function useAIChat(
-  options: {
+export interface UseAIChatOptions {
+  transport?: {
     api?: string;
+  };
+  messages?: {
     systemPrompt?: string;
-    initialMessages?: UIMessage[];
-    threadId?: string; // optional thread integration
-    /** Optional scope partition key for sharding threads (e.g. notebook/document id). */
+    initial?: UIMessage[];
+  };
+  thread?: {
+    id?: string;
     scopeKey?: string;
-    /**
-     * When true, the hook exposes a lightweight planning UI powered by built-in frontend tools.
-     * The assistant can create/update/complete a plan that is shown temporarily to the user.
-     */
-    enableChainOfThought?: boolean;
-    /**
-     * Endpoint for AI title generation. Defaults to "/api/thread-title".
-     * Set to a different path to customize, or set to an empty string to disable network-based titling.
-     */
-    threadTitleApi?: string;
-    /**
-     * Number of recent messages to include when asking the backend to generate/upgrade a title.
-     * Defaults to 8 (last 8 messages).
-     */
-    threadTitleSampleCount?: number;
-    /**
-     * If a threadId is provided and no thread exists in the store (and cannot be loaded
-     * from persistence), automatically create a new thread with that id.
-     * Defaults to true.
-     */
-    autoCreateThread?: boolean;
-    /**
-     * Emit a console.warn() when a supplied threadId could not be found/loaded.
-     * Defaults to false.
-     */
-    warnOnMissingThread?: boolean;
-    mcp?: {
-      enabled?: boolean;
+    autoCreate?: boolean;
+    warnOnMissing?: boolean;
+    title?: {
       api?: string;
-      servers?: SerializedMCPServer[];
+      sampleCount?: number;
     };
-    /**
-     * Optional list of model choices to expose in the prompt input. When provided, the
-     * hook keeps track of the selected model and forwards it with each chat request.
-     */
-    models?: ChatModelOption[];
-    /**
-     * Initial model identifier to select on mount. Defaults to the first model in the
-     * provided list when omitted.
-     */
-    model?: string;
-  } = {}
-) {
-  const {
-    api = "/api/chat",
-    systemPrompt,
-    initialMessages,
-    threadId,
-    scopeKey,
-    enableChainOfThought = false,
-    threadTitleApi = "",
-    threadTitleSampleCount = 8,
-    autoCreateThread = true,
-    warnOnMissingThread = false,
-    mcp,
-    models: providedModels,
-    model: providedModel,
-  } = options;
-  const incomingModels = providedModels ?? EMPTY_MODEL_OPTIONS;
+  };
+  features?: {
+    chainOfThought?: boolean;
+  };
+  mcp?: {
+    enabled?: boolean;
+    api?: string;
+    servers?: SerializedMCPServer[];
+  };
+  models?: {
+    available?: ChatModelOption[];
+    initial?: string;
+  };
+}
+
+const isSerializedToolArray = (value: unknown): value is SerializedTool[] =>
+  Array.isArray(value) &&
+  value.every(
+    (item) =>
+      item !== null &&
+      typeof item === "object" &&
+      "name" in item &&
+      typeof (item as { name?: unknown }).name === "string"
+  );
+
+const isSerializedMCPServerArray = (
+  value: unknown
+): value is SerializedMCPServer[] =>
+  Array.isArray(value) &&
+  value.every(
+    (item) =>
+      item !== null &&
+      typeof item === "object" &&
+      "id" in item &&
+      typeof (item as { id?: unknown }).id === "string" &&
+      "transport" in item &&
+      typeof (item as { transport?: unknown }).transport === "object"
+  );
+
+type ChatHelpers = ReturnType<typeof useChat>;
+
+const hasAutoTitledFlag = (metadata?: Record<string, unknown>): boolean => {
+  if (!metadata) return false;
+  const flag = (metadata as { autoTitled?: unknown }).autoTitled;
+  return flag === true;
+};
+
+export function useAIChat({
+  transport,
+  messages,
+  thread,
+  features,
+  mcp,
+  models: modelsGroup,
+}: UseAIChatOptions = {}) {
+  const api = transport?.api ?? "/api/chat";
+  const systemPrompt = messages?.systemPrompt;
+  const initialMessages = messages?.initial;
+  const threadId = thread?.id;
+  const scopeKey = thread?.scopeKey;
+  const chainOfThoughtEnabled = features?.chainOfThought ?? false;
+  const threadTitleApi = thread?.title?.api ?? "";
+  const threadTitleSampleCount = thread?.title?.sampleCount ?? 8;
+  const autoCreateThread = thread?.autoCreate ?? true;
+  const warnOnMissingThread = thread?.warnOnMissing ?? false;
+  const incomingModels = modelsGroup?.available ?? EMPTY_MODEL_OPTIONS;
+  const providedModel = modelsGroup?.initial;
   const mcpEnabled = mcp?.enabled ?? false;
 
   const { models, selectedModelId } = useAIModelsStore(
@@ -113,9 +124,6 @@ export function useAIChat(
     }))
   );
   const setModelsInStore = useAIModelsStore((state) => state.setModels);
-  const setSelectedModelIdInStore = useAIModelsStore(
-    (state) => state.setSelectedModelId
-  );
 
   useEffect(() => {
     const state = useAIModelsStore.getState();
@@ -160,12 +168,9 @@ export function useAIChat(
     selectedModelRef.current = selectedModelId;
   }, [selectedModelId]);
 
-  const setModel = React.useCallback(
-    (modelId: string) => {
-      setSelectedModelIdInStore(modelId);
-    },
-    [setSelectedModelIdInStore]
-  );
+  const setModel = React.useCallback((modelId: string) => {
+    useAIModelsStore.getState().setSelectedModelId(modelId);
+  }, []);
 
   // Get raw store data with stable selectors - these return the same reference when unchanged
   const contextItemsMap = useAIContextStore(
@@ -192,9 +197,9 @@ export function useAIChat(
     (state) => state.setConfigurations
   );
 
-  // Only register the chain of thought hook, passing enableChainOfThought
+  // Only register the chain of thought hook, passing chainOfThoughtEnabled
   useChainOfThought({
-    enabled: enableChainOfThought,
+    enabled: chainOfThoughtEnabled,
     registerTool,
     unregisterTool,
   });
@@ -415,8 +420,15 @@ export function useAIChat(
     return Array.from(toolsMap.values());
   }, [toolsMap]);
 
-  // Create transport with dynamic request preparation - only recreate when api/systemPrompt changes
-  const transport = useMemo(() => {
+  const systemPromptRef = useRef(systemPrompt);
+
+  // Update ref when systemPrompt changes
+  useEffect(() => {
+    systemPromptRef.current = systemPrompt;
+  }, [systemPrompt]);
+
+  // Create transport with dynamic request preparation - only recreate when api changes
+  const chatTransport = useMemo(() => {
     return new DefaultChatTransport({
       api,
       prepareSendMessagesRequest: async (options) => {
@@ -429,32 +441,41 @@ export function useAIChat(
         const mcpStore = useAIMCPServersStore.getState();
         const currentMcpServers = mcpStore.serializeServersForBackend();
         const mcpToolSummaries = mcpStore.getAllToolSummaries();
-        const callerBody = options.body ?? {};
+        const callerBody = (options.body ?? {}) as Record<string, unknown>;
 
-        // Per-call overrides
-        const overrideTools = (callerBody as any).tools as
-          | unknown[]
-          | undefined;
-        const overrideMcpServers = (callerBody as any).mcpServers as
-          | SerializedMCPServer[]
-          | undefined;
-        const overrideSystemPrompt = (callerBody as any).systemPrompt as
-          | string
-          | undefined;
-        const overrideEnrichedSystemPrompt = (callerBody as any)
-          .enrichedSystemPrompt as string | undefined;
-        const overrideModel = (callerBody as any).model as string | undefined;
+        // Per-call overrides validated for expected structure
+        const overrideTools = isSerializedToolArray(callerBody["tools"])
+          ? callerBody["tools"]
+          : undefined;
+        const overrideMcpServers = isSerializedMCPServerArray(
+          callerBody["mcpServers"]
+        )
+          ? callerBody["mcpServers"]
+          : undefined;
+        const overrideSystemPrompt =
+          typeof callerBody["systemPrompt"] === "string"
+            ? (callerBody["systemPrompt"] as string)
+            : undefined;
+        const overrideEnrichedSystemPrompt =
+          typeof callerBody["enrichedSystemPrompt"] === "string"
+            ? (callerBody["enrichedSystemPrompt"] as string)
+            : undefined;
+        const overrideModel =
+          typeof callerBody["model"] === "string"
+            ? (callerBody["model"] as string)
+            : undefined;
 
         const toolsToSend = overrideTools ?? currentTools;
         const mcpServersToSend = overrideMcpServers ?? currentMcpServers;
-        const systemPromptToSend = overrideSystemPrompt ?? systemPrompt;
+        const systemPromptToSend =
+          overrideSystemPrompt ?? systemPromptRef.current;
         // No chain of thought prompt
 
         const toolSummaryMap = new Map<
           string,
           { name: string; description?: string }
         >();
-        toolsToSend.forEach((tool: any) => {
+        toolsToSend.forEach((tool) => {
           if (!tool?.name) return;
           if (!toolSummaryMap.has(tool.name)) {
             toolSummaryMap.set(tool.name, {
@@ -482,19 +503,19 @@ export function useAIChat(
             context: currentContext,
             focus: currentFocusItems,
             tools: combinedToolSummaries,
-            chainOfThoughtEnabled: enableChainOfThought,
+            chainOfThoughtEnabled,
           });
 
-        const body = {
+        const body: ChatRequest & Record<string, unknown> = {
           ...callerBody,
-          messages: options.messages,
+          messages: options.messages as UIMessage[],
           context: currentContext,
           tools: toolsToSend,
           mcpServers: mcpServersToSend,
           focus: currentFocusItems, // Send complete focus items
           systemPrompt: systemPromptToSend,
           enrichedSystemPrompt: enrichedSystemPromptToSend,
-        } as Record<string, unknown>;
+        };
 
         if (overrideModel !== undefined) {
           body.model = overrideModel;
@@ -508,14 +529,19 @@ export function useAIChat(
         };
       },
     });
-  }, [api, systemPrompt, enableChainOfThought]);
+  }, [api, chainOfThoughtEnabled]); // systemPrompt removed - now uses stable ref
 
   const [draftInput, setDraftInput] = useState("");
 
+  // Create refs to access chat functions without causing re-renders
+  const chatHookRef = useRef<ChatHelpers | null>(null);
+
   const chatHook = useChat({
-    transport,
+    transport: chatTransport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     messages: existingThreadMessages ?? initialMessages,
+    experimental_throttle: 100,
+    // Will be added in future version for additional throttling
     onToolCall: async ({ toolCall }) => {
       try {
         // Execute frontend tool if available
@@ -540,11 +566,12 @@ export function useAIChat(
             // Immediate default title after first user message (if no manual title)
             const tNow = state.threads.get(effectiveId);
             if (tNow && !tNow.title) {
-              const firstUserText = (
-                chatHook.messages.find((m) => m.role === "user")?.parts || []
-              )
-                .map((p: any) =>
-                  p?.type === "text" ? String(p.text || "") : ""
+              const firstUserMessage = chatHook.messages.find(
+                (m) => m.role === "user"
+              );
+              const firstUserText = (firstUserMessage?.parts ?? [])
+                .map((part) =>
+                  part?.type === "text" ? String(part.text ?? "") : ""
                 )
                 .filter(Boolean)
                 .join(" ")
@@ -594,13 +621,16 @@ export function useAIChat(
                       ? storeMsgs
                       : (chatHook.messages as UIMessage[]) || [];
                   const sample = source.slice(-threadTitleSampleCount);
-                  const payload = {
+                  const payload: {
+                    messages: UIMessage[];
+                    previousTitle?: string;
+                  } = {
                     messages: sample,
                     previousTitle:
                       typeof current?.title === "string"
-                        ? current?.title
+                        ? current.title
                         : undefined,
-                  } as any;
+                  };
                   fetch(threadTitleApi, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -629,6 +659,11 @@ export function useAIChat(
       setError("Chat error occurred");
     },
   });
+
+  // Update ref to latest chatHook for stable callback access
+  useEffect(() => {
+    chatHookRef.current = chatHook;
+  }, [chatHook]);
 
   // Keep track of last thread id AND per-thread input drafts
   const lastThreadIdRef = useRef<string | undefined>(undefined);
@@ -678,7 +713,7 @@ export function useAIChat(
       // no active thread
       chatHook.setMessages([]);
     }
-  }, [threadId, storeActiveThreadId, chatHook]);
+  }, [threadId, storeActiveThreadId, chatHook, threadStore]);
 
   // Note: Removed chat store sync - causes infinite re-renders
   // The chat hook manages its own state internally
@@ -697,88 +732,90 @@ export function useAIChat(
     } catch {}
   }
 
-  const sendMessageWithContext = (content: string) => {
-    setError(null);
-    chatHook.sendMessage({ text: content });
-    if (threadStore) {
-      // schedule microtask after message appended by hook
-      queueMicrotask(() => {
-        try {
-          const state = threadStore.getState();
-          const effectiveId = threadId ?? state.activeThreadId;
-          if (effectiveId && state.threads.get(effectiveId)) {
-            state.updateThreadMessages(
-              effectiveId,
-              chatHook.messages as UIMessage[]
-            );
-            // Initial placeholder title: first user message preview if untitled
-            const t = state.threads.get(effectiveId);
-            if (t && (!t.title || (t.metadata as any)?.autoTitled === true)) {
-              if (!t.title) {
-                const raw = String(content ?? "").trim();
-                if (raw) {
-                  const PREVIEW_LEN = 24; // keep in sync with UI truncation
-                  let preview = raw.slice(0, PREVIEW_LEN);
-                  if (raw.length > PREVIEW_LEN) {
-                    const lastSpace = preview.lastIndexOf(" ");
-                    if (lastSpace > 8) preview = preview.slice(0, lastSpace);
-                    preview = preview + "…"; // indicate truncation in preview
-                  }
-                  preview = preview
-                    .replace(/[\n\r]+/g, " ")
-                    .replace(/\s+/g, " ")
-                    .trim();
-                  if (preview) {
-                    state.renameThread(effectiveId, preview, {
-                      allowAutoReplace: true,
-                    });
+  const sendMessageWithContext = useCallback(
+    (content: string) => {
+      setError(null);
+      chatHookRef.current?.sendMessage({ text: content });
+      if (threadStore) {
+        // schedule microtask after message appended by hook
+        queueMicrotask(() => {
+          try {
+            const state = threadStore.getState();
+            const effectiveId = threadId ?? state.activeThreadId;
+            if (effectiveId && state.threads.get(effectiveId)) {
+              state.updateThreadMessages(
+                effectiveId,
+                chatHookRef.current?.messages as UIMessage[]
+              );
+              // Initial placeholder title: first user message preview if untitled
+              const t = state.threads.get(effectiveId);
+              if (t && (!t.title || hasAutoTitledFlag(t.metadata))) {
+                if (!t.title) {
+                  const raw = String(content ?? "").trim();
+                  if (raw) {
+                    const PREVIEW_LEN = 24; // keep in sync with UI truncation
+                    let preview = raw.slice(0, PREVIEW_LEN);
+                    if (raw.length > PREVIEW_LEN) {
+                      const lastSpace = preview.lastIndexOf(" ");
+                      if (lastSpace > 8) preview = preview.slice(0, lastSpace);
+                      preview = preview + "…"; // indicate truncation in preview
+                    }
+                    preview = preview
+                      .replace(/[\n\r]+/g, " ")
+                      .replace(/\s+/g, " ")
+                      .trim();
+                    if (preview) {
+                      state.renameThread(effectiveId, preview, {
+                        allowAutoReplace: true,
+                      });
+                    }
                   }
                 }
               }
             }
-          }
-        } catch {}
-      });
-    }
-  };
+          } catch {}
+        });
+      }
+    },
+    [threadId, setError, threadStore]
+  );
 
   // Send AI command message with specific tool filtering
-  const sendAICommandMessage = (
-    content: string,
-    toolName: string,
-    commandSystemPrompt?: string
-  ) => {
-    setError(null);
+  const sendAICommandMessage = useCallback(
+    (content: string, toolName: string, commandSystemPrompt?: string) => {
+      setError(null);
 
-    // Filter tools to only include the specified tool (per-call override via body)
-    const allTools = useAIToolsStore.getState().serializeToolsForBackend();
-    const filteredTools = allTools.filter((tool) => tool.name === toolName);
+      // Filter tools to only include the specified tool (per-call override via body)
+      const allTools = useAIToolsStore.getState().serializeToolsForBackend();
+      const filteredTools = allTools.filter((tool) => tool.name === toolName);
 
-    // Send message with per-call overrides; transport will pick these up in prepareSendMessagesRequest
-    chatHook.sendMessage(
-      { text: content },
-      {
-        body: {
-          tools: filteredTools,
-          systemPrompt: commandSystemPrompt || systemPrompt,
-        },
+      // Send message with per-call overrides; transport will pick these up in prepareSendMessagesRequest
+      chatHookRef.current?.sendMessage(
+        { text: content },
+        {
+          body: {
+            tools: filteredTools,
+            systemPrompt: commandSystemPrompt || systemPromptRef.current,
+          },
+        }
+      );
+      if (threadStore) {
+        queueMicrotask(() => {
+          try {
+            const state = threadStore.getState();
+            const effectiveId = threadId ?? state.activeThreadId;
+            if (effectiveId && state.threads.get(effectiveId)) {
+              state.updateThreadMessages(
+                effectiveId,
+                chatHookRef.current?.messages as UIMessage[]
+              );
+            }
+          } catch {}
+        });
       }
-    );
-    if (threadStore) {
-      queueMicrotask(() => {
-        try {
-          const state = threadStore.getState();
-          const effectiveId = threadId ?? state.activeThreadId;
-          if (effectiveId && state.threads.get(effectiveId)) {
-            state.updateThreadMessages(
-              effectiveId,
-              chatHook.messages as UIMessage[]
-            );
-          }
-        } catch {}
-      });
-    }
-  };
+    },
+    [threadId, setError, threadStore]
+  );
 
   // Retry last message with error recovery
   const retryLastMessage = () => {
@@ -809,32 +846,35 @@ export function useAIChat(
     return `${msgs.length}:${tailIds}`;
   }
 
-  function persistMessagesIfChanged(reason?: string) {
-    void reason;
-    const effectiveId =
-      threadId ??
-      (() => {
-        try {
-          return threadStore.getState().activeThreadId;
-        } catch {
-          return undefined;
-        }
-      })();
-    if (!effectiveId) return;
-    try {
-      const store = threadStore.getState();
-      const loaded = store.getThreadIfLoaded?.(effectiveId);
-      if (!loaded) return; // only persist hydrated threads
-      const msgs = chatHook.messages as UIMessage[];
-      const sig = computeSignature(msgs);
-      if (sig === lastSavedSignatureRef.current) return;
-      store.updateThreadMessages(effectiveId, msgs);
-      lastSavedSignatureRef.current = sig;
-      // Optionally debug: console.debug('[acb][autosave]', reason, sig)
-    } catch {
-      /* ignore */
-    }
-  }
+  const persistMessagesIfChanged = useCallback(
+    (reason?: string) => {
+      void reason;
+      const effectiveId =
+        threadId ??
+        (() => {
+          try {
+            return threadStore.getState().activeThreadId;
+          } catch {
+            return undefined;
+          }
+        })();
+      if (!effectiveId) return;
+      try {
+        const store = threadStore.getState();
+        const loaded = store.getThreadIfLoaded?.(effectiveId);
+        if (!loaded) return; // only persist hydrated threads
+        const msgs = chatHook.messages as UIMessage[];
+        const sig = computeSignature(msgs);
+        if (sig === lastSavedSignatureRef.current) return;
+        store.updateThreadMessages(effectiveId, msgs);
+        lastSavedSignatureRef.current = sig;
+        // Optionally debug: console.debug('[acb][autosave]', reason, sig)
+      } catch {
+        /* ignore */
+      }
+    },
+    [threadId, threadStore, chatHook.messages]
+  );
 
   // Persist whenever messages settle and we are idle (not streaming/submitting)
   useEffect(() => {
@@ -843,7 +883,13 @@ export function useAIChat(
     if (chatHook.status === "streaming" || chatHook.status === "submitted")
       return;
     persistMessagesIfChanged("idle");
-  }, [threadId, storeActiveThreadId, chatHook.status, chatHook.messages]);
+  }, [
+    threadId,
+    storeActiveThreadId,
+    chatHook.status,
+    chatHook.messages,
+    persistMessagesIfChanged,
+  ]);
 
   // Removed prior periodic re-title effect; AI upgrade is triggered on assistant completion with cooldown
 
@@ -852,8 +898,7 @@ export function useAIChat(
     return () => {
       persistMessagesIfChanged("unmount");
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [persistMessagesIfChanged]);
 
   return {
     ...chatHook,
@@ -875,8 +920,8 @@ export function useAIChat(
     model: selectedModelId,
     setModel,
     // Expose options for UI components
-    threadId: options.threadId,
-    scopeKey: options.scopeKey,
-    chainOfThoughtEnabled: options.enableChainOfThought ?? false,
+    threadId,
+    scopeKey,
+    chainOfThoughtEnabled,
   };
 }

@@ -1,8 +1,5 @@
 "use client";
-import {
-  ChatContainer,
-  useAIFrontendTool,
-} from "ai-chat-bootstrap";
+import { MockChatContainer, useAIFrontendTool } from "ai-chat-bootstrap";
 import React, { useState } from "react";
 import { z } from "zod";
 import { useMockAIChat } from "./shared/useMockAIChat";
@@ -53,42 +50,43 @@ export function ChatWithToolsExample() {
   }
 
   // Create custom response generator with tool simulation
-  const toolAwareResponseGenerator = React.useCallback((text: string) => {
-    const lowerInput = text.toLowerCase();
-    const responseText = `You said: "${text}".`;
+  const toolAwareResponseGenerator = React.useCallback(
+    (text: string) => {
+      const lowerInput = text.toLowerCase();
+      const responseText = `You said: "${text}".`;
 
-    if (
-      lowerInput.includes("increment") ||
-      lowerInput.includes("increase") ||
-      lowerInput.includes("add") ||
-      lowerInput.includes("up")
-    ) {
-      const amount = extractNumber(text) || 1;
-      const newValue = counter + amount;
-      setCounter(newValue);
-      return `I'll increment the counter by ${amount}. Counter incremented by ${amount}. New value: ${newValue}`;
-    } else if (
-      lowerInput.includes("decrement") ||
-      lowerInput.includes("decrease") ||
-      lowerInput.includes("subtract") ||
-      lowerInput.includes("reduce")
-    ) {
-      const amount = extractNumber(text) || 1;
-      const newValue = counter - amount;
-      setCounter(newValue);
-      return `I'll decrement the counter by ${amount}. Counter decremented by ${amount}. New value: ${newValue}`;
-    } else {
-      return `${responseText} I can help you control the counter above! Try saying "increment by 5" or "decrease by 2".`;
-    }
-  }, [counter]);
+      if (
+        lowerInput.includes("increment") ||
+        lowerInput.includes("increase") ||
+        lowerInput.includes("add") ||
+        lowerInput.includes("up")
+      ) {
+        const amount = extractNumber(text) || 1;
+        const newValue = counter + amount;
+        setCounter(newValue);
+        return `I'll increment the counter by ${amount}. Counter incremented by ${amount}. New value: ${newValue}`;
+      } else if (
+        lowerInput.includes("decrement") ||
+        lowerInput.includes("decrease") ||
+        lowerInput.includes("subtract") ||
+        lowerInput.includes("reduce")
+      ) {
+        const amount = extractNumber(text) || 1;
+        const newValue = counter - amount;
+        setCounter(newValue);
+        return `I'll decrement the counter by ${amount}. Counter decremented by ${amount}. New value: ${newValue}`;
+      } else {
+        return `${responseText} I can help you control the counter above! Try saying "increment by 5" or "decrease by 2".`;
+      }
+    },
+    [counter]
+  );
 
   // Create mock chat with tool-aware responses
   const mockChat = useMockAIChat({
     responseGenerator: toolAwareResponseGenerator,
     responseDelay: 800,
   });
-
-
 
   return (
     <div className="space-y-4">
@@ -101,8 +99,8 @@ export function ChatWithToolsExample() {
       </div>
 
       {/* Chat Interface */}
-      <div className="h-[420px] w-full">
-        <ChatContainer
+      <div className="h-[600px] w-full">
+        <MockChatContainer
           chat={mockChat}
           header={{
             title: "AI Assistant with Tools",
@@ -160,8 +158,11 @@ export function ChatWithTools() {
   });
 
   const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant that can control a counter widget. Use the increment_counter and decrement_counter tools when users ask you to change the counter value."
+    transport: { api: "/api/chat" },
+    messages: {
+      systemPrompt:
+        "You are a helpful assistant that can control a counter widget. Use the increment_counter and decrement_counter tools when users ask you to change the counter value.",
+    },
   });
 
   return (
@@ -175,11 +176,15 @@ export function ChatWithTools() {
       </div>
       
       {/* Chat Interface */}
-      <div className="h-[420px] w-full">
+      <div className="h-[600px] w-full">
         <ChatContainer
+          transport={{ api: "/api/chat" }}
+          messages={{
+            systemPrompt:
+              "You are a helpful assistant that can control a counter widget. Use the increment_counter and decrement_counter tools when users ask you to change the counter value.",
+          }}
           header={{ title: "AI Assistant with Tools", subtitle: "Can control the counter above" }}
           ui={{ placeholder: "Try: 'increment by 3' or 'decrease by 2'" }}
-          chat={mockChat}
         />
       </div>
     </div>

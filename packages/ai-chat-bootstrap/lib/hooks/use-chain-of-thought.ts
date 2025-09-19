@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { z } from "zod";
+import type { AnyFrontendTool } from "../stores/tools";
 import {
   COT_COMPLETE_CHAIN_TOOL_NAME,
   COT_START_CHAIN_TOOL_NAME,
@@ -41,7 +42,7 @@ const completeChainSchema = z.object({
 
 export interface UseChainOfThoughtOptions {
   enabled: boolean;
-  registerTool: (tool: any) => void;
+  registerTool: (tool: AnyFrontendTool) => void;
   unregisterTool: (name: string) => void;
 }
 
@@ -84,5 +85,5 @@ export function useChainOfThought({
       unregisterTool(COT_START_STEP_TOOL_NAME);
       unregisterTool(COT_COMPLETE_CHAIN_TOOL_NAME);
     };
-  }, [enabled]);
+  }, [enabled, registerTool, unregisterTool]);
 }

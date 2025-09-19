@@ -1,8 +1,8 @@
 {
-  "name": "ai-sdk-chat-workspace",
-  "version": "0.4.0",
+  "name": "aai-chat-bootstrap-workspace",
+  "version": "0.4.1",
   "private": true,
-  "description": "Monorepo for AI SDK Chat library and demo",
+  "description": "Monorepo for AI Chat Bootstrap library and demo",
   "scripts": {
     "build": "pnpm run rebuild",
     "rebuild": "pnpm rebuild:lib && pnpm rebuild:demo && pnpm rebuild:docs",

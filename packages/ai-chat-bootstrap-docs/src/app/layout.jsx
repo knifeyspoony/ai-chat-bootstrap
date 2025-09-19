@@ -3,7 +3,16 @@ import "nextra-theme-docs/style.css";
 import "./globals.css";
 import { Head } from "nextra/components";
 import { getPageMap } from "nextra/page-map";
-import { Space_Grotesk } from "next/font/google";
+import {
+  Space_Grotesk,
+  Geist,
+  Geist_Mono,
+  Oxanium,
+  Merriweather,
+  Fira_Code,
+} from "next/font/google";
+
+import { DocsThemeSelect } from "../components/DocsThemeSelect";
 
 export const metadata = {
   title: "AI Chat Bootstrap",
@@ -30,6 +39,33 @@ const imageStyle = {
   width: 'auto',
 }
 
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+const oxanium = Oxanium({
+  variable: "--font-oxanium",
+  subsets: ["latin"],
+});
+
+const merriweather = Merriweather({
+  variable: "--font-merriweather",
+  subsets: ["latin"],
+  weight: ["300", "400", "700", "900"],
+});
+
+const firaCode = Fira_Code({
+  variable: "--font-fira-code",
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+});
+
 const displayFont = Space_Grotesk({
   subsets: ["latin"],
   weight: ["500", "600"],
@@ -44,6 +80,7 @@ const navbar = (
       </div>
     }
     projectLink="https://github.com/knifeyspoony/ai-chat-bootstrap"
+    children={<DocsThemeSelect />}
   />
 );
 const footer = <Footer>MIT {new Date().getFullYear()} © knifeyspoony.</Footer>;
@@ -54,6 +91,7 @@ export default async function RootLayout({ children }) {
       lang="en"
       dir="ltr"
       suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable} ${oxanium.variable} ${merriweather.variable} ${firaCode.variable}`}
     >
       <Head
       >

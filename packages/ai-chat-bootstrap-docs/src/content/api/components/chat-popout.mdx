@@ -5,7 +5,7 @@ description: Popout chat UI that wraps ChatContainer with built-in state and a r
 
 # ChatPopout
 
-A popout chat interface that wraps ChatContainer. Requires the `useAIChat` hook. Supports overlay or inline panel modes, left/right positioning, and resizable width.
+A popout chat interface that wraps ChatContainer with built-in AI chat functionality. Supports overlay or inline panel modes, left/right positioning, and resizable width.
 
 > Note: ChatPopout extends ChatContainer with popout shell functionality.
 
@@ -19,9 +19,6 @@ import { ChatPopout } from "ai-chat-bootstrap";
 
 ```ts
 interface ChatPopoutProps extends ChatContainerProps {
-  // Required
-  chat: ReturnType<typeof useAIChat>;
-
   // Popout shell (layout, sizing, positioning)
   popout?: {
     isOpen?: boolean;
@@ -52,17 +49,13 @@ See `ChatContainerProps` in [ChatContainer](/api/components/chat-container).
 ## Usage
 
 ```tsx
-import { ChatPopout, useAIChat } from "ai-chat-bootstrap";
+import { ChatPopout } from "ai-chat-bootstrap";
 
 export function Page() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant.",
-  });
-
   return (
     <ChatPopout
-      chat={chat}
+      transport={{ api: "/api/chat" }}
+      messages={{ systemPrompt: "You are a helpful assistant." }}
       header={{ title: "AI Assistant" }}
       ui={{ placeholder: "Ask me anything..." }}
       suggestions={{ enabled: true, count: 3 }}
@@ -77,13 +70,15 @@ export function Page() {
 ```tsx
 // Inline mode (embedded in layout)
 <ChatPopout
-  chat={chat}
+  transport={{ api: "/api/chat" }}
+  messages={{ systemPrompt: "You are a helpful assistant." }}
   popout={{ mode: "inline", width: { default: 420 } }}
 />
 
 // Overlay mode with custom positioning
 <ChatPopout
-  chat={chat}
+  transport={{ api: "/api/chat" }}
+  messages={{ systemPrompt: "You are a helpful assistant." }}
   popout={{
     mode: "overlay",
     position: "left",
@@ -94,7 +89,8 @@ export function Page() {
 
 // Permanent (always open)
 <ChatPopout
-  chat={chat}
+  transport={{ api: "/api/chat" }}
+  messages={{ systemPrompt: "You are a helpful assistant." }}
   popout={{ permanent: true }}
   button={{ show: false }}
 />

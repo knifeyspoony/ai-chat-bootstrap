@@ -24,6 +24,7 @@ export type {
   SuggestionsResponse,
   SuggestionsSchemaType,
 } from "./types/chat";
+export type { AssistantAction, AssistantActionsConfig } from "./types/actions";
 
 // Optional: Variant helpers (CVA) for consumers wanting pure class composition
 export * from "./variants";

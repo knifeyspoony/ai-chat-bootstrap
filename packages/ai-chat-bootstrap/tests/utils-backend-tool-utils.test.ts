@@ -4,7 +4,7 @@ import { deserializeFrontendTools } from '../lib/utils/backend-tool-utils';
 describe('deserializeFrontendTools', () => {
   it('returns empty record when input is empty or null', () => {
     expect(deserializeFrontendTools()).toEqual({});
-    // @ts-expect-error
+    // @ts-expect-error Testing null input for error handling
     expect(deserializeFrontendTools(null)).toEqual({});
     expect(deserializeFrontendTools([])).toEqual({});
   });

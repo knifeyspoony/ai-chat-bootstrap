@@ -35,6 +35,8 @@ The library accepts **shadcn/ui** and **Tailwind** classes naturally, falling ba
 @import "ai-chat-bootstrap/ai-chat.css";
 ```
 
+`tokens.css` defines the design tokens + minimal globals. `ai-chat.css` adds the component styles.
+
 To theme, override CSS custom properties:
 ```css
 :root {
@@ -60,17 +62,13 @@ Don't use both modes together.
 
 ```tsx
 import React from "react";
-import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+import { ChatContainer } from "ai-chat-bootstrap";
 
 export function App() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful AI assistant.",
-  });
-
   return (
     <ChatContainer
-      chat={chat}
+      transport={{ api: "/api/chat" }}
+      messages={{ systemPrompt: "You are a helpful AI assistant." }}
       header={{ title: "AI Assistant", subtitle: "Connected to AI" }}
       ui={{ placeholder: "Ask me anything..." }}
     />
@@ -114,8 +112,8 @@ Also available: `createSuggestionsHandler`, `createThreadTitleHandler`, `createM
 
 ## CSS & Theming
 
-- `tokens.css`: design tokens + minimal global fixes
-- `ai-chat.css`: optional precompiled library utility slice (only used classes, no preflight)
+- `ai-chat-bootstrap/tokens.css`: design tokens + minimal globals
+- `ai-chat-bootstrap/ai-chat.css`: chat component styles without Tailwind preflight
 - Tailwind preset: maps tokens into Tailwind theme when compiling yourself
 - Theme by overriding CSS variables (`--background`, `--foreground`, `--primary`, etc.)
 
@@ -123,7 +121,7 @@ Also available: `createSuggestionsHandler`, `createThreadTitleHandler`, `createM
 
 | Need | Choose |
 | ---- | ------ |
-| Fast drop‑in, minimal config | Zero‑config + `ai-chat.css` |
+| Fast drop‑in, minimal config | Zero‑config + `ai-chat-bootstrap/tokens.css` + `ai-chat-bootstrap/ai-chat.css` |
 | Centralized Tailwind control | Tailwind‑native preset |
 | Lowest duplicate CSS across many libs | Tailwind‑native |
 | Safest isolation from app utilities | Zero‑config |

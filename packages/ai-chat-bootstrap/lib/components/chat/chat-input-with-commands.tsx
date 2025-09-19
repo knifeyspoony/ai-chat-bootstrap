@@ -1,7 +1,15 @@
 import type { UIMessage } from "ai";
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { CommandDropdown } from "../../components/ui/chat-command";
 import { CommandParameterInfo } from "../../components/ui/command-parameter-info";
+import { useLocalStorage } from "../../hooks/use-local-storage";
 import { useChatStore } from "../../stores/chat";
 import { useChatThreadsStore } from "../../stores/chat-threads";
 import {
@@ -27,6 +35,8 @@ export interface ChatInputWithCommandsProps extends ChatInputProps {
     toolName: string,
     systemPrompt?: string
   ) => void;
+  // Submit-specific disabled state (separate from general disabled)
+  submitDisabled?: boolean;
 }
 
 const ChatInputWithCommandsImpl = ({
@@ -36,23 +46,46 @@ const ChatInputWithCommandsImpl = ({
   enableCommands = false,
   onCommandExecute,
   onAICommandExecute,
+  submitDisabled,
   ...props
 }: ChatInputWithCommandsProps) => {
   const setError = useChatStore((state) => state.setError);
+
+  // Local storage for draft persistence - similar to Vercel's approach
+  const [localStorageInput, setLocalStorageInput] = useLocalStorage(
+    "ai-chat-input",
+    ""
+  );
 
   // Local draft state for uncontrolled usage
   const [draft, setDraft] = useState("");
   const isControlled =
     typeof value === "string" && typeof onChange === "function";
   const currentValue = isControlled ? (value as string) : draft;
-  const updateValue = (next: string) => {
-    if (isControlled) {
-      (onChange as (v: string) => void)(next);
-    } else {
-      setDraft(next);
+
+  // Initialize draft from localStorage on mount (for uncontrolled usage)
+  useEffect(() => {
+    if (!isControlled && localStorageInput && !draft) {
+      setDraft(localStorageInput);
     }
-  };
-  const clearInput = () => updateValue("");
+  }, [isControlled, localStorageInput, draft]);
+
+  const updateValue = useCallback(
+    (next: string) => {
+      if (isControlled) {
+        (onChange as (v: string) => void)(next);
+      } else {
+        setDraft(next);
+        // Save to localStorage for persistence
+        setLocalStorageInput(next);
+      }
+    },
+    [isControlled, onChange, setLocalStorageInput]
+  );
+
+  const clearInput = useCallback(() => {
+    updateValue("");
+  }, [updateValue]);
 
   // Command detection state
   const [showCommands, setShowCommands] = useState(false);
@@ -91,7 +124,7 @@ const ChatInputWithCommandsImpl = ({
     const list = (threadMessages ?? [])
       .filter((m) => m.role === "user")
       .map((m) => {
-        const parts = (m as any).parts as Array<any> | undefined;
+        const parts = m.parts;
         if (Array.isArray(parts) && parts.length > 0) {
           const text = parts
             .map((p) => (p && p.type === "text" ? String(p.text ?? "") : ""))
@@ -100,13 +133,22 @@ const ChatInputWithCommandsImpl = ({
             .trim();
           return text;
         }
-        const content = (m as any).content as any;
-        if (typeof content === "string") return content;
-        if (Array.isArray(content))
-          return content
-            .map((c) => String(c?.text ?? ""))
+
+        const legacyContent = (m as { content?: unknown }).content;
+        if (typeof legacyContent === "string") return legacyContent;
+        if (Array.isArray(legacyContent)) {
+          return legacyContent
+            .map((c) => {
+              if (typeof c === "string") return c;
+              if (c && typeof c === "object" && "text" in c) {
+                const value = (c as { text?: unknown }).text;
+                return typeof value === "string" ? value : "";
+              }
+              return "";
+            })
             .join(" ")
             .trim();
+        }
         return "";
       })
       .filter((t) => t.length > 0);
@@ -133,9 +175,9 @@ const ChatInputWithCommandsImpl = ({
           setShowCommands(false);
 
           // Calculate current parameter index based on cursor position
-          const textarea = document.querySelector(
+          const textarea = document.querySelector<HTMLTextAreaElement>(
             'textarea[data-testid="chat-input"], textarea'
-          ) as HTMLTextAreaElement;
+          );
           const cursorPos = textarea?.selectionStart || currentValue.length;
           const paramIndex = getCurrentParameterIndex(
             currentValue,
@@ -164,126 +206,218 @@ const ChatInputWithCommandsImpl = ({
     }
   }, [currentValue, enableCommands, getCommand]);
 
+  // Stabilized command selection handler
+  const handleCommandSelect = useCallback(
+    async (command: ChatCommand | string) => {
+      const cmd =
+        typeof command === "string" ? getCommandRef.current(command) : command;
+      if (!cmd) return;
+
+      try {
+        if (!hasRequiredParameters(cmd.parameters)) {
+          // Execute immediately - no args needed
+          if (cmd.type === "ui") {
+            await executeCommandRef.current(cmd.name, {});
+            onCommandExecute?.(cmd.name, undefined);
+          } else if (cmd.type === "ai") {
+            // Send AI command message with no parameters
+            const message = `Execute ${cmd.name} command`;
+            onAICommandExecute?.(message, cmd.toolName, cmd.systemPrompt);
+          }
+          clearInput();
+          setShowCommands(false);
+
+          // Return focus to the chat input
+          setTimeout(() => {
+            const textarea = document.querySelector(
+              'textarea[data-testid="chat-input"], textarea'
+            );
+            if (textarea) {
+              (textarea as HTMLTextAreaElement).focus();
+            }
+          }, 10);
+        } else {
+          // Command needs parameters - set input with command name and space
+          updateValue(`/${cmd.name} `);
+          setShowCommands(false);
+          setSelectedCommand(cmd);
+          setShowParameterInfo(true);
+          setCurrentParameterIndex(0);
+          setParameterValidationError(null); // Clear any previous errors
+        }
+      } catch {
+        setErrorRef.current("Command execution failed");
+      }
+    },
+    [onCommandExecute, onAICommandExecute, clearInput, updateValue]
+    // Note: getCommand, executeCommand, setError now accessed via refs for stability
+  );
+
+  // Memoize matching commands to prevent callback recreation
+  const matchingCommands = useMemo(() => {
+    if (!enableCommands || !showCommands) return [];
+    return getMatchingCommands(commandQuery);
+  }, [enableCommands, showCommands, commandQuery, getMatchingCommands]);
+
+  // Create refs for accessing current values in stable callbacks
+  const matchingCommandsRef = useRef<ChatCommand[]>([]);
+  matchingCommandsRef.current = matchingCommands;
+
+  const currentValueRef = useRef(currentValue);
+  currentValueRef.current = currentValue;
+
+  const showCommandsRef = useRef(showCommands);
+  showCommandsRef.current = showCommands;
+
+  const selectedCommandIndexRef = useRef(selectedCommandIndex);
+  selectedCommandIndexRef.current = selectedCommandIndex;
+
+  // Additional refs for handleSubmit optimization
+  const getCommandRef = useRef(getCommand);
+  getCommandRef.current = getCommand;
+
+  const executeCommandRef = useRef(executeCommand);
+  executeCommandRef.current = executeCommand;
+
+  const setErrorRef = useRef(setError);
+  setErrorRef.current = setError;
+
   // Handle keyboard events
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Only intercept keys when we're actively typing a command (starts with '/')
-    if (
-      showCommands &&
-      matchingCommands.length > 0 &&
-      currentValue.startsWith("/")
-    ) {
-      if (e.key === "Escape") {
-        setShowCommands(false);
-        setSelectedCommandIndex(0);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      // Access current values via refs for stability
+      const currentMatchingCommands = matchingCommandsRef.current;
+      const currentValueNow = currentValueRef.current;
+      const showCommandsNow = showCommandsRef.current;
+
+      // Only intercept keys when we're actively typing a command (starts with '/')
+      if (
+        showCommandsNow &&
+        currentMatchingCommands.length > 0 &&
+        currentValueNow.startsWith("/")
+      ) {
+        if (e.key === "Escape") {
+          setShowCommands(false);
+          setSelectedCommandIndex(0);
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+
+        // Handle arrow keys for command navigation
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setSelectedCommandIndex(
+            (prev) => (prev + 1) % currentMatchingCommands.length // Wrap around to beginning
+          );
+          return;
+        }
+
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setSelectedCommandIndex(
+            (prev) =>
+              (prev + currentMatchingCommands.length - 1) %
+              currentMatchingCommands.length // Wrap around to end
+          );
+          return;
+        }
+
+        // Handle Enter to select highlighted command
+        if (e.key === "Enter") {
+          e.preventDefault();
+          const currentSelectedIndex = selectedCommandIndexRef.current;
+          if (currentMatchingCommands[currentSelectedIndex]) {
+            handleCommandSelect(currentMatchingCommands[currentSelectedIndex]);
+          }
+          return;
+        }
+      }
+
+      if (showParameterInfo && e.key === "Escape") {
+        setShowParameterInfo(false);
+        setSelectedCommand(null);
+        clearInput();
         e.preventDefault();
         e.stopPropagation();
         return;
       }
 
-      // Handle arrow keys for command navigation
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setSelectedCommandIndex(
-          (prev) => (prev + 1) % matchingCommands.length // Wrap around to beginning
-        );
-        return;
-      }
+      // Input history navigation (only when not in command UI)
+      // - ArrowUp: cycle to previous user messages, starting from most recent
+      // - ArrowDown: cycle forward and eventually restore the saved draft
+      // Behavior only triggers when caret is at start (Up) or end (Down)
+      // and when not typing a "/" command.
+      if (!currentValueNow.startsWith("/")) {
+        const el = e.currentTarget as HTMLTextAreaElement;
+        const caretStart = el?.selectionStart ?? 0;
+        const caretEnd = el?.selectionEnd ?? 0;
+        const atStart = caretStart === 0 && caretEnd === 0;
+        const atEnd =
+          caretStart === (currentValueNow?.length ?? 0) &&
+          caretEnd === caretStart;
 
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelectedCommandIndex(
-          (prev) =>
-            (prev + matchingCommands.length - 1) % matchingCommands.length // Wrap around to end
-        );
-        return;
-      }
-
-      // Handle Enter to select highlighted command
-      if (e.key === "Enter") {
-        e.preventDefault();
-        if (matchingCommands[selectedCommandIndex]) {
-          handleCommandSelect(matchingCommands[selectedCommandIndex]);
-        }
-        return;
-      }
-    }
-
-    if (showParameterInfo && e.key === "Escape") {
-      setShowParameterInfo(false);
-      setSelectedCommand(null);
-      clearInput();
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-
-    // Input history navigation (only when not in command UI)
-    // - ArrowUp: cycle to previous user messages, starting from most recent
-    // - ArrowDown: cycle forward and eventually restore the saved draft
-    // Behavior only triggers when caret is at start (Up) or end (Down)
-    // and when not typing a "/" command.
-    if (!currentValue.startsWith("/")) {
-      const el = e.currentTarget as HTMLTextAreaElement;
-      const caretStart = el?.selectionStart ?? 0;
-      const caretEnd = el?.selectionEnd ?? 0;
-      const atStart = caretStart === 0 && caretEnd === 0;
-      const atEnd =
-        caretStart === (currentValue?.length ?? 0) && caretEnd === caretStart;
-
-      if (e.key === "ArrowUp" && atStart && userHistory.length > 0) {
-        e.preventDefault();
-        // On first navigation, save the current draft
-        if (historyIndex === null) {
-          setSavedDraft(currentValue);
-          const idx = userHistory.length - 1; // most recent
-          setHistoryIndex(idx);
-          const next = userHistory[idx] ?? "";
-          updateValue(next);
-        } else {
-          const nextIndex = Math.max(0, historyIndex - 1);
-          setHistoryIndex(nextIndex);
-          const next = userHistory[nextIndex] ?? "";
-          updateValue(next);
-        }
-        // Place caret at end after value updates
-        setTimeout(() => {
-          const len = el.value.length;
-          el.setSelectionRange(len, len);
-        }, 0);
-        return;
-      }
-
-      if (e.key === "ArrowDown" && atEnd) {
-        if (historyIndex !== null) {
+        if (e.key === "ArrowUp" && atStart && userHistory.length > 0) {
           e.preventDefault();
-          const nextIndex = historyIndex + 1;
-          if (nextIndex >= userHistory.length) {
-            // Restore draft and exit history mode
-            setHistoryIndex(null);
-            updateValue(savedDraft);
-            // caret to end
-            setTimeout(() => {
-              const len = el.value.length;
-              el.setSelectionRange(len, len);
-            }, 0);
+          // On first navigation, save the current draft
+          if (historyIndex === null) {
+            setSavedDraft(currentValueNow);
+            const idx = userHistory.length - 1; // most recent
+            setHistoryIndex(idx);
+            const next = userHistory[idx] ?? "";
+            updateValue(next);
           } else {
+            const nextIndex = Math.max(0, historyIndex - 1);
             setHistoryIndex(nextIndex);
             const next = userHistory[nextIndex] ?? "";
             updateValue(next);
-            setTimeout(() => {
-              const len = el.value.length;
-              el.setSelectionRange(len, len);
-            }, 0);
           }
+          // Place caret at end after value updates
+          setTimeout(() => {
+            const len = el.value.length;
+            el.setSelectionRange(len, len);
+          }, 0);
           return;
         }
-      }
-    }
-  };
 
-  // Get matching commands
-  const matchingCommands =
-    enableCommands && showCommands ? getMatchingCommands(commandQuery) : [];
+        if (e.key === "ArrowDown" && atEnd) {
+          if (historyIndex !== null) {
+            e.preventDefault();
+            const nextIndex = historyIndex + 1;
+            if (nextIndex >= userHistory.length) {
+              // Restore draft and exit history mode
+              setHistoryIndex(null);
+              updateValue(savedDraft);
+              // caret to end
+              setTimeout(() => {
+                const len = el.value.length;
+                el.setSelectionRange(len, len);
+              }, 0);
+            } else {
+              setHistoryIndex(nextIndex);
+              const next = userHistory[nextIndex] ?? "";
+              updateValue(next);
+              setTimeout(() => {
+                const len = el.value.length;
+                el.setSelectionRange(len, len);
+              }, 0);
+            }
+            return;
+          }
+        }
+      }
+    },
+    [
+      handleCommandSelect,
+      showParameterInfo,
+      clearInput,
+      userHistory,
+      historyIndex,
+      savedDraft,
+      updateValue,
+    ]
+    // Note: showCommands, currentValue, selectedCommandIndex now accessed via refs for stability
+  );
 
   // Reset selected index if it's out of bounds when commands change
   useEffect(() => {
@@ -295,124 +429,98 @@ const ChatInputWithCommandsImpl = ({
     }
   }, [matchingCommands.length, selectedCommandIndex]);
 
-  // Handle command selection
-  const handleCommandSelect = async (command: ChatCommand | string) => {
-    const cmd = typeof command === "string" ? getCommand(command) : command;
-    if (!cmd) return;
-
-    try {
-      if (!hasRequiredParameters(cmd.parameters)) {
-        // Execute immediately - no args needed
-        if (cmd.type === "ui") {
-          await executeCommand(cmd.name, {});
-          onCommandExecute?.(cmd.name, undefined);
-        } else if (cmd.type === "ai") {
-          // Send AI command message with no parameters
-          const message = `Execute ${cmd.name} command`;
-          onAICommandExecute?.(message, cmd.toolName, cmd.systemPrompt);
-        }
-        clearInput();
-        setShowCommands(false);
-
-        // Return focus to the chat input
-        setTimeout(() => {
-          const textarea = document.querySelector(
-            'textarea[data-testid="chat-input"], textarea'
-          );
-          if (textarea) {
-            (textarea as HTMLTextAreaElement).focus();
-          }
-        }, 10);
-      } else {
-        // Command needs parameters - set input with command name and space
-        updateValue(`/${cmd.name} `);
-        setShowCommands(false);
-        setSelectedCommand(cmd);
-        setShowParameterInfo(true);
-        setCurrentParameterIndex(0);
-        setParameterValidationError(null); // Clear any previous errors
-      }
-    } catch {
-      setError("Command execution failed");
-    }
-  };
-
   // Handle form submission - prevent if showing commands
-  const handleSubmit = async (e: React.FormEvent) => {
-    // Only prevent form submission if we're actively typing a command
-    if (
-      showCommands &&
-      matchingCommands.length > 0 &&
-      currentValue.startsWith("/")
-    ) {
-      e.preventDefault();
-      handleCommandSelect(
-        matchingCommands[selectedCommandIndex] || matchingCommands[0]
-      );
-      return;
-    }
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      // Access current values via refs for stability
+      const currentMatchingCommands = matchingCommandsRef.current;
+      const currentValueNow = currentValueRef.current;
+      const showCommandsNow = showCommandsRef.current;
+      const selectedCommandIndexNow = selectedCommandIndexRef.current;
 
-    // Handle command execution with parameters
-    if (currentValue.startsWith("/")) {
-      e.preventDefault();
-      const cmdText = currentValue.slice(1);
-      const [cmdName, ...args] = cmdText.split(" ");
-      const command = getCommand(cmdName);
-
-      if (command) {
-        const argsString = args.join(" ");
-
-        // Check if all required parameters are provided
-        if (!hasAllRequiredParams(argsString, command.parameters)) {
-          setParameterValidationError(
-            "Please fill in all required parameters before executing the command"
-          );
-          return;
-        }
-
-        // Clear any previous validation error
-        setParameterValidationError(null);
-
-        try {
-          const params = parseArgsToParams(argsString, command.parameters);
-
-          if (command.type === "ui") {
-            await executeCommand(cmdName, params);
-            onCommandExecute?.(cmdName, argsString || undefined);
-          } else if (command.type === "ai") {
-            // Build AI command message with parameters
-            const message = argsString ? `${cmdName} ${argsString}` : cmdName;
-            onAICommandExecute?.(
-              message,
-              command.toolName,
-              command.systemPrompt
-            );
-          }
-
-          clearInput();
-          setShowParameterInfo(false);
-          setSelectedCommand(null);
-          setParameterValidationError(null);
-
-          // Return focus to the chat input
-          setTimeout(() => {
-            const textarea = document.querySelector(
-              'textarea[data-testid="chat-input"], textarea'
-            );
-            if (textarea) {
-              (textarea as HTMLTextAreaElement).focus();
-            }
-          }, 10);
-        } catch {
-          setError("Command execution failed");
-        }
+      // Only prevent form submission if we're actively typing a command
+      if (
+        showCommandsNow &&
+        currentMatchingCommands.length > 0 &&
+        currentValueNow.startsWith("/")
+      ) {
+        e.preventDefault();
+        handleCommandSelect(
+          currentMatchingCommands[selectedCommandIndexNow] ||
+            currentMatchingCommands[0]
+        );
         return;
       }
-    }
 
-    onSubmit?.(e);
-    clearInput();
-  };
+      // Handle command execution with parameters
+      if (currentValueNow.startsWith("/")) {
+        e.preventDefault();
+        const cmdText = currentValueNow.slice(1);
+        const [cmdName, ...args] = cmdText.split(" ");
+        const command = getCommandRef.current(cmdName);
+
+        if (command) {
+          const argsString = args.join(" ");
+
+          // Check if all required parameters are provided
+          if (!hasAllRequiredParams(argsString, command.parameters)) {
+            setParameterValidationError(
+              "Please fill in all required parameters before executing the command"
+            );
+            return;
+          }
+
+          // Clear any previous validation error
+          setParameterValidationError(null);
+
+          try {
+            const params = parseArgsToParams(argsString, command.parameters);
+
+            if (command.type === "ui") {
+              await executeCommandRef.current(cmdName, params);
+              onCommandExecute?.(cmdName, argsString || undefined);
+            } else if (command.type === "ai") {
+              // Build AI command message with parameters
+              const message = argsString ? `${cmdName} ${argsString}` : cmdName;
+              onAICommandExecute?.(
+                message,
+                command.toolName,
+                command.systemPrompt
+              );
+            }
+
+            clearInput();
+            setShowParameterInfo(false);
+            setSelectedCommand(null);
+            setParameterValidationError(null);
+
+            // Return focus to the chat input
+            setTimeout(() => {
+              const textarea = document.querySelector(
+                'textarea[data-testid="chat-input"], textarea'
+              );
+              if (textarea) {
+                (textarea as HTMLTextAreaElement).focus();
+              }
+            }, 10);
+          } catch {
+            setErrorRef.current("Command execution failed");
+          }
+          return;
+        }
+      }
+
+      onSubmit?.(e);
+      clearInput();
+    },
+    [
+      handleCommandSelect,
+      onCommandExecute,
+      onAICommandExecute,
+      clearInput,
+      onSubmit,
+    ]
+  );
 
   // Enhanced ChatInput with command dropdown
   if (!enableCommands) {
@@ -422,6 +530,7 @@ const ChatInputWithCommandsImpl = ({
         onChange={updateValue}
         onSubmit={handleSubmit}
         onKeyDown={handleKeyDown}
+        submitDisabled={submitDisabled}
         {...props}
       />
     );
@@ -434,6 +543,7 @@ const ChatInputWithCommandsImpl = ({
         onChange={updateValue}
         onSubmit={handleSubmit}
         onKeyDown={handleKeyDown}
+        submitDisabled={submitDisabled}
         {...props}
       />
 
@@ -461,6 +571,33 @@ const ChatInputWithCommandsImpl = ({
   );
 };
 
-export const ChatInputWithCommands = React.memo(ChatInputWithCommandsImpl);
+// Optimized React.memo with simplified comparison for better performance
+export const ChatInputWithCommands = memo(
+  ChatInputWithCommandsImpl,
+  (
+    prevProps: ChatInputWithCommandsProps,
+    nextProps: ChatInputWithCommandsProps
+  ) => {
+    // Primary props that always trigger re-render
+    if (prevProps.value !== nextProps.value) return false;
+    if (prevProps.disabled !== nextProps.disabled) return false;
+    if (prevProps.submitDisabled !== nextProps.submitDisabled) return false;
+    if (prevProps.status !== nextProps.status) return false;
+    if (prevProps.error !== nextProps.error) return false;
+    if (prevProps.enableCommands !== nextProps.enableCommands) return false;
+    if (prevProps.selectedModelId !== nextProps.selectedModelId) return false;
+
+    // Reference equality for arrays/objects (much faster than deep comparison)
+    if (prevProps.models !== nextProps.models) return false;
+    if (prevProps.suggestions !== nextProps.suggestions) return false;
+    if (prevProps.allFocusItems !== nextProps.allFocusItems) return false;
+
+    // Function props - assume they're stable if parent is using useCallback correctly
+    // Skip function comparison to avoid performance overhead
+
+    // All relevant props are the same
+    return true;
+  }
+);
 
 ChatInputWithCommands.displayName = "ChatInputWithCommands";

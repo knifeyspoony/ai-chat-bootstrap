@@ -1,38 +1,51 @@
 import { getToolName, UIMessage, type ToolUIPart } from "ai";
-import { ReactNode } from "react";
+import isEqual from "fast-deep-equal";
+import React, { ReactNode } from "react";
 import { CodeBlock } from "../../components/ai-elements/code-block";
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "../../components/ai-elements/reasoning";
+import { Response } from "../../components/ai-elements/response";
+import { Source } from "../../components/ai-elements/sources";
+import {
+  Tool,
+  ToolContent,
+  ToolHeader,
+  ToolInput,
+  ToolOutput,
+} from "../../components/ai-elements/tool";
 import { useAIToolsStore } from "../../stores";
-import { ChatTool, type ChatToolVariant } from "./chat-tool";
-import { ChatResponse } from "./chat-response";
-import { ChatReasoning } from "./chat-reasoning";
-import { ChatSource } from "./chat-source";
 
 type AnyUIPart = UIMessage["parts"][number];
 
-export function ChatMessagePart({
+function ChatMessagePartImpl({
   part,
   streaming = false,
-  variant = 'md',
 }: {
   part: AnyUIPart;
   streaming?: boolean;
-  variant?: ChatToolVariant;
 }) {
-  // Remove unused streaming parameter for now
   const getTool = useAIToolsStore((s) => s.getTool);
-  void streaming;
+
   switch (part.type) {
     case "text":
-      return <ChatResponse variant={variant}>{part.text}</ChatResponse>;
+      return <Response>{part.text}</Response>;
 
     case "reasoning":
-      return <ChatReasoning variant={variant} isStreaming={streaming}>{part.text}</ChatReasoning>;
+      return (
+        <Reasoning isStreaming={streaming}>
+          <ReasoningTrigger />
+          <ReasoningContent>{part.text}</ReasoningContent>
+        </Reasoning>
+      );
 
     case "source-url":
-      return <ChatSource variant={variant} href={part.url} title={part.title} />;
+      return <Source href={part.url} title={part.title} />;
 
     case "source-document":
-      return <ChatSource variant={variant} href={"#"} title={part.title} />;
+      return <Source href={"#"} title={part.title} />;
 
     case "file":
       return (
@@ -69,7 +82,7 @@ export function ChatMessagePart({
           toolPart.output
         ) {
           try {
-            customRendered = toolStoreTool.render(toolPart.output as any);
+            customRendered = toolStoreTool.render(toolPart.output);
           } catch (err) {
             customRenderError = err;
           }
@@ -78,11 +91,9 @@ export function ChatMessagePart({
         // If custom render succeeded, show only that (no default chrome)
         if (customRendered) {
           return (
-            <ChatTool variant={variant}>
-              <div className="rounded-md border bg-[var(--acb-tool-bg)] border-[var(--acb-tool-border)] p-3">
-                {customRendered}
-              </div>
-            </ChatTool>
+            <div className="rounded-md border bg-[var(--acb-tool-bg)] border-[var(--acb-tool-border)] p-3">
+              {customRendered}
+            </div>
           );
         }
 
@@ -98,14 +109,19 @@ export function ChatMessagePart({
           )
         ) : undefined;
 
+        const customRenderErrorText =
+          customRenderError instanceof Error
+            ? customRenderError.message
+            : typeof customRenderError === "string"
+              ? customRenderError
+              : undefined;
+
         const combinedErrorText =
-          toolPart.errorText || customRenderError
+          toolPart.errorText || customRenderErrorText
             ? [
                 toolPart.errorText,
-                customRenderError
-                  ? `Custom render error: ${
-                      (customRenderError as any)?.message || customRenderError
-                    }`
+                customRenderErrorText
+                  ? `Custom render error: ${customRenderErrorText}`
                   : undefined,
               ]
                 .filter(Boolean)
@@ -113,16 +129,35 @@ export function ChatMessagePart({
             : undefined;
 
         return (
-          <ChatTool
-            variant={variant}
-            type={toolPart.type}
-            state={toolPart.state || "input-streaming"}
-            input={toolPart.input}
-            output={fallbackOutput}
-            errorText={combinedErrorText}
-          />
+          <Tool>
+            <ToolHeader
+              type={toolPart.type}
+              state={toolPart.state || "input-streaming"}
+            />
+            <ToolContent>
+              {Boolean(toolPart.input) && <ToolInput input={toolPart.input} />}
+              {(fallbackOutput || combinedErrorText) && (
+                <ToolOutput
+                  output={fallbackOutput}
+                  errorText={combinedErrorText}
+                />
+              )}
+            </ToolContent>
+          </Tool>
         );
       }
       return null;
   }
 }
+
+export const ChatMessagePart = React.memo(ChatMessagePartImpl, (prev, next) => {
+  // Fast path: same reference
+  if (prev.part === next.part && prev.streaming === next.streaming) return true;
+
+  // Type-specific comparisons
+  if (prev.part.type !== next.part.type) return false;
+  if (prev.streaming !== next.streaming) return false;
+
+  // Deep compare the part content
+  return isEqual(prev.part, next.part);
+});

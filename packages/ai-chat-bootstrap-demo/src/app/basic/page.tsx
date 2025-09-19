@@ -1,7 +1,7 @@
 "use client";
 
 import { useEphemeralChatThreads } from "@/hooks/use-ephemeral-chat-threads";
-import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+import { ChatContainer } from "ai-chat-bootstrap";
 
 const DEMO_MODELS = [
   { id: "gpt-4o", label: "GPT-4o" },
@@ -15,22 +15,25 @@ export default function BasicChatPage() {
   // Optional: keep a scope key to partition threads in this demo route
   const scopeKey = "basic-demo";
 
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt:
-      "You are a helpful assistant. Answer as concisely as possible.",
-    scopeKey,
-    autoCreateThread: true,
-    threadTitleApi: "/api/thread-title",
-    enableChainOfThought: true,
-    models: DEMO_MODELS,
-    model: "gpt-4o",
-  });
-
   return (
     <div className="h-screen flex flex-col p-8">
       <ChatContainer
-        chat={chat}
+        transport={{ api: "/api/chat" }}
+        messages={{
+          systemPrompt: "You are a helpful assistant. Answer as concisely as possible.",
+        }}
+        thread={{
+          scopeKey,
+          autoCreate: true,
+          title: {
+            api: "/api/thread-title",
+          },
+        }}
+        features={{ chainOfThought: true }}
+        models={{
+          options: DEMO_MODELS,
+          initialId: "gpt-4o",
+        }}
         header={{
           title: "AI Chat Bootstrap Demo",
           avatar: "/acb.png",

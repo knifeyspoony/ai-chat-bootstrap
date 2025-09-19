@@ -74,7 +74,7 @@ Here's a full example showing multiple context items:
 ```tsx
 "use client";
 import React, { useState, useMemo } from "react";
-import { ChatContainer, useAIChat, useAIContext } from "ai-chat-bootstrap";
+import { ChatContainer, useAIContext } from "ai-chat-bootstrap";
 
 export function AIContextDemo() {
   const [userProfile, setUserProfile] = useState({
@@ -118,11 +118,6 @@ export function AIContextDemo() {
     description: "Session Info",
     value: sessionInfo,
     priority: 60,
-  });
-
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant with access to the user's profile, settings, and session information. Use this context to provide personalized responses."
   });
 
   return (
@@ -177,7 +172,11 @@ export function AIContextDemo() {
 
       {/* Chat Interface */}
       <ChatContainer
-        chat={chat}
+        transport={{ api: "/api/chat" }}
+        messages={{
+          systemPrompt:
+            "You are a helpful assistant with access to the user's profile and settings.",
+        }}
         header={{
           title: "AI with Shared Context",
           subtitle: "AI knows your profile and settings",
@@ -305,22 +304,6 @@ function ConditionalContext() {
 
 ## Best Practices
 
-### Preventing Re-render Loops
-
-The `useAIContext` hook follows the critical Zustand pattern to prevent infinite re-renders:
-
-```tsx
-// ✅ Correct - Only include stable values in dependencies
-useEffect(() => {
-  setContextItem(contextData);
-  return () => removeContextItem(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps  
-}, [id, data, opts?.label, opts?.description, opts?.scope, opts?.priority]);
-
-// ❌ Wrong - Including Zustand actions causes infinite loops
-}, [id, data, setContextItem, removeContextItem]); // Don't do this!
-```
-
 ### Data Structure
 
 Keep context data serializable and structured:
@@ -364,27 +347,6 @@ function ExpensiveContext() {
 
   return <div>...</div>;
 }
-```
-
-### Security Considerations
-
-Never share sensitive data in context:
-
-```tsx
-// ✅ Safe - Only share necessary, non-sensitive data
-useAIContext({ description: "User Profile", value: {
-  displayName: user.displayName,
-  role: user.role,
-  preferences: user.preferences,
-}});
-
-// ❌ Unsafe - Don't share sensitive information
-useAIContext({ description: "User Auth", value: {
-  password: user.password,           // Never share passwords
-  apiKeys: user.apiKeys,            // Never share API keys
-  socialSecurity: user.ssn,         // Never share PII
-  creditCard: user.paymentInfo,     // Never share payment info
-}});
 ```
 
 ## Common Use Cases
@@ -449,4 +411,4 @@ useAIContext({ description: "Shopping Cart", value: {
 
 ## Next
 
-Continue to [Focus Items →](/chat/focus-items)
+Continue to [Focus Items →](/features/focus-items)

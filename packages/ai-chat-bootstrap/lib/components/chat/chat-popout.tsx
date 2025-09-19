@@ -36,14 +36,22 @@ export interface ChatPopoutProps extends ChatContainerProps {
 
 export function ChatPopout(props: ChatPopoutProps) {
   const {
-    chat,
+    // AI configuration props (passed through to ChatContainer)
+    transport,
+    messages: messagesOptions,
+    thread: threadOptions,
+    features,
+    mcp,
+    models: modelsOptions,
+    // UI configuration props
     header,
     ui,
-    suggestions,
-    commands,
-    threads,
-    assistantActions,
-    assistantLatestActions,
+    suggestions: suggestionOptions,
+    commands: commandOptions,
+    threads: threadsOptions,
+    assistantActions: assistantActionOptions,
+    ["data-acb-unstyled"]: unstyledProp,
+    // Popout-specific props
     popout,
     button,
   } = props;
@@ -108,7 +116,14 @@ export function ChatPopout(props: ChatPopoutProps) {
   const getChatContainerProps = (
     includeContentClassInUI: boolean
   ): ChatContainerProps => ({
-    chat,
+    // Pass through AI configuration
+    transport,
+    messages: messagesOptions,
+    thread: threadOptions,
+    features,
+    mcp,
+    models: modelsOptions,
+    "data-acb-unstyled": unstyledProp,
     header: {
       ...header,
       actions: (
@@ -136,16 +151,15 @@ export function ChatPopout(props: ChatPopoutProps) {
       ),
     },
     suggestions: {
-      enabled: suggestions?.enabled,
-      prompt: suggestions?.prompt,
-      count: suggestions?.count,
+      enabled: suggestionOptions?.enabled,
+      prompt: suggestionOptions?.prompt,
+      count: suggestionOptions?.count,
     },
     commands: {
-      enabled: commands?.enabled,
+      enabled: commandOptions?.enabled,
     },
-    threads,
-    assistantActions,
-    assistantLatestActions,
+    threads: threadsOptions,
+    assistantActions: assistantActionOptions,
   });
 
   // Handle resize drag

@@ -1,0 +1,160 @@
+---
+title: Chain of Thought
+description: Guide models through multi-step plans and surface their reasoning in a dedicated UI panel.
+---
+
+import {
+  ChainOfThoughtExample,
+  CHAIN_OF_THOUGHT_EXAMPLE_SOURCE,
+} from "../../components/ChainOfThoughtExample";
+import { LiveCodeExample } from "../../components/LiveCodeExample";
+import { Api as API } from "../../components/ApiLink";
+
+# Chain of Thought
+
+Chain of thought exposes the assistant's multi-step plan as a collapsible panel at the top of each response. When enabled, the chat registers hidden planning tools, instructs the model how to use them, and renders the streamed steps with live progress indicators.
+
+## Live demo
+
+<LiveCodeExample code={CHAIN_OF_THOUGHT_EXAMPLE_SOURCE}>
+  <ChainOfThoughtExample />
+</LiveCodeExample>
+
+This mock chat is read-only and highlights how the planning panel stays attached to the final answer.
+
+## Enable the feature
+
+<API name="ChatContainer">ChatContainer</API> ships with chain of thought disabled by default. Turn it on through the `features.chainOfThought` flag:
+
+```tsx
+import { ChatContainer } from "ai-chat-bootstrap";
+
+export function PlannedChat() {
+  return (
+    <ChatContainer
+      transport={{ api: "/api/chat" }}
+      messages={{ systemPrompt: "You are a helpful AI assistant." }}
+      features={{ chainOfThought: true }}
+      header={{ title: "Reasoning Assistant" }}
+    />
+  );
+}
+```
+
+If you build a custom UI with <API name="useAIChat">useAIChat</API>, pass the same flag and use the returned `chainOfThoughtEnabled` value to decide when to mount the ChatChainOfThought renderer.
+
+```tsx
+import { ChatMessages, useAIChat } from "ai-chat-bootstrap";
+
+export function CustomChat() {
+  const chat = useAIChat({
+    transport: { api: "/api/chat" },
+    features: { chainOfThought: true },
+  });
+
+  return (
+    <ChatMessages
+      messages={chat.messages}
+      isLoading={chat.isLoading}
+      useChainOfThought={chat.chainOfThoughtEnabled}
+    />
+  );
+}
+```
+
+## What the model sees
+
+When chain of thought is enabled, the chat hook:
+
+- Registers three frontend tools (`acb_start_chain_of_thought`, `acb_start_chain_of_thought_step`, `acb_complete_chain_of_thought`) so the assistant can outline its plan, open new steps, and mark completion without hitting your API.
+- Injects an extra "Chain of Thought" section into the `enrichedSystemPrompt`, describing when to plan and reminding the model to skip it for simple answers.
+- Continues to stream regular message parts (text, reasoning, tool results) alongside the plan so the UI can render both views.
+
+Tool-calling models that follow the Vercel AI SDK conventions (OpenAI GPT-4o, Azure GPT-4o, Anthropic Claude 3.5 via tool calls, etc.) will immediately understand these instructions. No backend changes are required—the tools execute entirely on the client and only persist metadata to the current assistant message.
+
+## UI behavior
+
+- Plans appear as an accordion with the plan title, optional description, and a step counter badge.
+- Each step expands into the reasoning and tool results that streamed while that step was active.
+- The panel auto-expands while the last assistant message is streaming, then collapses for older messages.
+- Regular assistant content continues to render underneath the panel, so the final answer remains easy to read.
+
+If you need deeper customization, import the base primitives from `ai-chat-bootstrap/ai-elements` (`ChainOfThought`, `ChainOfThoughtStep`, etc.) and compose your own layout.
+
+## Example transcript
+
+`UIMessage` objects capture the chain of thought tools alongside the final assistant text. The live demo above uses the parts below: one user turn followed by the assistant's planned response with the planning tool metadata.
+
+```ts
+import type { UIMessage } from "ai";
+
+const messages: UIMessage[] = [
+  {
+    id: "user_1",
+    role: "user",
+    parts: [
+      {
+        type: "text",
+        text: "Can you outline the onboarding plan for ACME Corp?",
+      },
+    ],
+  },
+  {
+    id: "assistant_1",
+    role: "assistant",
+    parts: [
+      {
+        type: "tool-acb_start_chain_of_thought",
+        toolCallId: "cot_plan",
+        state: "input-available",
+        input: {
+          name: "Plan ACME customer onboarding",
+          description: "Collect notes and prepare a schedule before replying.",
+        },
+      },
+      {
+        type: "tool-acb_start_chain_of_thought_step",
+        toolCallId: "cot_step_review",
+        state: "input-available",
+        input: {
+          name: "Review recent customer activity",
+          description: "Check CRM entries and support tickets.",
+        },
+      },
+      {
+        type: "reasoning",
+        text: "Scanning the CRM timeline and latest support summary.",
+      },
+      {
+        type: "tool-acb_start_chain_of_thought_step",
+        toolCallId: "cot_step_milestones",
+        state: "input-available",
+        input: {
+          name: "Draft rollout milestones",
+        },
+      },
+      {
+        type: "reasoning",
+        text: "Mapping the work into kickoff, configuration, and training phases.",
+      },
+      {
+        type: "tool-acb_complete_chain_of_thought",
+        toolCallId: "cot_plan_complete",
+        state: "input-available",
+        input: {
+          summary: "Prepared a three-step onboarding plan for ACME.",
+        },
+      },
+      {
+        type: "text",
+        text: [
+          "Here’s how we’ll approach the onboarding:",
+          "\n\n1. Kickoff tomorrow to confirm goals.",
+          "\n2. Configure integrations by Friday.",
+          "\n3. Train the ACME success team early next week.",
+        ].join(""),
+      },
+    ],
+  },
+];
+```

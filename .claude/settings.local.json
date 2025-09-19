@@ -15,7 +15,9 @@
       "WebFetch(domain:mdxjs.com)",
       "WebFetch(domain:shiki.style)",
       "WebFetch(domain:ui.shadcn.com)",
-      "Bash(pnpm ls:*)"
+      "Bash(pnpm ls:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "deny": [],
     "ask": []

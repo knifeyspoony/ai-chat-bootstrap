@@ -85,23 +85,17 @@ Enable suggestions in your chat component:
 
 ```tsx
 // Frontend component
-import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+import { ChatContainer } from "ai-chat-bootstrap";
 
 function ChatWithSuggestions() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant.",
-  });
-
   return (
     <ChatContainer
-      chat={chat}
+      transport={{ api: "/api/chat" }}
+      messages={{ systemPrompt: "You are a helpful assistant." }}
       suggestions={{
         enabled: true,
-        api: "/api/suggestions",
         count: 3,
-        showOnEmpty: true,
-        showAfterResponse: true,
+        prompt: "Offer helpful follow-up questions.",
       }}
     />
   );
@@ -467,97 +461,6 @@ const handler = createSuggestionsHandler({
 
 export { handler as POST };
 ```
-
-## Best Practices
-
-### Performance
-1. **Use fast models** like `gpt-4o-mini` for suggestions
-2. **Limit suggestion count** to 3-4 for quick responses
-3. **Cache suggestions** for similar contexts
-4. **Debounce requests** on the frontend
-
-### Quality
-1. **Filter inappropriate content** in suggestion processing
-2. **Consider user permissions** and available features
-3. **Weight suggestion types** based on your use case
-4. **Validate suggestions** before returning them
-
-### User Experience
-1. **Show suggestions contextually** based on conversation state
-2. **Make suggestions actionable** and specific
-3. **Avoid repetitive suggestions** in the same session
-4. **Provide clear suggestion categories** (questions, actions, etc.)
-
-### Security
-1. **Validate requests** in production environments
-2. **Filter sensitive suggestions** based on user roles
-3. **Log suggestion usage** for analytics and abuse detection
-4. **Rate limit suggestion requests** to prevent abuse
-
-## Common Patterns
-
-### Conditional Suggestions
-
-```ts
-const handler = createSuggestionsHandler({
-  model: openai("gpt-4o-mini"),
-
-  onSuggestionGenerated: async (suggestion, context) => {
-    // Only suggest advanced features to experienced users
-    if (suggestion.text.includes("advanced") && !context.userProfile?.isExperienced) {
-      return null;
-    }
-
-    // Personalize suggestions based on user preferences
-    if (context.userProfile?.preferredActions?.includes(suggestion.type)) {
-      suggestion.confidence += 0.1;
-    }
-
-    return suggestion;
-  }
-});
-```
-
-### Domain-Specific Suggestions
-
-```ts
-// For a code assistance tool
-const handler = createSuggestionsHandler({
-  model: openai("gpt-4o-mini"),
-
-  suggestionTypes: [
-    { type: "question", weight: 0.8 },
-    { type: "action", weight: 1.0 }, // Prioritize actionable suggestions
-    { type: "exploration", weight: 0.6 },
-  ],
-
-  onSuggestionGenerated: async (suggestion, context) => {
-    const hasCodeInConversation = context.messages?.some(msg =>
-      msg.parts.some(part => part.type === 'text' && part.text.includes('```'))
-    );
-
-    if (hasCodeInConversation && suggestion.type === "action") {
-      // Suggest code-related actions
-      const codeActions = [
-        "Explain this code",
-        "Optimize this function",
-        "Add error handling",
-        "Write tests for this code"
-      ];
-
-      if (codeActions.some(action => suggestion.text.includes(action))) {
-        suggestion.confidence += 0.2;
-      }
-    }
-
-    return suggestion;
-  }
-});
-```
-
-## Environment Variables
-
-No additional environment variables required beyond those for the AI model.
 
 ## See Also
 

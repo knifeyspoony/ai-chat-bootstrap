@@ -4,18 +4,26 @@ import { useAIContextStore } from "../stores";
 
 export interface UseAIContextOptions {
   description: string;
-  value: any;
+  value: unknown;
   parentId?: string;
   categories?: string[];
   available?: "enabled" | "disabled";
-  dump?: (description: string, value: any) => string;
+  dump?: (description: string, value: unknown) => string;
   priority?: number;
 }
 
-function dumpJSON(description: string, value: any): string {
-  return `${description}: ${
-    typeof value === "string" ? value : JSON.stringify(value)
-  }`;
+function dumpJSON(description: string, value: unknown): string {
+  const serialized =
+    typeof value === "string"
+      ? value
+      : (() => {
+          try {
+            return JSON.stringify(value);
+          } catch {
+            return String(value);
+          }
+        })();
+  return `${description}: ${serialized}`;
 }
 
 export function useAIContext(
@@ -28,14 +36,35 @@ export function useAIContext(
     available = "enabled",
     priority,
   }: UseAIContextOptions,
-  dependencies?: any[]
+  dependencies?: ReadonlyArray<unknown>
 ): string | undefined {
   const setContextItem = useAIContextStore((s) => s.setContextItem);
   const removeContextItem = useAIContextStore((s) => s.removeContextItem);
   const idRef = useRef<string | undefined>(undefined);
-  dump = dump || dumpJSON;
+  const dumpFn = dump ?? dumpJSON;
+  const dumped = dumpFn(description, value);
 
-  const dumped = dump(description, value);
+  const previousDependenciesRef = useRef<ReadonlyArray<unknown> | undefined>(
+    undefined
+  );
+  const dependencyVersionRef = useRef(0);
+
+  if (dependencies) {
+    const prev = previousDependenciesRef.current;
+    const changed =
+      !prev ||
+      prev.length !== dependencies.length ||
+      dependencies.some((dep, index) => dep !== prev[index]);
+    if (changed) {
+      previousDependenciesRef.current = [...dependencies];
+      dependencyVersionRef.current += 1;
+    }
+  } else if (previousDependenciesRef.current) {
+    previousDependenciesRef.current = undefined;
+    dependencyVersionRef.current += 1;
+  }
+
+  const dependencyVersion = dependencyVersionRef.current;
 
   useEffect(() => {
     if (available === "disabled") return;
@@ -61,13 +90,12 @@ export function useAIContext(
     available,
     dumped,
     description,
-    value,
     parentId,
     categories,
     setContextItem,
     removeContextItem,
     priority,
-    ...(dependencies || []),
+    dependencyVersion,
   ]);
 
   return idRef.current;

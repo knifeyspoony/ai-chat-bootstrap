@@ -5,119 +5,143 @@ description: Main hook for managing chat state and AI interactions with automati
 
 # useAIChat
 
-The `useAIChat` hook is the main hook for managing chat state and AI interactions. It automatically integrates with context items from `useAIContext`, focus items from `useAIFocus`, frontend tools from `useAIFrontendTool`, and now automatically builds and sends an `enrichedSystemPrompt` that gives models structured awareness of those capabilities.
+The `useAIChat` hook is the main hook for managing chat state and AI interactions. It automatically integrates with context items from `useAIContext`, focus items from `useAIFocus`, frontend tools from `useAIFrontendTool`, and builds the enriched system prompt that is sent to your chat handler.
 
 ## Syntax
 
-```typescript
+```ts
 interface UseAIChatOptions {
-  api: string;
-  systemPrompt?: string;
-  initialMessages?: UIMessage[];
-  models?: ChatModelOption[];
-  selectedModelId?: string;
-  chainOfThoughtEnabled?: boolean;
-  mcpEnabled?: boolean;
-  onFinish?: (message: UIMessage) => void;
-  onError?: (error: Error) => void;
+  transport?: {
+    /** API route for chat requests (defaults to `/api/chat`). */
+    api?: string;
+  };
+  messages?: {
+    /** Optional system prompt appended after the enriched prompt sections. */
+    systemPrompt?: string;
+    /** Initial transcript loaded into the chat store. */
+    initial?: UIMessage[];
+  };
+  thread?: {
+    /** Explicit thread id to load or create. */
+    id?: string;
+    /** Logical scope used to group threads (e.g. project id). */
+    scopeKey?: string;
+    /** Automatically create a thread when loading fails (default: true). */
+    autoCreate?: boolean;
+    /** Emit console.warn when a requested thread cannot be loaded. */
+    warnOnMissing?: boolean;
+    /** Automatic titling configuration. */
+    title?: {
+      /** API endpoint that will receive sampled messages and return a title. */
+      api?: string;
+      /** Number of recent messages to send to the title endpoint (default: 8). */
+      sampleCount?: number;
+    };
+  };
+  features?: {
+    /** Enable reasoning capture and rendering blocks. */
+    chainOfThought?: boolean;
+  };
+  mcp?: {
+    /** Toggle MCP support. */
+    enabled?: boolean;
+    /** Default MCP HTTP endpoint (for dynamic tool loading). */
+    api?: string;
+    /** Pre-configured MCP servers exposed to the client. */
+    servers?: SerializedMCPServer[];
+  };
+  models?: {
+    /** Models rendered in the model switcher. */
+    available?: ChatModelOption[];
+    /** Preferred model id to select on mount. */
+    initial?: string;
+  };
 }
 
-function useAIChat(options: UseAIChatOptions): UseAIChatReturn
+function useAIChat(options?: UseAIChatOptions): UseAIChatReturn
 ```
 
-### System Prompt Enrichment (Automatic)
+### System Prompt Enrichment
 
-The ALWAYS generates an `enrichedSystemPrompt` for each request. This enriched prompt:
+`useAIChat` always generates an `enrichedSystemPrompt` for each request. This enriched prompt:
 
 - Adds a standardized preamble describing that the assistant runs in an enhanced environment (context, focus, tools).
 - Includes conditional sections only when data exists (tools, context, focus).
-- Lists tool names with descriptions (no parameter schemas; those are already sent separately).
+- Lists tool names with descriptions (parameter schemas are already sent separately).
 - Appends the original `systemPrompt` you provided (if any) at the end with a clear separator.
 
-Per-call override: you can still override the final string by passing `body.enrichedSystemPrompt` in `sendMessage` (advanced usage). If you only provide `systemPrompt`, enrichment still runs and your original content is appended.
+Per-call override: you can still control the final string by providing `body.enrichedSystemPrompt` when calling `chat.sendMessage`. If you only provide `systemPrompt`, enrichment still runs and your original content is appended.
 
-## Parameters
+## Options
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `api` | `string` | Yes | API endpoint for chat requests |
-| `systemPrompt` | `string` | No | Application-specific system prompt |
-| `initialMessages` | `UIMessage[]` | No | Initial chat messages |
-| `models` | `ChatModelOption[]` | No | Available models for selection |
-| `selectedModelId` | `string` | No | Initially selected model ID |
-| `chainOfThoughtEnabled` | `boolean` | No | Enable reasoning display mode |
-| `mcpEnabled` | `boolean` | No | Enable MCP server tools |
-| `onFinish` | `(message: UIMessage) => void` | No | Callback when a message is completed |
-| `onError` | `(error: Error) => void` | No | Error callback |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `transport.api` | `string` | `/api/chat` | HTTP endpoint used by the chat transport |
+| `messages.systemPrompt` | `string` | `undefined` | App-specific directions appended after the enriched prompt |
+| `messages.initial` | `UIMessage[]` | `[]` | Initial transcript seeded into the chat store |
+| `thread.id` | `string` | auto | Explicit thread id to load or create |
+| `thread.scopeKey` | `string` | `undefined` | Scope identifier used when listing threads |
+| `thread.autoCreate` | `boolean` | `true` | Create a thread automatically when none exists |
+| `thread.warnOnMissing` | `boolean` | `false` | Log warnings when a referenced thread is missing |
+| `thread.title.api` | `string` | `""` | Endpoint used to upgrade thread titles |
+| `thread.title.sampleCount` | `number` | `8` | Number of messages sent to the title endpoint |
+| `features.chainOfThought` | `boolean` | `false` | Enables reasoning capture/tooling |
+| `mcp.enabled` | `boolean` | `false` | Turns MCP support on/off |
+| `mcp.api` | `string` | `undefined` | Default MCP server API endpoint |
+| `mcp.servers` | `SerializedMCPServer[]` | `[]` | Pre-registered MCP servers |
+| `models.available` | `ChatModelOption[]` | `[]` | Models displayed in the selector |
+| `models.initial` | `string` | `undefined` | Preferred model id selected on mount |
 
 ## Return Value
 
-```typescript
-interface UseAIChatReturn {
-  messages: UIMessage[];
-  input: string;
-  isLoading: boolean;
-  error: Error | null;
+`useAIChat` returns everything exposed by the Vercel AI SDK `useChat` helper plus several convenience fields that integrate with the AI Chat Bootstrap stores.
 
-  // Model Selection
+```ts
+interface UseAIChatReturn extends ChatHelpers {
+  /** Draft input managed by AI Chat Bootstrap (decoupled from streaming state). */
+  input: string;
+  setInput: (value: string) => void;
+
+  /** Send a user message while automatically syncing context/focus/tool metadata. */
+  sendMessageWithContext(content: string): void;
+  /** Send a targeted AI command that runs a specific frontend tool. */
+  sendAICommandMessage(
+    content: string,
+    toolName: string,
+    systemPrompt?: string
+  ): void;
+  /** Retry the last user message when an error occurs. */
+  retryLastMessage(): void;
+  /** Clear the shared chat error store. */
+  clearError(): void;
+
+  /** Convenience loading flag (true during `submitted` or `streaming`). */
+  isLoading: boolean;
+
+  /** Derived store state exposed for UI components. */
+  context: ContextItem[];
+  focusItems: FocusItem[];
+  tools: Array<{
+    name: string;
+    description?: string;
+    inputSchema: unknown;
+  }>;
+  availableTools: SerializedTool[];
+
+  /** Model selection helpers. */
   models: ChatModelOption[];
-  model?: string; // selected model ID
+  model?: string;
   setModel: (modelId: string) => void;
 
-  // Chain of Thought
-  chainOfThoughtEnabled: boolean;
-
-  // Core Actions
-  handleInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  handleSubmit: (e?: FormEvent) => void;
-  setInput: (input: string) => void;
-  setMessages: (messages: UIMessage[]) => void;
-  append: (message: UIMessage) => void;
-  reload: () => void;
-  stop: () => void;
-
-  // Convenience Methods
-  sendMessageWithContext: (text: string) => void;
-  sendAICommandMessage: (text: string, toolName: string, systemPrompt?: string) => void;
-  retryLastMessage: () => void;
-  clearError: () => void;
-
-  // Context & Tools
-  context: ContextItem[];
-  tools: { name: string; description: string; inputSchema: unknown }[];
-  focusItems: FocusItem[];
-
-  // Thread Management
+  /** Thread and feature metadata. */
   threadId?: string;
   scopeKey?: string;
+  chainOfThoughtEnabled: boolean;
   mcpEnabled: boolean;
 }
 ```
 
-### State Properties
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `messages` | `UIMessage[]` | Array of chat messages |
-| `input` | `string` | Current input value |
-| `isLoading` | `boolean` | Whether a request is in progress |
-| `error` | `Error \| null` | Current error state |
-| `models` | `ChatModelOption[]` | Available models for selection |
-| `model` | `string \| undefined` | Currently selected model ID |
-| `chainOfThoughtEnabled` | `boolean` | Whether reasoning display is enabled |
-| `mcpEnabled` | `boolean` | Whether MCP server tools are enabled |
-
-### Action Methods
-
-| Method | Parameters | Description |
-|--------|------------|-------------|
-| `handleInputChange` | `e: ChangeEvent` | Handle input field changes |
-| `handleSubmit` | `e?: FormEvent` | Submit the current message |
-| `setInput` | `input: string` | Set input value programmatically |
-| `setMessages` | `messages: UIMessage[]` | Replace all messages |
-| `append` | `message: UIMessage` | Add a new message |
-| `reload` | None | Regenerate the last AI response |
-| `stop` | None | Stop the current streaming response |
+> All other helpers from `useChat`—such as `messages`, `append`, `reload`, `stop`, `status`, `error`, and `addToolResult`—are still available because `useAIChat` returns the underlying helpers in addition to the fields above.
 
 ## Examples
 
@@ -128,425 +152,119 @@ import { useAIChat } from "ai-chat-bootstrap";
 
 function ChatInterface() {
   const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful AI assistant."
+    transport: { api: "/api/chat" },
+    messages: {
+      systemPrompt: "You are a helpful AI assistant.",
+    },
   });
 
   return (
-    <ChatContainer
-      chat={chat}
-    />
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (chat.input.trim()) {
+          chat.sendMessageWithContext(chat.input);
+          chat.setInput("");
+        }
+      }}
+    >
+      <ul>
+        {chat.messages.map((message) => (
+          <li key={message.id}>
+            <strong>{message.role}:</strong>{" "}
+            {message.parts?.map((part) =>
+              part.type === "text" ? part.text : "[tool call]"
+            ).join("")}
+          </li>
+        ))}
+      </ul>
+      <textarea
+        value={chat.input}
+        onChange={(event) => chat.setInput(event.target.value)}
+        placeholder="Ask me anything..."
+      />
+      <button type="submit" disabled={chat.isLoading}>
+        Send
+      </button>
+    </form>
   );
 }
 ```
+
+> For a production UI, use `ChatContainer` or `ChatPopout`, which instantiate `useAIChat` for you and expose additional UX niceties.
 
 ### With Model Selection
 
 ```tsx
 const chat = useAIChat({
-  api: "/api/chat",
-  models: [
-    { id: "gpt-4", name: "GPT-4", description: "Most capable model" },
-    { id: "gpt-3.5-turbo", name: "GPT-3.5", description: "Faster, less expensive" },
-    { id: "claude-3-sonnet", name: "Claude 3 Sonnet", description: "Balanced performance" }
-  ],
-  selectedModelId: "gpt-4",
-  systemPrompt: "You are a helpful assistant."
-});
-
-// Model selection dropdown appears automatically in ChatContainer
-```
-
-### With Chain of Thought
-
-```tsx
-const chat = useAIChat({
-  api: "/api/chat",
-  chainOfThoughtEnabled: true,
-  systemPrompt: "You are a helpful assistant. Show your reasoning."
-});
-
-// Reasoning blocks are displayed automatically when present
-```
-
-### With Event Handlers
-
-```tsx
-const chat = useAIChat({
-  api: "/api/chat",
-  onFinish: (message) => {
-    console.log("AI response completed:", message);
-    saveMessageToHistory(message);
+  transport: { api: "/api/chat" },
+  models: {
+    available: [
+      { id: "gpt-4", label: "GPT‑4", description: "Most capable model" },
+      { id: "gpt-4o-mini", label: "GPT‑4o mini", description: "Balanced speed" },
+      { id: "claude-3-sonnet", label: "Claude 3 Sonnet" },
+    ],
+    initial: "gpt-4",
   },
-  onError: (error) => {
-    console.error("Chat error:", error);
-    toast.error("Sorry, there was an error processing your request.");
-  }
+});
+
+// ChatContainer automatically renders the model dropdown.
+```
+
+### Enabling Chain of Thought
+
+```tsx
+const chat = useAIChat({
+  features: { chainOfThought: true },
+  transport: { api: "/api/chat" },
+});
+
+// Assistant reasoning blocks render when the model returns them.
+```
+
+### Thread Scoping & Persistence
+
+```tsx
+const chat = useAIChat({
+  thread: {
+    scopeKey: projectId,
+    autoCreate: true,
+    title: { api: "/api/threads/title", sampleCount: 6 },
+  },
+});
+
+// Threads are stored per scope; the hook auto-loads the most recent thread.
+```
+
+### Integrating MCP Servers
+
+```tsx
+const chat = useAIChat({
+  mcp: {
+    enabled: true,
+    api: "/api/mcp",
+    servers: initialServers,
+  },
 });
 ```
 
-### Programmatic Message Control
+### Sending Targeted AI Commands
 
 ```tsx
-function ChatWithControls() {
-  const chat = useAIChat({ api: "/api/chat" });
+const chat = useAIChat();
 
-  const sendPredefinedMessage = () => {
-    chat.append({
-      id: Date.now().toString(),
-      role: "user",
-      parts: [{ type: "text", text: "What's the weather like?" }]
-    });
-
-    chat.handleSubmit();
-  };
-
-  const clearChat = () => {
-    chat.setMessages([]);
-  };
-
-  const stopGeneration = () => {
-    chat.stop();
-  };
-
-  return (
-    <div>
-      <div className="mb-4 space-x-2">
-        <button onClick={sendPredefinedMessage}>Ask about weather</button>
-        <button onClick={clearChat}>Clear chat</button>
-        <button onClick={stopGeneration}>Stop generation</button>
-      </div>
-
-      <ChatContainer chat={chat} />
-    </div>
+function handleSummarise() {
+  chat.sendAICommandMessage(
+    "Summarise the current chat history",
+    "summarise",
+    "Summarise the conversation succinctly."
   );
 }
 ```
 
-## Automatic Integration
+## Related
 
-The `useAIChat` hook automatically integrates with other hooks:
-
-### Context Integration
-
-```tsx
-function ChatWithContext() {
-  const [user, setUser] = useState({ name: "Alice", role: "admin" });
-
-  useAIContext({ description: "User Profile", value: user, priority: 100 });
-
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You have access to the user's profile information."
-  });
-
-  return <ChatContainer chat={chat} />;
-}
-```
-
-### Focus Integration
-
-```tsx
-function ChatWithFocus() {
-  const { focusedIds, allFocusItems } = useAIFocus();
-
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You have access to the user's focused documents."
-  });
-
-  return (
-    <div>
-      <div className="mb-2">
-        {allFocusItems.length > 0 && (
-          <div className="text-sm text-muted-foreground">
-            {allFocusItems.length} items in focus
-          </div>
-        )}
-      </div>
-      <ChatContainer chat={chat} />
-    </div>
-  );
-}
-```
-
-### Tools Integration
-
-```tsx
-function ChatWithTools() {
-  const [counter, setCounter] = useState(0);
-
-  useAIFrontendTool({
-    name: "increment_counter",
-    description: "Increment the counter",
-    parameters: z.object({
-      amount: z.number().default(1)
-    }),
-    execute: async ({ amount }) => {
-      setCounter(prev => prev + amount);
-      return { newValue: counter + amount };
-    }
-  });
-
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You can control the counter using the available tools."
-  });
-
-  return (
-    <div>
-      <div className="mb-4">Counter: {counter}</div>
-      <ChatContainer chat={chat} />
-    </div>
-  );
-}
-```
-
-## System Prompt Enrichment Details
-
-The client sends two related fields in the request body:
-
-| Field | Always Present? | Source | Description |
-|-------|------------------|--------|-------------|
-| `systemPrompt` | Optional | Your hook option / per-call override | Original app-specific instructions |
-| `enrichedSystemPrompt` | Yes (generated unless overridden) | Built by `useAIChat` | Structured preamble + conditional sections + appended original `systemPrompt` |
-
-Downstream code should prefer `enrichedSystemPrompt` if provided.
-
-### Override Mechanism
-
-You can override enrichment per-call:
-
-```tsx
-chat.sendMessage(
-  { text: "Analyze document" },
-  {
-    body: {
-      enrichedSystemPrompt: "Custom fully composed system message..."
-    }
-  }
-);
-```
-
-## Request Payload
-
-The hook automatically sends a structured payload:
-
-```typescript
-interface ChatRequestPayload {
-  messages: UIMessage[];
-  systemPrompt?: string;            // Original (legacy) prompt (optional)
-  enrichedSystemPrompt: string;     // Always provided by the hook
-  tools?: Record<string, ToolDefinition>;
-  context?: ContextItem[];
-  focus?: FocusItem[];
-}
-```
-
-## Example API Route
-
-```ts
-import { createOpenAI } from "@ai-sdk/openai";
-import { createAIChatHandler } from "ai-chat-bootstrap/server";
-
-const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-const model = openai("gpt-4o-mini");
-
-export const POST = createAIChatHandler({
-  model,
-});
-```
-
-## Advanced Usage
-
-### Custom Message Processing
-
-```tsx
-function ChatWithCustomProcessing() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    onFinish: (message) => {
-      const textParts = message.parts
-        .filter(part => part.type === 'text')
-        .map(part => part.text);
-
-      const codeBlocks = textParts
-        .join(' ')
-        .match(/```[\s\S]*?```/g) || [];
-
-      if (codeBlocks.length > 0) {
-        saveCodeBlocks(codeBlocks);
-      }
-    }
-  });
-
-  return <ChatContainer chat={chat} />;
-}
-```
-
-### Error Recovery
-
-```tsx
-function ChatWithErrorRecovery() {
-  const [retryCount, setRetryCount] = useState(0);
-
-  const chat = useAIChat({
-    api: "/api/chat",
-    onError: (error) => {
-      console.error("Chat error:", error);
-
-      if (error.name === 'NetworkError' && retryCount < 3) {
-        setTimeout(() => {
-          setRetryCount(prev => prev + 1);
-          chat.reload();
-        }, 1000 * (retryCount + 1));
-      } else {
-        toast.error(`Failed to get response: ${error.message}`);
-      }
-    }
-  });
-
-  return <ChatContainer chat={chat} />;
-}
-```
-
-### Message Validation
-
-```tsx
-function ChatWithValidation() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    onFinish: (message) => {
-      const textContent = message.parts
-        .filter(part => part.type === 'text')
-        .map(part => part.text)
-        .join(' ');
-
-      if (containsInappropriateContent(textContent)) {
-        const filteredMessage = {
-          ...message,
-            parts: message.parts.map(part =>
-              part.type === 'text'
-                ? { ...part, text: filterContent(part.text) }
-                : part
-            )
-        };
-
-        chat.setMessages(prev =>
-          prev.map(msg =>
-            msg.id === message.id ? filteredMessage : msg
-          )
-        );
-      }
-    }
-  });
-
-  return <ChatContainer chat={chat} />;
-}
-```
-
-## Message Format
-
-Works with Vercel AI SDK `UIMessage`:
-
-```typescript
-interface UIMessage {
-  id: string;
-  role: 'system' | 'user' | 'assistant';
-  metadata?: unknown;
-  parts: Array<UIMessagePart>;
-}
-
-type UIMessagePart =
-  | { type: 'text'; text: string; state?: 'streaming' | 'done' }
-  | { type: 'reasoning'; text: string; state?: 'streaming' | 'done' }
-  | { type: 'file'; mediaType: string; filename?: string; url: string }
-  | { type: 'source-url'; sourceId: string; url: string; title?: string };
-```
-
-## Performance Considerations
-
-### Message History Management
-
-```tsx
-function ChatWithHistoryLimit() {
-  const MAX_MESSAGES = 50;
-
-  const chat = useAIChat({
-    api: "/api/chat",
-    onFinish: () => {
-      if (chat.messages.length > MAX_MESSAGES) {
-        const trimmed = chat.messages.slice(-MAX_MESSAGES);
-        chat.setMessages(trimmed);
-      }
-    }
-  });
-
-  return <ChatContainer chat={chat} />;
-}
-```
-
-### Auto-Submit on Enter
-
-```tsx
-import { useEffect } from 'react';
-
-function ChatWithAutoSubmit() {
-  const chat = useAIChat({ api: "/api/chat" });
-
-  // Auto-submit when user presses Enter (without Shift)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey && chat.input.trim()) {
-        e.preventDefault();
-        chat.handleSubmit();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [chat.input, chat.handleSubmit]);
-
-  return <ChatContainer chat={chat} />;
-}
-```
-
-## Error Types
-
-```typescript
-interface ChatError extends Error {
-  name: 'ChatError';
-  cause?: unknown;
-}
-
-interface NetworkError extends Error {
-  name: 'NetworkError';
-  status?: number;
-  statusText?: string;
-}
-
-interface ValidationError extends Error {
-  name: 'ValidationError';
-  field?: string;
-  value?: unknown;
-}
-```
-
-## Best Practices
-
-1. **Leverage Enrichment**: Always rely on `enrichedSystemPrompt` downstream; it is more informative than a raw prompt.
-2. **Handle Errors Gracefully**: Implement `onError` for production apps.
-3. **Validate Input**: Check user input before sending.
-4. **Manage Memory**: Trim long histories to reduce token usage.
-5. **Performance**: Use stable selectors and avoid unnecessary re-renders.
-6. **Security**: Avoid sending sensitive data in context/focus.
-7. **Observability**: Log resolved system prompts (but redact sensitive parts if any).
-8. **Per-Call Overrides**: Use `body.enrichedSystemPrompt` sparingly—prefer built-in builder unless you have a specialized orchestrator.
-
-## See Also
-
-- [Basic Chat guide](/chat/basic-chat)
-- [useAIContext](/api/hooks/use-ai-context)
-- [useAIFocus](/api/hooks/use-ai-focus)
-- [useAIFrontendTool](/api/hooks/use-ai-frontend-tool)
 - [ChatContainer](/api/components/chat-container)
+- [ChatPopout](/api/components/chat-popout)
+- [useAIFrontendTool](/api/hooks/use-ai-frontend-tool)
+- [useAIContext](/api/hooks/use-ai-context)

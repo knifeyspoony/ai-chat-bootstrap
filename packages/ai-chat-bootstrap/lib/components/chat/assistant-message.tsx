@@ -1,5 +1,7 @@
 import type { UIMessage } from "ai";
 import React from "react";
+import isEqual from "fast-deep-equal";
+import type { AssistantActionsConfig } from "../../types/actions";
 import {
   Message,
   MessageAvatar,
@@ -8,6 +10,9 @@ import {
 import { cn } from "../../utils";
 import { ChatChainOfThought } from "./chat-chain-of-thought";
 import { ChatMessagePart } from "./chat-message-part";
+import { AssistantActionsRenderer } from "./assistant-actions-renderer";
+
+type MessagePart = UIMessage["parts"][number];
 
 interface AssistantMessageProps {
   message: UIMessage;
@@ -19,9 +24,10 @@ interface AssistantMessageProps {
   latestActions?: React.ReactNode;
   actionsClassName?: string;
   isLatestAssistant?: boolean;
+  actionsConfig?: AssistantActionsConfig;
 }
 
-export const AssistantMessage: React.FC<AssistantMessageProps> = ({
+const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
   message,
   isStreaming,
   assistantAvatar = "/acb.png",
@@ -31,14 +37,15 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
   latestActions,
   actionsClassName,
   isLatestAssistant,
+  actionsConfig,
 }) => {
   // Separate COT parts from regular parts
-  const cotParts: any[] = [];
-  const regularParts: any[] = [];
+  const cotParts: MessagePart[] = [];
+  const regularParts: MessagePart[] = [];
   let cotActive = false;
 
   // Helper: filter out non-visible parts
-  const isVisiblePart = (part: any) => {
+  const isVisiblePart = (part: MessagePart) => {
     // Filter out all acb_ tools (they render as null in ChatMessagePart)
     if (part.type?.startsWith("tool-acb_") || part.type === "dynamic-tool") {
       return false;
@@ -92,8 +99,9 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
 
   const hasSharedActions = Boolean(actions);
   const hasLatestActions = Boolean(latestActions);
+  const hasConfigActions = Boolean(actionsConfig);
   const showAnyActions =
-    hasSharedActions || (isLatestAssistant && hasLatestActions);
+    hasSharedActions || (isLatestAssistant && hasLatestActions) || hasConfigActions;
 
   return (
     <div className={cn("group flex flex-col gap-0", !showAnyActions && "pt-4")}>
@@ -154,11 +162,46 @@ export const AssistantMessage: React.FC<AssistantMessageProps> = ({
               actionsClassName
             )}
           >
+            {/* Legacy JSX-based actions */}
             {actions}
             {isLatestAssistant && latestActions ? latestActions : null}
+
+            {/* New config-based actions */}
+            {hasConfigActions && (
+              <AssistantActionsRenderer
+                message={message}
+                actionsConfig={actionsConfig}
+                isLatestAssistant={isLatestAssistant}
+              />
+            )}
           </div>
         </div>
       ) : null}
     </div>
   );
 };
+
+export const AssistantMessage = React.memo(
+  AssistantMessageImpl,
+  (prev, next) => {
+    // Fast path: reference equality check
+    if (prev.message === next.message &&
+        prev.isStreaming === next.isStreaming &&
+        prev.isLatestAssistant === next.isLatestAssistant) return true;
+
+    // Detailed property comparison
+    return (
+      prev.message.id === next.message.id &&
+      prev.isStreaming === next.isStreaming &&
+      prev.isLastMessage === next.isLastMessage &&
+      prev.isLatestAssistant === next.isLatestAssistant &&
+      prev.assistantAvatar === next.assistantAvatar &&
+      prev.messageClassName === next.messageClassName &&
+      prev.actionsClassName === next.actionsClassName &&
+      prev.actions === next.actions &&
+      prev.latestActions === next.latestActions &&
+      prev.actionsConfig === next.actionsConfig &&
+      isEqual(prev.message.parts, next.message.parts)
+    );
+  }
+);

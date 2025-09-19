@@ -1,29 +1,45 @@
 "use client";
-import { ChatPopout } from "ai-chat-bootstrap";
+import { ChatPopout, type UIMessage } from "ai-chat-bootstrap";
 import { useState } from "react";
-import { useMockAIChat } from "./shared/useMockAIChat";
 
-// A lightweight live demo for ChatPopout using mock chat functionality
+type PopoutChatExampleProps = {
+  mode?: "inline" | "overlay";
+};
+
+const PREVIEW_MESSAGES: UIMessage[] = [
+  {
+    id: "assistant-welcome",
+    role: "assistant",
+    parts: [
+      {
+        type: "text",
+        text: "Hi there! I'm your floating assistant. Try opening the chat or switching between inline and overlay modes.",
+      },
+    ],
+  },
+];
+
+// A lightweight live demo for ChatPopout showcasing layout and controls
 export function PopoutChatExample({
-  mode = "overlay" as "inline" | "overlay",
-}) {
+  mode = "overlay",
+}: PopoutChatExampleProps) {
   const [open, setOpen] = useState(false);
-  const chat = useMockAIChat({
-    responseGenerator: (text) => `You said: "${text}". This is a mock response from the AI popout chat.`,
-    responseDelay: 800,
-  });
 
   return (
-    <div className="relative h-[420px] w-full border rounded-md bg-muted/30 overflow-hidden flex">
+    <div className="relative h-[600px] w-full border rounded-md bg-muted/30 overflow-hidden flex">
       {/* Demo content area so inline mode participates in flex layout */}
       <div className="flex-1 p-4 text-sm text-muted-foreground">
         This area represents your app content. In inline mode, the chat sits as
         a flex sidebar and fills the parent height.
       </div>
       <ChatPopout
-        chat={chat}
+        messages={{
+          systemPrompt:
+            "You are an embedded assistant helping users while they browse the app interface.",
+          initial: PREVIEW_MESSAGES,
+        }}
         header={{ title: "Assistant" }}
-        ui={{ placeholder: "Ask me anything..." }}
+        ui={{ placeholder: "Hook up your API to start chatting..." }}
         popout={{
           mode,
           position: "right",
@@ -43,17 +59,13 @@ export function PopoutChatExample({
 
 export const POPOUT_CHAT_INLINE_SOURCE = `"use client";
 import React from "react";
-import { ChatPopout, useAIChat } from "ai-chat-bootstrap";
+import { ChatPopout } from "ai-chat-bootstrap";
 
 export function PopoutChat() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant."
-  });
-
   return (
     <ChatPopout
-      chat={chat}
+      transport={{ api: "/api/chat" }}
+      messages={{ systemPrompt: "You are a helpful assistant." }}
       header={{ title: "Assistant" }}
       ui={{ placeholder: "Ask me anything..." }}
       popout={{
@@ -68,19 +80,15 @@ export function PopoutChat() {
 
 export const POPOUT_CHAT_OVERLAY_SOURCE = `"use client";
 import React from "react";
-import { ChatPopout, useAIChat } from "ai-chat-bootstrap";
+import { ChatPopout } from "ai-chat-bootstrap";
 
 export function PopoutChat() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant."
-  });
-
   return (
     // To confine the overlay to a parent container, set the parent to position: relative
     // and override the popout to use absolute positioning with height: 100%.
     <ChatPopout
-      chat={chat}
+      transport={{ api: "/api/chat" }}
+      messages={{ systemPrompt: "You are a helpful assistant." }}
       header={{ title: "Assistant" }}
       ui={{ placeholder: "Ask me anything..." }}
       popout={{

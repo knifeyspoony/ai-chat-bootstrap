@@ -1,18 +1,18 @@
 import type { ChatStatus } from "ai";
 import { PlusIcon, RotateCcwIcon, SparklesIcon, XIcon } from "lucide-react";
-import React, { useCallback, useRef } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   PromptInput,
   PromptInputButton,
+  PromptInputModelSelect,
+  PromptInputModelSelectContent,
+  PromptInputModelSelectItem,
+  PromptInputModelSelectTrigger,
+  PromptInputModelSelectValue,
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputToolbar,
   PromptInputTools,
-  PromptInputModelSelect,
-  PromptInputModelSelectTrigger,
-  PromptInputModelSelectValue,
-  PromptInputModelSelectContent,
-  PromptInputModelSelectItem,
 } from "../../components/ai-elements/prompt-input";
 import { Alert, AlertDescription } from "../../components/ui/alert";
 import { Badge } from "../../components/ui/badge";
@@ -23,10 +23,271 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
-import { useAIFocus } from "../../hooks";
-import { useChatStore } from "../../stores/chat";
 import type { ChatModelOption, FocusItem, Suggestion } from "../../types/chat";
 import { cn } from "../../utils";
+
+// Pure suggestions button implementation
+interface PureSuggestionsButtonProps {
+  suggestions?: Suggestion[];
+  suggestionsCount?: number;
+  onSuggestionClick?: (suggestion: Suggestion) => void;
+}
+
+const PureSuggestionsButton = ({
+  suggestions = [],
+  suggestionsCount = 3,
+  onSuggestionClick,
+}: PureSuggestionsButtonProps) => {
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <PromptInputButton
+          type="button"
+          disabled={!suggestions || suggestions.length === 0}
+          className={cn(
+            suggestions &&
+              suggestions.length > 0 &&
+              "text-primary hover:text-primary"
+          )}
+        >
+          <SparklesIcon className="h-4 w-4" />
+        </PromptInputButton>
+      </DropdownMenuTrigger>
+      {suggestions && suggestions.length > 0 && (
+        <DropdownMenuContent
+          align="end"
+          side="top"
+          className="w-80"
+          sideOffset={8}
+        >
+          <DropdownMenuLabel>AI Suggestions</DropdownMenuLabel>
+          {suggestions
+            .slice(0, Math.min(Math.max(suggestionsCount, 1), 10))
+            .map((suggestion, index) => (
+              <DropdownMenuItem
+                key={index}
+                onClick={() => onSuggestionClick?.(suggestion)}
+                className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
+              >
+                <div className="flex flex-col gap-1 py-1">
+                  <span className="font-medium leading-tight">
+                    {suggestion.shortSuggestion}
+                  </span>
+                  {suggestion.shortSuggestion !==
+                    suggestion.longSuggestion && (
+                    <span className="text-xs text-muted-foreground leading-tight">
+                      {suggestion.longSuggestion}
+                    </span>
+                  )}
+                </div>
+              </DropdownMenuItem>
+            ))}
+        </DropdownMenuContent>
+      )}
+    </DropdownMenu>
+  );
+};
+
+// Memoized suggestions button - only re-renders when suggestions change
+const SuggestionsButton = memo(PureSuggestionsButton, (prevProps, nextProps) => {
+  // Only re-render if suggestions array reference changes
+  if (prevProps.suggestions !== nextProps.suggestions) return false;
+  if (prevProps.suggestionsCount !== nextProps.suggestionsCount) return false;
+
+  // Skip function comparison for better performance
+  return true;
+});
+
+// Pure model selector implementation
+interface PureModelSelectorProps {
+  models?: ChatModelOption[];
+  selectedModelId?: string;
+  onModelChange?: (modelId: string) => void;
+  disabled?: boolean;
+}
+
+const PureModelSelector = ({
+  models = [],
+  selectedModelId,
+  onModelChange,
+  disabled = false,
+}: PureModelSelectorProps) => {
+  const modelOptions = Array.isArray(models) ? models : [];
+  const hasModelOptions = modelOptions.length > 0;
+
+  if (!hasModelOptions) {
+    return null;
+  }
+
+  const selectModelValue =
+    selectedModelId &&
+    modelOptions.some((option) => option.id === selectedModelId)
+      ? selectedModelId
+      : modelOptions[0]?.id;
+
+  return (
+    <PromptInputModelSelect
+      value={selectModelValue}
+      onValueChange={(value) => onModelChange?.(value)}
+      disabled={disabled}
+    >
+      <PromptInputModelSelectTrigger className="h-8 px-2 text-sm">
+        <PromptInputModelSelectValue placeholder="Select a model" />
+      </PromptInputModelSelectTrigger>
+      <PromptInputModelSelectContent align="start">
+        {modelOptions.map((option) => (
+          <PromptInputModelSelectItem
+            key={option.id}
+            value={option.id}
+          >
+            <div className="flex flex-col gap-0.5 py-1">
+              <span className="text-sm font-medium leading-tight">
+                {option.label ?? option.id}
+              </span>
+              {option.description && (
+                <span className="text-xs text-muted-foreground leading-tight">
+                  {option.description}
+                </span>
+              )}
+            </div>
+          </PromptInputModelSelectItem>
+        ))}
+      </PromptInputModelSelectContent>
+    </PromptInputModelSelect>
+  );
+};
+
+// Memoized model selector - only re-renders when model data changes
+const ModelSelector = memo(PureModelSelector, (prevProps, nextProps) => {
+  // Only re-render if model-related props change
+  if (prevProps.models !== nextProps.models) return false;
+  if (prevProps.selectedModelId !== nextProps.selectedModelId) return false;
+  if (prevProps.disabled !== nextProps.disabled) return false;
+
+  // Skip function comparison for better performance
+  return true;
+});
+
+// Pure attach button implementation
+interface PureAttachButtonProps {
+  onAttach?: () => void;
+  disabled?: boolean;
+}
+
+const PureAttachButton = ({
+  onAttach,
+  disabled = false,
+}: PureAttachButtonProps) => {
+  if (!onAttach) {
+    return null;
+  }
+
+  return (
+    <PromptInputButton onClick={onAttach} disabled={disabled}>
+      <PlusIcon className="h-4 w-4" />
+    </PromptInputButton>
+  );
+};
+
+// Memoized attach button - only re-renders when disabled state changes
+const AttachButton = memo(PureAttachButton, (prevProps, nextProps) => {
+  if (prevProps.disabled !== nextProps.disabled) return false;
+
+  // Skip function comparison for better performance
+  return true;
+});
+
+// Pure toolbar left section (model + attach button)
+interface PureToolbarLeftProps {
+  models?: ChatModelOption[];
+  selectedModelId?: string;
+  onModelChange?: (modelId: string) => void;
+  onAttach?: () => void;
+  disabled?: boolean;
+}
+
+const PureToolbarLeft = ({
+  models,
+  selectedModelId,
+  onModelChange,
+  onAttach,
+  disabled = false,
+}: PureToolbarLeftProps) => {
+  return (
+    <div className="flex items-center gap-1">
+      <ModelSelector
+        models={models}
+        selectedModelId={selectedModelId}
+        onModelChange={onModelChange}
+        disabled={disabled}
+      />
+      <PromptInputTools>
+        <AttachButton onAttach={onAttach} disabled={disabled} />
+      </PromptInputTools>
+    </div>
+  );
+};
+
+// Memoized toolbar left section
+const ToolbarLeft = memo(PureToolbarLeft, (prevProps, nextProps) => {
+  if (prevProps.models !== nextProps.models) return false;
+  if (prevProps.selectedModelId !== nextProps.selectedModelId) return false;
+  if (prevProps.disabled !== nextProps.disabled) return false;
+
+  // Skip function comparison for better performance
+  return true;
+});
+
+// Pure toolbar right section (suggestions + send button)
+interface PureToolbarRightProps {
+  status?: ChatStatus;
+  submitDisabled?: boolean;
+  hasContent?: boolean;
+  enableSuggestions?: boolean;
+  suggestions?: Suggestion[];
+  suggestionsCount?: number;
+  onSuggestionClick?: (suggestion: Suggestion) => void;
+}
+
+const PureToolbarRight = ({
+  status,
+  submitDisabled = false,
+  hasContent = false,
+  enableSuggestions = false,
+  suggestions = [],
+  suggestionsCount = 3,
+  onSuggestionClick,
+}: PureToolbarRightProps) => {
+  return (
+    <div className="flex gap-1">
+      {enableSuggestions && (
+        <SuggestionsButton
+          suggestions={suggestions}
+          suggestionsCount={suggestionsCount}
+          onSuggestionClick={onSuggestionClick}
+        />
+      )}
+
+      <PromptInputSubmit
+        status={status}
+        disabled={submitDisabled || !hasContent}
+      />
+    </div>
+  );
+};
+
+// Memoized toolbar right section
+const ToolbarRight = memo(PureToolbarRight, (prevProps, nextProps) => {
+  if (prevProps.status !== nextProps.status) return false;
+  if (prevProps.submitDisabled !== nextProps.submitDisabled) return false;
+  if (prevProps.hasContent !== nextProps.hasContent) return false;
+  if (prevProps.enableSuggestions !== nextProps.enableSuggestions) return false;
+  if (prevProps.suggestions !== nextProps.suggestions) return false;
+  if (prevProps.suggestionsCount !== nextProps.suggestionsCount) return false;
+
+  // Skip function comparison for better performance
+  return true;
+});
 
 export interface ChatInputProps {
   value: string;
@@ -37,6 +298,8 @@ export interface ChatInputProps {
   onRetry?: () => void;
   placeholder?: string;
   disabled?: boolean;
+  // Submit-specific disabled state (separate from general disabled)
+  submitDisabled?: boolean;
   status?: ChatStatus;
   maxRows?: number;
   className?: string;
@@ -50,9 +313,15 @@ export interface ChatInputProps {
   suggestions?: Suggestion[];
   suggestionsCount?: number;
   onSuggestionClick?: (suggestion: Suggestion) => void;
+
+  // Performance props - passed from parent to avoid store subscriptions
+  allFocusItems?: FocusItem[];
+  clearFocus?: (id: string) => void;
+  error?: string | null;
+  setError?: (error: string | null) => void;
 }
 
-export const ChatInput = ({
+const ChatInputImpl = ({
   value,
   onChange,
   onSubmit,
@@ -60,6 +329,7 @@ export const ChatInput = ({
   onRetry,
   placeholder = "Type your message...",
   disabled = false,
+  submitDisabled,
   status,
   maxRows = 4,
   className,
@@ -73,18 +343,70 @@ export const ChatInput = ({
   suggestions = [],
   suggestionsCount = 3,
   onSuggestionClick,
+
+  // Performance props - passed from parent to avoid store subscriptions
+  allFocusItems = [],
+  clearFocus,
+  error,
+  setError,
 }: ChatInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const { allFocusItems, clearFocus } = useAIFocus();
-  const error = useChatStore((state) => state.error);
-  const setError = useChatStore((state) => state.setError);
-  const modelOptions = Array.isArray(models) ? models : [];
-  const hasModelOptions = modelOptions.length > 0;
-  const selectModelValue = hasModelOptions
-    ? selectedModelId && modelOptions.some((option) => option.id === selectedModelId)
-      ? selectedModelId
-      : modelOptions[0]?.id
-    : undefined;
+
+  // Track current value in ref to avoid re-renders during typing
+  const currentValueRef = useRef<string>(value || "");
+  const hasContentRef = useRef<boolean>(Boolean(value?.trim()));
+
+  // Update ref when controlled value changes from parent
+  useEffect(() => {
+    if (value !== undefined) {
+      currentValueRef.current = value;
+      hasContentRef.current = Boolean(value.trim());
+      if (textareaRef.current && textareaRef.current.value !== value) {
+        textareaRef.current.value = value;
+      }
+    }
+  }, [value]);
+
+  // Model computations are now handled by the memoized ModelSelector component
+
+  // Memoize focus items rendering
+  const focusItemElements = useMemo(
+    () =>
+      allFocusItems.map((item: FocusItem) => {
+        const displayText = item.label || item.id;
+        return (
+          <Badge
+            key={item.id}
+            variant="secondary"
+            className="group flex items-center gap-1 pr-1 text-xs"
+          >
+            <span className="truncate max-w-32">{displayText}</span>
+            <PromptInputButton
+              onClick={() => clearFocus?.(item.id)}
+              className="h-4 w-4 p-0 hover:bg-background/80 opacity-60 group-hover:opacity-100 transition-opacity"
+            >
+              <XIcon className="h-3 w-3" />
+            </PromptInputButton>
+          </Badge>
+        );
+      }),
+    [allFocusItems, clearFocus]
+  );
+
+  // Create stable hasContent for button optimization
+  const hasContent = useMemo(() => Boolean(value?.trim()), [value]);
+
+  // Optimized onChange handler - use refs to minimize re-renders
+  const handleTextareaChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const newValue = e.target.value;
+      currentValueRef.current = newValue;
+      hasContentRef.current = Boolean(newValue.trim());
+      // Only call onChange if it's a controlled component
+      onChange?.(newValue);
+    },
+    [onChange]
+  );
 
   // Keep focus in the input after submit
   const handleSubmit = useCallback(
@@ -98,9 +420,9 @@ export const ChatInput = ({
     [onSubmit]
   );
 
-  // Do not disable textarea while sending/streaming; keep it interactive to preserve focus
-  const textareaDisabled =
-    disabled && !["submitted", "streaming"].includes(String(status ?? ""));
+  // Keep textarea enabled during streaming so users can type their next message
+  // Only disable for true disabled state (not loading/streaming)
+  const textareaDisabled = disabled;
 
   const handleTextareaKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
@@ -111,7 +433,7 @@ export const ChatInput = ({
       }
 
       if (
-        (disabled || status === "submitted" || status === "streaming") &&
+        (submitDisabled || status === "submitted" || status === "streaming") &&
         event.key === "Enter" &&
         !event.shiftKey &&
         !event.nativeEvent.isComposing
@@ -120,7 +442,7 @@ export const ChatInput = ({
         event.stopPropagation();
       }
     },
-    [disabled, onKeyDown, status]
+    [submitDisabled, onKeyDown, status]
   );
 
   return (
@@ -141,7 +463,7 @@ export const ChatInput = ({
                 </PromptInputButton>
               )}
               <PromptInputButton
-                onClick={() => setError(null)}
+                onClick={() => setError?.(null)}
                 className="h-6 w-6 p-0 hover:bg-background/20"
                 title="Dismiss error"
               >
@@ -154,32 +476,13 @@ export const ChatInput = ({
 
       {/* Focus Item Chips */}
       {allFocusItems.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 px-1">
-          {allFocusItems.map((item: FocusItem) => {
-            const displayText = item.label || item.id;
-            return (
-              <Badge
-                key={item.id}
-                variant="secondary"
-                className="group flex items-center gap-1 pr-1 text-xs"
-              >
-                <span className="truncate max-w-32">{displayText}</span>
-                <PromptInputButton
-                  onClick={() => clearFocus(item.id)}
-                  className="h-4 w-4 p-0 hover:bg-background/80 opacity-60 group-hover:opacity-100 transition-opacity"
-                >
-                  <XIcon className="h-3 w-3" />
-                </PromptInputButton>
-              </Badge>
-            );
-          })}
-        </div>
+        <div className="flex flex-wrap gap-1.5 px-1">{focusItemElements}</div>
       )}
 
       <PromptInput onSubmit={handleSubmit} className="w-full">
         <PromptInputTextarea
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={handleTextareaChange}
           placeholder={placeholder}
           disabled={textareaDisabled}
           maxHeight={maxRows * 24}
@@ -187,105 +490,49 @@ export const ChatInput = ({
           ref={textareaRef}
         />
         <PromptInputToolbar>
-          <div className="flex items-center gap-1">
-            {hasModelOptions && (
-              <PromptInputModelSelect
-                value={selectModelValue}
-                onValueChange={(value) => onModelChange?.(value)}
-                disabled={disabled}
-              >
-                <PromptInputModelSelectTrigger className="h-8 px-2 text-sm">
-                  <PromptInputModelSelectValue placeholder="Select a model" />
-                </PromptInputModelSelectTrigger>
-                <PromptInputModelSelectContent align="start">
-                  {modelOptions.map((option) => (
-                    <PromptInputModelSelectItem key={option.id} value={option.id}>
-                      <div className="flex flex-col gap-0.5 py-1">
-                        <span className="text-sm font-medium leading-tight">
-                          {option.label ?? option.id}
-                        </span>
-                        {option.description && (
-                          <span className="text-xs text-muted-foreground leading-tight">
-                            {option.description}
-                          </span>
-                        )}
-                      </div>
-                    </PromptInputModelSelectItem>
-                  ))}
-                </PromptInputModelSelectContent>
-              </PromptInputModelSelect>
-            )}
-            <PromptInputTools>
-              {onAttach && (
-                <PromptInputButton onClick={onAttach} disabled={disabled}>
-                  <PlusIcon className="h-4 w-4" />
-                </PromptInputButton>
-              )}
-            </PromptInputTools>
-          </div>
+          <ToolbarLeft
+            models={models}
+            selectedModelId={selectedModelId}
+            onModelChange={onModelChange}
+            onAttach={onAttach}
+            disabled={disabled}
+          />
 
-          {/* Right side buttons group - Suggestions + Send */}
-          <div className="flex gap-1">
-            {/* AI Suggestions Button */}
-            {enableSuggestions && (
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <PromptInputButton
-                    type="button"
-                    disabled={!suggestions || suggestions.length === 0}
-                    className={cn(
-                      suggestions &&
-                        suggestions.length > 0 &&
-                        "text-primary hover:text-primary"
-                    )}
-                  >
-                    <SparklesIcon className="h-4 w-4" />
-                  </PromptInputButton>
-                </DropdownMenuTrigger>
-                {suggestions && suggestions.length > 0 && (
-                  <DropdownMenuContent
-                    align="end"
-                    side="top"
-                    className="w-80"
-                    sideOffset={8}
-                  >
-                    <DropdownMenuLabel>AI Suggestions</DropdownMenuLabel>
-                    {suggestions
-                      .slice(0, Math.min(Math.max(suggestionsCount, 1), 10))
-                      .map((suggestion, index) => (
-                        <DropdownMenuItem
-                          key={index}
-                          onClick={() => onSuggestionClick?.(suggestion)}
-                          className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
-                        >
-                          <div className="flex flex-col gap-1 py-1">
-                            <span className="font-medium leading-tight">
-                              {suggestion.shortSuggestion}
-                            </span>
-                            {suggestion.shortSuggestion !==
-                              suggestion.longSuggestion && (
-                              <span className="text-xs text-muted-foreground leading-tight">
-                                {suggestion.longSuggestion}
-                              </span>
-                            )}
-                          </div>
-                        </DropdownMenuItem>
-                      ))}
-                  </DropdownMenuContent>
-                )}
-              </DropdownMenu>
-            )}
-
-            <PromptInputSubmit
-              status={status}
-              // Disable submit while loading or when empty, but keep textarea enabled
-              disabled={disabled || !value.trim()}
-            />
-          </div>
+          <ToolbarRight
+            status={status}
+            submitDisabled={submitDisabled}
+            hasContent={hasContent}
+            enableSuggestions={enableSuggestions}
+            suggestions={suggestions}
+            suggestionsCount={suggestionsCount}
+            onSuggestionClick={onSuggestionClick}
+          />
         </PromptInputToolbar>
       </PromptInput>
     </div>
   );
 };
+
+// Optimized React.memo with simplified comparison for better performance
+export const ChatInput = memo(ChatInputImpl, (prevProps, nextProps) => {
+  // Primary props that always trigger re-render
+  if (prevProps.value !== nextProps.value) return false;
+  if (prevProps.disabled !== nextProps.disabled) return false;
+  if (prevProps.submitDisabled !== nextProps.submitDisabled) return false;
+  if (prevProps.status !== nextProps.status) return false;
+  if (prevProps.error !== nextProps.error) return false;
+  if (prevProps.selectedModelId !== nextProps.selectedModelId) return false;
+
+  // Reference equality for arrays/objects (much faster than deep comparison)
+  if (prevProps.models !== nextProps.models) return false;
+  if (prevProps.suggestions !== nextProps.suggestions) return false;
+  if (prevProps.allFocusItems !== nextProps.allFocusItems) return false;
+
+  // Function props - assume they're stable if parent is using useCallback correctly
+  // Skip function comparison to avoid performance overhead
+
+  // All relevant props are the same
+  return true;
+});
 
 ChatInput.displayName = "ChatInput";

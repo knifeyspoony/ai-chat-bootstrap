@@ -5,7 +5,9 @@
 const meta = {
   index: "Overview",
   chat: "Chat",
+  features: "Features",
   api: "API",
+  styling: "Styling",
 };
 
 export default meta;

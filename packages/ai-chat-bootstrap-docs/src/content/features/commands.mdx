@@ -142,17 +142,18 @@ Here's a comprehensive example showing both command types:
 ```tsx
 "use client";
 import React, { useState } from "react";
-import { 
-  ChatContainer, 
-  useAIChat, 
+import {
+  ChatContainer,
   useAIChatCommand,
+  useAIFrontendTool,
+  useChatStore,
   useUIChatCommand,
-  useAIFrontendTool 
 } from "ai-chat-bootstrap";
 import { z } from "zod";
 
 export function ChatWithCommands() {
-  const [messages, setMessages] = useState([]);
+  const messages = useChatStore((state) => state.messages);
+  const clearMessages = useChatStore((state) => state.clearMessages);
   const [theme, setTheme] = useState("light");
   const [debugMode, setDebugMode] = useState(false);
 
@@ -171,7 +172,7 @@ export function ChatWithCommands() {
         keywords: ["example", "content", "analysis"],
         summary: "This is a summary of the content.",
       };
-      
+
       return {
         success: true,
         analysis: results[params.type],
@@ -195,7 +196,7 @@ export function ChatWithCommands() {
     - For sentiment: Explain the emotional tone and provide insights
     - For keywords: Identify key themes and important terms
     - For summary: Create a concise, informative summary
-    Always be thorough and provide actionable insights.`
+    Always be thorough and provide actionable insights.`,
   });
 
   // UI Commands - execute directly
@@ -209,7 +210,7 @@ export function ChatWithCommands() {
       setTheme(mode);
       document.documentElement.setAttribute("data-theme", mode);
       localStorage.setItem("theme", mode);
-    }
+    },
   });
 
   useUIChatCommand({
@@ -217,8 +218,8 @@ export function ChatWithCommands() {
     description: "Clear the chat history",
     parameters: z.object({}),
     execute: async () => {
-      setMessages([]);
-    }
+      clearMessages();
+    },
   });
 
   useUIChatCommand({
@@ -231,64 +232,18 @@ export function ChatWithCommands() {
       const newState = enabled !== undefined ? enabled : !debugMode;
       setDebugMode(newState);
       console.log(`Debug mode: ${newState ? "ON" : "OFF"}`);
-    }
-  });
-
-  useUIChatCommand({
-    name: "export",
-    description: "Export chat history",
-    parameters: z.object({
-      format: z.enum(["json", "txt", "markdown"])
-        .default("json")
-        .describe("Export format"),
-    }),
-    execute: async ({ format }) => {
-      const data = messages.map(m => ({
-        role: m.role,
-        content: m.content,
-        timestamp: m.timestamp,
-      }));
-      
-      let content;
-      let filename;
-      
-      switch (format) {
-        case "json":
-          content = JSON.stringify(data, null, 2);
-          filename = "chat-export.json";
-          break;
-        case "txt":
-          content = data.map(m => `${m.role}: ${m.content}`).join("\\n\\n");
-          filename = "chat-export.txt";
-          break;
-        case "markdown":
-          content = data.map(m => `**${m.role}**: ${m.content}`).join("\\n\\n");
-          filename = "chat-export.md";
-          break;
-      }
-      
-      // Create download
-      const blob = new Blob([content], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-  });
-
-  const chat = useAIChat({
-    api: "/api/chat",
-    messages,
-    onMessagesChange: setMessages,
+    },
   });
 
   return (
     <div className="space-y-4">
       <div className="h-[500px] w-full">
         <ChatContainer
-          chat={chat}
+          transport={{ api: "/api/chat" }}
+          messages={{
+            systemPrompt:
+              "You are an assistant that understands slash commands and can analyze content.",
+          }}
           header={{
             title: "Chat with Commands",
             subtitle: "Try AI: /analyze or UI: /theme, /clear, /debug",
@@ -296,17 +251,21 @@ export function ChatWithCommands() {
           ui={{ placeholder: "Type / to see available commands" }}
         />
       </div>
-      
+
       {debugMode && (
         <div className="p-4 bg-muted rounded-lg">
           <h3 className="font-bold mb-2">Debug Info</h3>
           <pre className="text-xs overflow-auto">
-            {JSON.stringify({
-              messageCount: messages.length,
-              theme,
-              debugMode,
-              timestamp: new Date().toISOString(),
-            }, null, 2)}
+            {JSON.stringify(
+              {
+                messageCount: messages.length,
+                theme,
+                debugMode,
+                timestamp: new Date().toISOString(),
+              },
+              null,
+              2
+            )}
           </pre>
         </div>
       )}
@@ -368,28 +327,6 @@ Users can discover available commands by:
 4. **Parameter hints** - Shows parameter requirements for each command
 
 ## Best Practices
-
-### Command Design
-
-1. **Clear Names**: Use descriptive, memorable command names
-2. **Consistent Patterns**: Follow consistent naming conventions
-3. **Parameter Descriptions**: Provide clear descriptions for all parameters
-4. **Defaults**: Use sensible defaults for optional parameters
-5. **Validation**: Use strict Zod schemas to validate input
-
-### AI Commands
-
-1. **System Prompts**: Craft specific prompts for each command's purpose
-2. **Tool Alignment**: Ensure tool names match registered frontend tools
-3. **Error Handling**: Tools should handle errors gracefully
-4. **Context**: Provide relevant context in tool responses
-
-### UI Commands
-
-1. **Instant Feedback**: Provide immediate visual feedback
-2. **State Sync**: Keep UI state consistent with command effects
-3. **Undo Support**: Consider implementing undo for destructive operations
-4. **Performance**: Avoid heavy computations in synchronous operations
 
 ### Error Handling
 

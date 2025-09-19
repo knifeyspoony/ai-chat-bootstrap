@@ -44,7 +44,10 @@ The library accepts **shadcn/ui** and **Tailwind** classes naturally, falling ba
 @import "ai-chat-bootstrap/ai-chat.css";
 ```
 
+`tokens.css` provides design tokens + minimal globals. `ai-chat.css` layers the chat component styles on top.
+
 To theme, override CSS custom properties:
+
 ```css
 :root {
   --radius: 0.75rem;
@@ -69,15 +72,16 @@ Don't use both modes together.
 
 ```tsx
 import React from "react";
-import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+import { ChatContainer } from "ai-chat-bootstrap";
 
 export function App() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful AI assistant.",
-  });
-
-  return <ChatContainer chat={chat} header={{ title: "AI Assistant" }} />;
+  return (
+    <ChatContainer
+      transport={{ api: "/api/chat" }}
+      messages={{ systemPrompt: "You are a helpful AI assistant." }}
+      header={{ title: "AI Assistant" }}
+    />
+  );
 }
 ```
 
@@ -99,6 +103,7 @@ export { handler as POST };
 ```
 
 Available handlers:
+
 - `createAIChatHandler` - Main chat streaming
 - `createSuggestionsHandler` - AI-generated suggestions
 - `createThreadTitleHandler` - Auto thread titles
@@ -121,22 +126,14 @@ Each handler accepts model configuration and error handling options.
 
 ## CSS / Theming
 
-- `tokens.css` supplies design tokens & minimal global fixes.
-- `ai-chat.css` is an optional precompiled minimal utility slice (no preflight) containing only classes our components use.
-- The Tailwind preset maps the tokens to theme values if you opt into full Tailwind compilation.
-- Override theme by redefining CSS custom properties after importing `tokens.css`.
+- `ai-chat-bootstrap/tokens.css` exposes design tokens + minimal global fixes
+- `ai-chat-bootstrap/ai-chat.css` ships the component styles without Tailwind preflight
+- The Tailwind preset maps the tokens to theme values if you opt into full Tailwind compilation
+- Override theme by redefining CSS custom properties after importing the tokens
 
 ### Layered Tokens
 
-You can opt into granular layers instead of the aggregate `tokens.css`:
-
-```ts
-import "ai-chat-bootstrap/tokens.primitives.css"; // primitive scales
-import "ai-chat-bootstrap/tokens.dark.css"; // dark overrides (optional)
-import "ai-chat-bootstrap/tokens.css"; // component hooks + globals only
-```
-
-If you import the first three, you may skip the aggregate and copy just the needed hooks into your own stylesheet.
+For more granular control, you can import individual CSS files if needed (check the `lib/` directory for available styles).
 
 ## Theming & Customization
 
@@ -158,7 +155,10 @@ Wrap your chat:
 
 ```tsx
 <div className="my-chat-scope">
-  <ChatContainer chat={chat} />
+  <ChatContainer
+    transport={{ api: "/api/chat" }}
+    messages={{ systemPrompt: "You are a helpful AI assistant." }}
+  />
 </div>
 ```
 
@@ -215,7 +215,10 @@ All utilities start with `acb-` and map to a CSS variable; color values come fro
   data-acb-theme="alt"
   className="[--acb-chat-container-bg:oklch(0.15_0.02_250)] [--acb-chat-header-fg:white]"
 >
-  <ChatContainer chat={chat} />
+  <ChatContainer
+    transport={{ api: "/api/chat" }}
+    messages={{ systemPrompt: "You are a helpful AI assistant." }}
+  />
 </div>
 ```
 
@@ -334,31 +337,39 @@ If you need additional variant surfaces, open an issue or PR—extending CVA con
 
 ### ChatContainer
 
-**Required:**
-- `chat`: result of `useAIChat` hook (handles all state and actions)
+**Chat Configuration (AI Settings):**
+
+- `transport`: `{ api?: string }` – endpoint for AI requests
+- `messages`: `{ systemPrompt?: string; initial?: UIMessage[] }`
+- `thread`: `{ id?: string; scopeKey?: string; autoCreate?: boolean; warnOnMissing?: boolean; title?: { api?: string; sampleCount?: number } }`
+- `features`: `{ chainOfThought?: boolean }`
+- `mcp`: `{ enabled?: boolean; api?: string; servers?: SerializedMCPServer[] }`
+- `models`: `{ options?: ChatModelOption[]; initialId?: string }`
 
 **Optional:**
+
 - `header`: title, subtitle, avatar, badge, actions, className
 - `ui`: placeholder, className, classes (`header`, `messages`, `message`, `input`, `assistantActions`), emptyState
 - `suggestions`: enabled, prompt, count
 - `commands`: enabled
 - `threads`: enabled
-- `assistantActions`: controls rendered beneath each assistant reply (`node` or `(message) => node`); always visible on the latest reply and revealed on hover/focus for earlier replies
-- `assistantLatestActions`: extra controls that attach only to the most recent assistant reply
+- `assistantActions`: enable built-in buttons (`copy`, `regenerate`, `debug`, `feedback`) or supply a `custom` array of `AssistantAction`s for bespoke controls
 
 ### ChatPopout
 
 Extends `ChatContainer` props with:
+
 - `popout`: position, mode, container, width, height, className
 - `button`: show, label, icon, className, container
 
-Both components now require the `chat` hook - no manual state management needed.
+Both components handle the AI chat state internally - no manual state management needed.
 
 Enable suggestions and commands:
 
 ```tsx
 <ChatContainer
-  chat={chat}
+  transport={{ api: "/api/chat" }}
+  messages={{ systemPrompt: "You are a helpful AI assistant." }}
   suggestions={{ enabled: true, count: 3 }}
   commands={{ enabled: true }}
   threads={{ enabled: true }}
@@ -368,13 +379,18 @@ Enable suggestions and commands:
 Model selection and chain of thought:
 
 ```tsx
-const chat = useAIChat({
-  api: "/api/chat",
-  models: [{ id: "gpt-4", name: "GPT-4" }, { id: "gpt-3.5-turbo", name: "GPT-3.5" }],
-  chainOfThoughtEnabled: true,
-});
-
-<ChatContainer chat={chat} />
+<ChatContainer
+  transport={{ api: "/api/chat" }}
+  messages={{ systemPrompt: "You are a helpful AI assistant." }}
+  models={{
+    options: [
+      { id: "gpt-4o", label: "GPT-4o" },
+      { id: "gpt-4o-mini", label: "GPT-4o mini" },
+    ],
+    initialId: "gpt-4o",
+  }}
+  features={{ chainOfThought: true }}
+/>
 ```
 
 ## Tree-shaking

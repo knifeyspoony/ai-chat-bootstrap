@@ -131,22 +131,18 @@ Enable MCP tools in your chat:
 
 ```tsx
 // Frontend component
-import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+import { ChatContainer } from "ai-chat-bootstrap";
 
 function ChatWithMcpTools() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    mcpEnabled: true, // Enable MCP tool integration
-    systemPrompt: "You have access to external tools via MCP servers.",
-  });
-
   return (
     <ChatContainer
-      chat={chat}
+      transport={{ api: "/api/chat" }}
+      messages={{
+        systemPrompt: "You have access to external tools via MCP servers.",
+      }}
       mcp={{
         enabled: true,
-        discoveryApi: "/api/mcp-tools",
-        refreshInterval: 30000, // Refresh tools every 30 seconds
+        api: "/api/mcp-tools",
       }}
     />
   );
@@ -400,16 +396,6 @@ const getMcpServers = () => {
     });
   }
 
-  // Add database tools for admin users
-  if (process.env.ENABLE_DB_TOOLS === "true") {
-    baseServers.push({
-      url: process.env.MCP_DB_SERVER_URL!,
-      name: "database",
-      enabled: true,
-      timeout: 15000, // Longer timeout for DB operations
-    });
-  }
-
   return baseServers;
 };
 
@@ -556,56 +542,6 @@ const handler = createMcpToolsHandler({
 });
 
 export { handler as POST };
-```
-
-## Best Practices
-
-### Performance
-1. **Cache tool discovery** to avoid repeated server queries
-2. **Set appropriate timeouts** for server connections
-3. **Use connection pooling** for high-traffic applications
-4. **Implement retry logic** with exponential backoff
-
-### Security
-1. **Validate server certificates** in production
-2. **Use authentication tokens** for MCP server access
-3. **Filter dangerous tools** based on user permissions
-4. **Sanitize tool inputs** to prevent injection attacks
-
-### Reliability
-1. **Handle server unavailability** gracefully
-2. **Implement fallback mechanisms** when servers are down
-3. **Monitor server health** and tool availability
-4. **Log tool usage** for debugging and analytics
-
-### User Experience
-1. **Show tool availability** in the UI
-2. **Provide clear error messages** when tools fail
-3. **Cache tool results** when appropriate
-4. **Allow users to disable** specific tool categories
-
-## Environment Variables
-
-```bash
-# MCP Server URLs
-MCP_FILE_SERVER_URL=http://localhost:3001
-MCP_SEARCH_SERVER_URL=http://localhost:3002
-MCP_DB_SERVER_URL=http://localhost:3003
-
-# Authentication tokens
-MCP_FILE_TOKEN=your_file_server_token
-MCP_SEARCH_TOKEN=your_search_server_token
-MCP_DB_TOKEN=your_db_server_token
-
-# Feature flags
-ENABLE_DB_TOOLS=false
-ENABLE_FILE_OPERATIONS=true
-ENABLE_WEB_SEARCH=true
-
-# Enterprise configuration
-ENTERPRISE_MCP_SERVER=https://mcp.company.com
-ENTERPRISE_TOKEN=your_enterprise_token
-TENANT_ID=your_tenant_id
 ```
 
 ## See Also

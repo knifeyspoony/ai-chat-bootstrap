@@ -1,12 +1,10 @@
-import { Settings2 } from "lucide-react";
-import React from "react";
+import React, { memo, useMemo } from "react";
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
 } from "../../components/ui/avatar";
 import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
 import { cn } from "../../utils";
 
 export interface ChatHeaderProps {
@@ -16,21 +14,21 @@ export interface ChatHeaderProps {
   badge?: React.ReactNode;
   className?: string;
   actions?: React.ReactNode;
-  showMcpButton?: boolean;
-  onOpenMcpDialog?: () => void;
 }
 
-export const ChatHeader = React.memo(function ChatHeader({
+const ChatHeaderImpl = ({
   title,
   subtitle,
   avatar,
   badge,
   className,
   actions,
-  showMcpButton,
-  onOpenMcpDialog,
-}: ChatHeaderProps) {
-  const hasActions = showMcpButton || Boolean(actions);
+}: ChatHeaderProps) => {
+  // Memoize hasActions computation
+  const hasActions = useMemo(() =>
+    Boolean(actions),
+    [actions]
+  );
 
   if (!title && !subtitle && !avatar && !hasActions) {
     return null;
@@ -85,21 +83,47 @@ export const ChatHeader = React.memo(function ChatHeader({
 
       {hasActions && (
         <div className="flex items-center gap-1 flex-shrink-0">
-          {showMcpButton && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={onOpenMcpDialog}
-              aria-label="Configure MCP servers"
-              disabled={!onOpenMcpDialog}
-            >
-              <Settings2 className="h-4 w-4" />
-            </Button>
-          )}
           {actions}
         </div>
       )}
     </div>
   );
+};
+
+// React.memo with custom comparison for performance
+export const ChatHeader = memo(ChatHeaderImpl, (prevProps, nextProps) => {
+  // Check primitive props first (fast)
+  if (prevProps.title !== nextProps.title) return false;
+  if (prevProps.subtitle !== nextProps.subtitle) return false;
+  if (prevProps.className !== nextProps.className) return false;
+
+  // Check React.ReactNode props (these are often recreated)
+  if (prevProps.avatar !== nextProps.avatar) {
+    // For string avatars, do deep comparison
+    if (typeof prevProps.avatar === 'string' && typeof nextProps.avatar === 'string') {
+      if (prevProps.avatar !== nextProps.avatar) return false;
+    } else {
+      // For ReactNode avatars, assume reference equality is needed
+      return false;
+    }
+  }
+
+  if (prevProps.badge !== nextProps.badge) {
+    // For string badges, do deep comparison
+    if (typeof prevProps.badge === 'string' && typeof nextProps.badge === 'string') {
+      if (prevProps.badge !== nextProps.badge) return false;
+    } else {
+      // For ReactNode badges, assume reference equality is needed
+      return false;
+    }
+  }
+
+  // Actions prop is often recreated, so we'll accept this causes re-renders
+  // since the content is dynamic and complex to compare
+  if (prevProps.actions !== nextProps.actions) return false;
+
+  // All relevant props are the same
+  return true;
 });
+
+ChatHeader.displayName = "ChatHeader";

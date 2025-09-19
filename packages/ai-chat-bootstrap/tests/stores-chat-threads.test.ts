@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useChatThreadsStore } from '../lib/stores/chat-threads';
 import type { ChatThread, ChatThreadMeta, ChatThreadPersistence } from '../lib/types/threads';
 

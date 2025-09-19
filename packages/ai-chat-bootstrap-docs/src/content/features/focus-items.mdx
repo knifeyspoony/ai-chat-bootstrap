@@ -30,7 +30,7 @@ The <API name="useAIFocus">useAIFocus</API> hook provides everything needed to m
 
 ```tsx
 import React from "react";
-import { ChatContainer, useAIChat, useAIFocus } from "ai-chat-bootstrap";
+import { ChatContainer, useAIFocus } from "ai-chat-bootstrap";
 
 function DocumentSelector({ documents }: { documents: Document[] }) {
   const { setFocus, clearFocus, focusedIds } = useAIFocus();
@@ -74,17 +74,16 @@ function DocumentSelector({ documents }: { documents: Document[] }) {
 
 export function ChatWithFocus() {
   const { allFocusItems } = useAIFocus();
-  
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant with access to the user's focused documents."
-  });
 
   return (
     <div className="grid grid-cols-2 gap-4">
       <DocumentSelector documents={myDocuments} />
       <ChatContainer
-        chat={chat}
+        transport={{ api: "/api/chat" }}
+        messages={{
+          systemPrompt:
+            "You are a helpful assistant with access to the user's focused documents.",
+        }}
         header={{
           title: "AI Assistant",
           subtitle: `${allFocusItems.length} items in focus`,

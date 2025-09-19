@@ -267,11 +267,6 @@ export function ChatWithTools() {
     },
   });
 
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant that can control a counter widget. Use the increment_counter tool when users ask you to change the counter value."
-  });
-
   return (
     <div className="space-y-4">
       {/* Counter Display */}
@@ -283,9 +278,13 @@ export function ChatWithTools() {
       </div>
       
       {/* Chat Interface */}
-      <div className="h-[420px] w-full">
+      <div className="h-[600px] w-full">
         <ChatContainer
-          chat={chat}
+          transport={{ api: "/api/chat" }}
+          messages={{
+            systemPrompt:
+              "You are a helpful assistant that can control a counter widget. Use the increment_counter and decrement_counter tools when users ask you to change the counter value.",
+          }}
           header={{ title: "AI Assistant with Tools", subtitle: "Can control the counter above" }}
           ui={{ placeholder: "Try: 'increment by 3' or 'decrease by 2'" }}
         />
@@ -415,17 +414,6 @@ function DataManager() {
 5. **Context Update**: Tool results are added to the conversation context
 6. **UI Updates**: Tools can modify React state, triggering re-renders
 
-## Best Practices
-
-1. **Clear Descriptions**: Write detailed tool descriptions so the AI knows when to use them
-2. **Typed Parameters**: Use specific Zod schemas for better validation
-3. **Meaningful Returns**: Return structured data that helps the AI understand what happened
-4. **Error Handling**: Handle failures gracefully and return error information
-5. **State Management**: Keep tool state in sync with your component state
-6. **Performance**: Avoid heavy computations in tool execution
-7. **Security**: Validate all parameters and sanitize inputs
-8. **User Feedback**: Provide clear feedback about tool execution results
-
 ## TypeScript Interface
 
 ```typescript
@@ -459,4 +447,4 @@ interface ToolDefinition {
 
 - [Chat with Tools guide](/chat/chat-with-tools) - Complete tutorial with live examples
 - [useAIChat](/api/hooks/use-ai-chat) - Main chat hook
-- [Tool Result Rendering](/chat/tool-result-rendering) - Custom tool result display
+- [Tool Result Rendering](/features/tool-result-rendering) - Custom tool result display

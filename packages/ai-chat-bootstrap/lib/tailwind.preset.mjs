@@ -6,6 +6,35 @@
 const preset = {
   theme: {
     extend: {
+      fontFamily: {
+        sans: [
+          "var(--acb-font-sans)",
+          "system-ui",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "\"Segoe UI\"",
+          "sans-serif",
+        ],
+        serif: [
+          "var(--acb-font-serif)",
+          "ui-serif",
+          "Georgia",
+          "Cambria",
+          "\"Times New Roman\"",
+          "serif",
+        ],
+        mono: [
+          "var(--acb-font-mono)",
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "Monaco",
+          "Consolas",
+          "\"Liberation Mono\"",
+          "\"Courier New\"",
+          "monospace",
+        ],
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",

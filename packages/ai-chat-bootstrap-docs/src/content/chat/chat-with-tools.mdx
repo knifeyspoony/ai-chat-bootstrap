@@ -63,7 +63,7 @@ Here's the complete frontend code showing tool registration and chat integration
 ```tsx
 "use client";
 import React, { useState } from "react";
-import { ChatContainer, useAIChat, useAIFrontendTool } from "ai-chat-bootstrap";
+import { ChatContainer, useAIFrontendTool } from "ai-chat-bootstrap";
 import { z } from "zod";
 
 export function ChatWithTools() {
@@ -104,11 +104,6 @@ export function ChatWithTools() {
     },
   });
 
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant that can control a counter widget. Use the increment_counter and decrement_counter tools when users ask you to change the counter value."
-  });
-
   return (
     <div className="space-y-4">
       {/* Counter Display */}
@@ -120,9 +115,13 @@ export function ChatWithTools() {
       </div>
       
       {/* Chat Interface */}
-      <div className="h-[420px] w-full">
+      <div className="h-[600px] w-full">
         <ChatContainer
-          chat={chat}
+          transport={{ api: "/api/chat" }}
+          messages={{
+            systemPrompt:
+              "You are a helpful assistant that can control a counter widget. Use the increment_counter and decrement_counter tools when users ask you to change the counter value.",
+          }}
           header={{
             title: "AI Assistant with Tools",
             subtitle: "Can control the counter above",
@@ -156,7 +155,7 @@ export const POST = createAIChatHandler({
 });
 ```
 
-> Note: `useAIChat` automatically sends `enrichedSystemPrompt` with a standardized preamble plus conditional Tools / Context / Focus sections, then appends your original `systemPrompt` (if any). Do not rebuild those sections on the server to avoid duplication.
+> Note: `ChatContainer` automatically sends an `enrichedSystemPrompt` with a standardized preamble plus conditional Tools / Context / Focus sections, then appends your original `systemPrompt` (if any). Do not rebuild those sections on the server to avoid duplication.
 
 ## API Reference
 
@@ -232,4 +231,4 @@ execute: async (params) => {
 
 ## Next
 
-Continue to [Tool Result Rendering →](/chat/tool-result-rendering)
+Continue to [Tool Result Rendering →](/features/tool-result-rendering)

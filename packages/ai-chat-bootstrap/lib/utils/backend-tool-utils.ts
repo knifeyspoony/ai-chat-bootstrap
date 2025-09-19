@@ -20,9 +20,12 @@ export function deserializeFrontendTools(serialized?: SerializedTool[] | null) {
   if (!serialized || serialized.length === 0)
     return {} as Record<string, BackendTool>;
   return serialized.reduce((acc, t) => {
+    const inputSchema = jsonSchema(
+      t.inputSchema as Parameters<typeof jsonSchema>[0]
+    ) as unknown as Parameters<typeof tool>[0]["inputSchema"];
     acc[t.name] = tool({
       description: t.description,
-      inputSchema: jsonSchema(t.inputSchema as Record<string, unknown>),
+      inputSchema,
       // Backend doesn't execute; frontend handles tool execution results.
     });
     return acc;

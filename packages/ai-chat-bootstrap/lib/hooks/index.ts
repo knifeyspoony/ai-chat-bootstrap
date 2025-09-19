@@ -1,4 +1,4 @@
-export * from "./use-ai-chat";
+// export * from "./use-ai-chat"; // ← Removed from public API - now internal only
 export * from "./use-ai-chat-command";
 export * from "./use-ai-context";
 export * from "./use-ai-focus";

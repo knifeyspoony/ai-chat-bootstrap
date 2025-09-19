@@ -1,5 +1,10 @@
-import { type UIMessage } from "ai-chat-bootstrap";
-import { useState } from "react";
+import { MockChatContainer, type UIMessage } from "ai-chat-bootstrap";
+import {
+  useState,
+  type ComponentProps,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 
 interface MockChatOptions {
   /**
@@ -16,8 +21,14 @@ interface MockChatOptions {
   initialMessages?: UIMessage[];
 }
 
+type MockChatBase = ComponentProps<typeof MockChatContainer>["chat"];
+
 // Mock useAIChat hook for demo purposes
-export function useMockAIChat(options: MockChatOptions = {}) {
+type MockChat = MockChatBase & {
+  setIsLoading: Dispatch<SetStateAction<boolean>>;
+};
+
+export function useMockAIChat(options: MockChatOptions = {}): MockChat {
   const {
     responseGenerator = (text) =>
       `You said: "${text}". This is a mock response from the AI model.`,
@@ -84,10 +95,12 @@ export function useMockAIChat(options: MockChatOptions = {}) {
   };
 
   // Mock sendMessage function (from useChat) - matches the AI SDK interface
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sendMessage = (message?: any,
+  const sendMessage = (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    message?: any,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
-    options?: any): Promise<void> => {
+    options?: any
+  ): Promise<void> => {
     if (message?.text) {
       sendMessageWithContext(message.text);
     }
@@ -137,5 +150,5 @@ export function useMockAIChat(options: MockChatOptions = {}) {
 
     // Utility functions for tests
     setIsLoading,
-  };
+  } as MockChat;
 }

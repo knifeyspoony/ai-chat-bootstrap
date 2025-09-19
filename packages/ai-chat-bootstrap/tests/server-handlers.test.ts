@@ -27,7 +27,7 @@ import {
   createSuggestionsHandler,
   createThreadTitleHandler,
   createMcpToolsHandler,
-} from "../lib/server-handlers";
+} from "../lib/handlers";
 import {
   convertToModelMessages,
   streamText,

@@ -5,16 +5,16 @@ description: Main chat interface component with message display and input.
 
 # ChatContainer
 
-Main chat interface component with message display and input. Requires the `useAIChat` hook.
+`ChatContainer` renders the full chat experience—message list, input surface, model switcher, thread controls, and assistant actions—while managing AI state internally via `useAIChat`.
 
 ## Props
 
-```tsx
-interface ChatContainerProps {
-  // Required
-  chat: ReturnType<typeof useAIChat>;
+```ts
+// Core types such as UIMessage and AssistantAction are exported from the library.
+interface ChatContainerProps extends UseAIChatOptions {
+  /** Opt-in to the unstyled variant (removes default borders/background). */
+  "data-acb-unstyled"?: "" | boolean;
 
-  // Optional
   header?: {
     title?: string;
     subtitle?: string;
@@ -23,6 +23,7 @@ interface ChatContainerProps {
     actions?: React.ReactNode;
     className?: string;
   };
+
   ui?: {
     placeholder?: string;
     className?: string;
@@ -35,40 +36,58 @@ interface ChatContainerProps {
     };
     emptyState?: React.ReactNode;
   };
+
   suggestions?: {
     enabled?: boolean;
     prompt?: string;
     count?: number;
   };
+
   commands?: {
     enabled?: boolean;
   };
+
   threads?: {
     enabled?: boolean;
   };
-  assistantActions?: React.ReactNode | ((message: UIMessage) => React.ReactNode);
-  assistantLatestActions?: React.ReactNode | ((message: UIMessage) => React.ReactNode);
+
+  assistantActions?: {
+    copy?: boolean;
+    regenerate?: boolean;
+    debug?: boolean;
+    feedback?: {
+      onThumbsUp: (message: UIMessage) => void | Promise<void>;
+      onThumbsDown: (message: UIMessage) => void | Promise<void>;
+    };
+    custom?: AssistantAction[];
+  };
 }
 ```
+
+> All AI configuration (API endpoint, system prompt, models, MCP, threading, etc.) is supplied via the `UseAIChatOptions` keys: `transport`, `messages`, `thread`, `features`, `mcp`, and `models`.
 
 ## Usage
 
 ```tsx
-import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+import { ChatContainer } from "ai-chat-bootstrap";
 
 export function MyChat() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant.",
-  });
-
   return (
     <ChatContainer
-      chat={chat}
+      transport={{ api: "/api/chat" }}
+      messages={{ systemPrompt: "You are a helpful assistant." }}
+      models={{
+        available: [
+          { id: "gpt-4o-mini", label: "GPT-4o mini" },
+          { id: "gpt-4", label: "GPT-4" },
+        ],
+        initial: "gpt-4o-mini",
+      }}
       header={{ title: "AI Assistant", subtitle: "Connected" }}
       ui={{ placeholder: "Ask me anything..." }}
       suggestions={{ enabled: true, count: 3 }}
       commands={{ enabled: true }}
+      threads={{ enabled: true }}
     />
   );
 }
@@ -76,42 +95,57 @@ export function MyChat() {
 
 ## Features
 
-- **Model Selection**: Dropdown automatically appears when multiple models are configured
-- **Chain of Thought**: Reasoning display when enabled in the chat hook
-- **Assistant Actions**: Custom controls under assistant replies
-- **Suggestions**: AI-generated follow-up suggestions
-- **Commands**: Slash command system
-- **Threads**: Thread management when enabled
+- **Model Selection**: Dropdown automatically appears when multiple models are configured via `models.available`.
+- **Chain of Thought**: Reasoning blocks render when `features.chainOfThought` is enabled and the assistant returns reasoning parts.
+- **Assistant Actions**: Built-in copy/regenerate/debug/feedback actions with support for custom buttons.
+- **Suggestions**: Optional AI-generated follow-up suggestions displayed above the input.
+- **Commands**: Slash-command palette that integrates with `useAIChatCommand` and frontend tools.
+- **Threads**: Built-in thread picker (`threads.enabled`) that works with scoped persistence.
+- **MCP Support**: When `mcp.enabled` is true, the header surfaces the MCP server manager.
 
 ## Assistant Actions
 
 ```tsx
-// Static actions
+import { Share2Icon } from "lucide-react";
+
+// Built-in buttons
 <ChatContainer
-  chat={chat}
-  assistantActions={
-    <div>
-      <button>Copy</button>
-      <button>Share</button>
-    </div>
-  }
+  transport={{ api: "/api/chat" }}
+  messages={{ systemPrompt: "You are a helpful assistant." }}
+  assistantActions={{
+    copy: true,
+    regenerate: true,
+    debug: true,
+    feedback: {
+      onThumbsUp: (message) => console.log("thumbs up", message.id),
+      onThumbsDown: (message) => console.log("thumbs down", message.id),
+    },
+  }}
 />
 
-// Dynamic actions based on message
+// Mixing built-ins with custom actions
 <ChatContainer
-  chat={chat}
-  assistantActions={(message) => (
-    <button onClick={() => copyToClipboard(message.text)}>
-      Copy
-    </button>
-  )}
-  assistantLatestActions={(_message) => (
-    <div className="flex gap-2">
-      <button onClick={() => regenerate()}>Retry</button>
-      <button onClick={() => handleSummarize()}>Summarize</button>
-    </div>
-  )}
+  transport={{ api: "/api/chat" }}
+  messages={{ systemPrompt: "You are a helpful assistant." }}
+  assistantActions={{
+    copy: true,
+    regenerate: true,
+    custom: [
+      {
+        id: "share",
+        icon: Share2Icon,
+        label: "Share",
+        tooltip: "Copy sharable link",
+        onClick: (message) => console.log("share", message.id),
+      },
+    ],
+  }}
 />
-
-> `assistantActions` renders beneath every assistant message (always visible on the latest reply and revealed on hover/focus for older messages). Use `assistantLatestActions` for controls that only make sense on the newest response, such as retry buttons.
 ```
+
+> Built-in actions automatically hide on older messages when `onlyOnMostRecent` is set (e.g. regenerate). Custom actions can use `onlyOnMostRecent`, `visible`, or `disabled` predicates for granular control.
+
+## See Also
+
+- [useAIChat](/api/hooks/use-ai-chat) – Hook used internally by `ChatContainer`
+- [ChatPopout](/api/components/chat-popout) – Popout shell that wraps `ChatContainer`

@@ -72,15 +72,16 @@ Don't use both modes together.
 
 ```tsx
 import React from "react";
-import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+import { ChatContainer } from "ai-chat-bootstrap";
 
 export function App() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful AI assistant.",
-  });
-
-  return <ChatContainer chat={chat} header={{ title: "AI Assistant" }} />;
+  return (
+    <ChatContainer
+      transport={{ api: "/api/chat" }}
+      messages={{ systemPrompt: "You are a helpful AI assistant." }}
+      header={{ title: "AI Assistant" }}
+    />
+  );
 }
 ```
 
@@ -178,31 +179,37 @@ Full styling docs live in `packages/ai-chat-bootstrap/README.md`.
 
 ## ChatContainer props
 
-**Required:**
+**AI configuration:**
 
-- `chat`: result of `useAIChat` hook (handles all state and actions)
+- `api`: chat endpoint (defaults to `/api/chat`)
+- `systemPrompt`: optional system prompt string
+- `initialMessages`: seed UI messages on mount
+- `threadId`: control which persisted thread to load/continue
+- `scopeKey`: partition threads (e.g. per-document)
+- `enableChainOfThought`: surface reasoning traces when available
+- `threadTitleApi`: endpoint to auto-title threads (empty string disables)
+- `threadTitleSampleCount`: number of recent messages to include when generating titles
+- `autoCreateThread`: create a thread automatically when missing (`true`)
+- `warnOnMissingThread`: emit console warning when a thread can't be loaded
+- `mcp`: `{ enabled, api, servers }` to enable MCP integrations
+- `models`: array of model choices for the built-in selector
+- `model`: preferred model id to select initially
 
-**Optional:**
+**UI configuration:**
 
 - `header`: title, subtitle, avatar, badge, actions, className
 - `ui`: placeholder, className, classes (`header`, `messages`, `message`, `input`, `assistantActions`), emptyState
-- `suggestions`: enabled, prompt, count
-- `commands`: enabled
-- `threads`: enabled
-- `assistantActions`: controls rendered beneath each assistant reply; accepts a node or `(message) => node` and appears by default on the latest response (earlier responses reveal on hover/focus)
-- `assistantLatestActions`: extra controls only appended to the most recent assistant reply (e.g. retry buttons)
+- `suggestions`: `{ enabled, prompt, count }`
+- `commands`: `{ enabled }`
+- `threads`: `{ enabled }`
+- `assistantActions`: enable built-ins (`copy`, `regenerate`, `debug`, `feedback`) and supply custom `AssistantAction[]`
 
-Example controlled input:
-
-```tsx
-<ChatContainer chat={chat} inputProps={{ value: input, onChange: setInput }} />
-```
-
-Enable suggestions and commands:
+Example enabling suggestions and commands:
 
 ```tsx
 <ChatContainer
-  chat={chat}
+  transport={{ api: "/api/chat" }}
+  messages={{ systemPrompt: "You are a helpful AI assistant." }}
   suggestions={{ enabled: true, count: 3 }}
   commands={{ enabled: true }}
 />

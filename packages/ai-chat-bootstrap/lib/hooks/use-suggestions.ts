@@ -149,14 +149,14 @@ export function useSuggestions({
         { signal: controller.signal, numSuggestions, api }
       );
       setSuggestions(suggestions);
-    } catch (e: any) {
-      if (e?.name === "AbortError") return; // ignore aborted
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      if (err instanceof Error && err.name === "AbortError") return;
       setError("Failed to fetch suggestions");
       setSuggestions([]);
     } finally {
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     enabled,
     messages,
@@ -165,6 +165,12 @@ export function useSuggestions({
     api,
     toolsMap,
     mcpToolSummaries,
+    focusItemsMap,
+    contextItemsMap,
+    setLoading,
+    setError,
+    setSuggestions,
+    fetcher,
   ]);
 
   // Handle suggestion click
@@ -173,9 +179,8 @@ export function useSuggestions({
       onSuggestionClick?.(suggestion);
       // Clear suggestions after a suggestion is clicked (user is about to send a message)
       clearSuggestions();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     },
-    [onSuggestionClick]
+    [onSuggestionClick, clearSuggestions]
   ); // Only depend on the callback
 
   // Auto-fetch suggestions on initial load
@@ -184,8 +189,7 @@ export function useSuggestions({
     if (strategy === "eager" && messages.length === 0) {
       handleFetchSuggestions();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, strategy]);
+  }, [enabled, strategy, messages.length, handleFetchSuggestions]);
 
   // Clear suggestions when user sends a message
   useEffect(() => {
@@ -195,8 +199,7 @@ export function useSuggestions({
     if (lastMessage?.role === "user") {
       clearSuggestions();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, messages.length]); // Trigger when messages count changes
+  }, [enabled, messages, clearSuggestions]); // Trigger when messages change
 
   // Callback to be called when assistant finishes responding
   const onAssistantFinish = useCallback(() => {
@@ -210,7 +213,6 @@ export function useSuggestions({
         handleFetchSuggestions();
       }, debounceMs);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, strategy, debounceMs, handleFetchSuggestions]);
 
   // Cleanup abort controller on unmount

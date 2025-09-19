@@ -8,7 +8,7 @@ import { Api as API } from "../../components/ApiLink";
 
 # Popout Chat
 
-The <API name="ChatPopout" /> component provides a complete assistant UI that requires the <API name="useAIChat" /> hook. It supports overlay and inline modes, left/right positioning, and a draggable resize handle.
+The <API name="ChatPopout" /> component provides a complete assistant UI with built-in AI chat functionality. It supports overlay and inline modes, left/right positioning, and a draggable resize handle.
 
 <PopoutDocsBlock />
 
@@ -24,19 +24,15 @@ The <API name="ChatPopout" /> component provides a complete assistant UI that re
 - Overlay mode slides in from left/right and can show a backdrop on mobile
 
 ```tsx
-import { ChatPopout, useAIChat } from "ai-chat-bootstrap";
+import { ChatPopout } from "ai-chat-bootstrap";
 
 export function App() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant.",
-  });
-
   return (
     <>
       {/* Inline mode */}
       <ChatPopout
-        chat={chat}
+        transport={{ api: "/api/chat" }}
+        messages={{ systemPrompt: "You are a helpful assistant." }}
         header={{ title: "Assistant" }}
         ui={{ placeholder: "Ask me anything..." }}
         popout={{ mode: "inline", position: "right", width: { default: 420 } }}
@@ -44,7 +40,8 @@ export function App() {
 
       {/* Overlay mode (left) */}
       <ChatPopout
-        chat={chat}
+        transport={{ api: "/api/chat" }}
+        messages={{ systemPrompt: "You are a helpful assistant." }}
         header={{ title: "Assistant" }}
         ui={{ placeholder: "Ask me anything..." }}
         popout={{ mode: "overlay", position: "left", width: { default: 480, min: 360, max: 640 }, height: "100%" }}

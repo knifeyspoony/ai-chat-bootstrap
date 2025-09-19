@@ -1,5 +1,5 @@
 "use client";
-import { ChatPopout, useAIChat } from "ai-chat-bootstrap";
+import { ChatPopout } from "ai-chat-bootstrap";
 import Image from "next/image";
 
 export default function Page() {
@@ -61,15 +61,18 @@ export default function Page() {
       </p>
       {/* Drop-in chat assistant with built-in toggle button & overlay panel */}
       <ChatPopout
-        chat={useAIChat({
-          api: "/api/chat",
-          systemPrompt: "You are a helpful AI assistant.",
-        })}
+        transport={{ api: "/api/chat" }}
+        messages={{ systemPrompt: "You are a helpful AI assistant." }}
         header={{ title: "AI Assistant" }}
         suggestions={{ enabled: true, count: 3 }}
         commands={{ enabled: true }}
         button={{ label: "Open Chat" }}
         popout={{ position: "right", mode: "overlay", container: "viewport" }}
+        assistantActions={{
+          copy: true,
+          regenerate: true,
+          debug: true,
+        }}
       />
     </main>
   );

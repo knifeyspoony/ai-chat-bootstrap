@@ -1,20 +1,23 @@
-import React, { useCallback, useMemo, useRef } from "react";
 import type { UIMessage } from "ai";
+import React, { useCallback, useDeferredValue, useMemo, useRef } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { ChatInputWithCommands } from "../../components/chat/chat-input-with-commands";
 import {
   ChatMessages,
   type ChatMessagesHandle,
 } from "../../components/chat/chat-messages";
+import { useAIFocus } from "../../hooks";
+import { useAIChat, type UseAIChatOptions } from "../../hooks/use-ai-chat";
 import { useSuggestions } from "../../hooks/use-suggestions";
-import { useAIMCPServersStore } from "../../stores";
+import { useChatStore } from "../../stores/chat";
+import type { AssistantAction } from "../../types/actions";
+import type { Suggestion } from "../../types/chat";
 import { cn } from "../../utils";
+import { buildBuiltInActions } from "../../utils/built-in-actions";
 import { ChatThreadsButton } from "./chat-threads-button";
-import { McpServersDialog } from "./mcp-servers-dialog";
+import { McpServersButton } from "./mcp-servers-button";
 
-// type-only import to avoid cycles
-import type { useAIChat } from "../../hooks";
 import { ChatHeader } from "./chat-header";
-type ChatHook = ReturnType<typeof useAIChat>;
 
 // Lazily load the debug button (development only) so it is tree-shaken away in production
 const LazyChatDebugButton = React.lazy(async () =>
@@ -28,13 +31,12 @@ const ThreadsDropdownWrapper: React.FC<{
   return <ChatThreadsButton scopeKey={scopeKey} className="ml-1" />;
 };
 
-type AssistantActionsProp =
-  | React.ReactNode
-  | ((message: UIMessage) => React.ReactNode);
+export interface ChatContainerProps extends UseAIChatOptions {
+  "data-acb-unstyled"?: "" | boolean;
 
-export interface ChatContainerProps {
-  // Required: pass chat hook result
-  chat: ChatHook;
+  // ==========================================
+  // UI CONFIGURATION
+  // ==========================================
 
   // Header group
   header?: {
@@ -78,37 +80,71 @@ export interface ChatContainerProps {
   };
 
   /**
-   * Optional controls rendered beneath assistant responses.
-   * Always visible on the latest reply and revealed on hover/focus for previous replies.
+   * Assistant actions configuration with built-in and custom actions.
+   * Built-in actions can be enabled with simple boolean flags or configuration objects.
+   * Custom actions allow full flexibility for user-defined behaviors.
    */
-  assistantActions?: AssistantActionsProp;
-
-  /**
-   * Additional controls shown only for the latest assistant response.
-   * Accepts a static node or a function receiving the assistant message.
-   */
-  assistantLatestActions?: AssistantActionsProp;
+  assistantActions?: {
+    /** Enable copy action to copy message text to clipboard */
+    copy?: boolean;
+    /** Enable regenerate action to retry the last assistant response */
+    regenerate?: boolean;
+    /** Enable debug action to view message details */
+    debug?: boolean;
+    /** Enable feedback actions with callbacks for user feedback */
+    feedback?: {
+      onThumbsUp: (message: UIMessage) => void | Promise<void>;
+      onThumbsDown: (message: UIMessage) => void | Promise<void>;
+    };
+    /** Custom actions with full control over behavior and appearance */
+    custom?: AssistantAction[];
+  };
 }
 
-export function ChatContainer(props: ChatContainerProps) {
+type ChatContainerUiProps = Omit<ChatContainerProps, keyof UseAIChatOptions>;
+
+type ChatAdapter = ReturnType<typeof useAIChat>;
+
+interface ChatContainerViewProps extends ChatContainerUiProps {
+  chat: ChatAdapter;
+}
+
+function ChatContainerView(props: ChatContainerViewProps) {
+  const {
+    chat,
+    header,
+    ui,
+    suggestions: suggestionOptions,
+    commands: commandOptions,
+    threads: threadsOptions,
+    assistantActions: assistantActionOptions,
+    ["data-acb-unstyled"]: unstyledProp,
+  } = props;
+
+  const {
+    messages,
+    isLoading,
+    status,
+    input,
+    setInput,
+    model,
+    setModel,
+    models,
+    threadId,
+    scopeKey,
+    chainOfThoughtEnabled,
+    mcpEnabled,
+    sendMessageWithContext,
+    sendAICommandMessage,
+    regenerate,
+  } = chat;
+
   // Ref to control scrolling programmatically
   const messagesRef = useRef<ChatMessagesHandle | null>(null);
-  const [isMcpDialogOpen, setIsMcpDialogOpen] = React.useState(false);
-  const mcpConfigurations = useAIMCPServersStore(
-    (state) => state.configurations
-  );
-  const addOrUpdateMcpConfiguration = useAIMCPServersStore(
-    (state) => state.addOrUpdateConfiguration
-  );
-  const removeMcpConfiguration = useAIMCPServersStore(
-    (state) => state.removeConfiguration
-  );
-  const mcpServersMap = useAIMCPServersStore((state) => state.servers);
 
-  // Get state from required chat hook
-  const messages = props.chat.messages;
-  const isLoading = props.chat.isLoading;
-  const status = props.chat.status;
+  // Defer non-critical updates to prevent input lag
+  const deferredMessages = useDeferredValue(messages);
+  const deferredIsLoading = useDeferredValue(isLoading);
 
   // Note: We do not sync messages to threads here to avoid render loops.
   // The useAIChat hook manages persistence into the threads store.
@@ -122,53 +158,121 @@ export function ChatContainer(props: ChatContainerProps) {
         const fd = new FormData(form);
         const text = String(fd.get("message") || "").trim();
         if (!text) return;
-        props.chat.sendMessageWithContext(text);
+        sendMessageWithContext(text);
       } catch {
         /* ignore */
       }
     },
-    [props.chat]
+    [sendMessageWithContext]
   );
 
   // AI command execution via chat hook
   const handleAICommandExecute = useCallback(
     (message: string, toolName: string, systemPrompt?: string) => {
-      props.chat.sendAICommandMessage(message, toolName, systemPrompt);
+      sendAICommandMessage(message, toolName, systemPrompt);
     },
-    [props.chat]
+    [sendAICommandMessage]
   );
-  // Handle suggestions
-  const { suggestions, handleSuggestionClick } = useSuggestions({
-    enabled: props.suggestions?.enabled ?? false,
-    prompt: props.suggestions?.prompt,
-    messages,
-    numSuggestions: props.suggestions?.count,
-    onSuggestionClick: (suggestion) => {
-      props.chat.sendMessageWithContext(suggestion.longSuggestion);
+
+  // Stable suggestion click handler
+  const handleSuggestionClick = useCallback(
+    (suggestion: Suggestion) => {
+      sendMessageWithContext(suggestion.longSuggestion);
       // Scroll after next frame so message is rendered
       requestAnimationFrame(() => {
         messagesRef.current?.scrollToBottom();
       });
     },
+    [sendMessageWithContext]
+  );
+
+  // Handle suggestions
+  const {
+    suggestions: generatedSuggestions,
+    handleSuggestionClick: suggestionClickHandler,
+  } = useSuggestions({
+    enabled: suggestionOptions?.enabled ?? false,
+    prompt: suggestionOptions?.prompt,
+    messages: deferredMessages, // Use deferred messages for suggestions
+    numSuggestions: suggestionOptions?.count,
+    onSuggestionClick: handleSuggestionClick,
   });
 
-  const mcpEnabled = props.chat?.mcpEnabled ?? false;
-  const chainOfThoughtEnabled = props.chat.chainOfThoughtEnabled ?? false;
+  // Defer suggestions to avoid blocking input
+  const deferredSuggestions = useDeferredValue(generatedSuggestions);
 
-  const renderAssistantActions = useMemo(
-    () => normalizeActionsRenderer(props.assistantActions),
-    [props.assistantActions]
+  // Optimized store subscriptions - useAIFocus already uses useShallow internally
+  const { allFocusItems, clearFocus } = useAIFocus();
+
+  // Defer focus items to avoid blocking input during focus changes
+  const deferredAllFocusItems = useDeferredValue(allFocusItems);
+
+  // Chat store subscriptions with stable selectors using useShallow
+  const { error, setError } = useChatStore(
+    useShallow((state) => ({
+      error: state.error,
+      setError: state.setError,
+    }))
   );
 
-  const renderAssistantLatestActions = useMemo(
-    () => normalizeActionsRenderer(props.assistantLatestActions),
-    [props.assistantLatestActions]
-  );
+  // Memoize header actions to prevent recreating on every render
+  const headerActions = useMemo(() => {
+    const hasThreads = threadsOptions?.enabled;
+    const hasDebug =
+      typeof process !== "undefined" && process.env.NODE_ENV !== "production";
+    const hasMcp = mcpEnabled;
+    const hasCustomActions = header?.actions;
+
+    if (!hasThreads && !hasDebug && !hasMcp && !hasCustomActions) {
+      return undefined;
+    }
+
+    return (
+      <>
+        {hasMcp && <McpServersButton />}
+        {hasThreads && (
+          <React.Suspense fallback={null}>
+            {/* Lazy import to avoid bundle impact if unused */}
+            <ThreadsDropdownWrapper scopeKey={scopeKey} />
+          </React.Suspense>
+        )}
+        {/* Debug tools are only rendered in non-production */}
+        {hasDebug && (
+          <React.Suspense fallback={null}>
+            {/* Dynamic import to avoid including debug UI in prod bundles */}
+            <LazyChatDebugButton />
+          </React.Suspense>
+        )}
+        {hasCustomActions && header?.actions}
+      </>
+    );
+  }, [threadsOptions?.enabled, scopeKey, mcpEnabled, header?.actions]);
+
+  // Build assistant actions configuration from built-in and custom actions
+  const assistantActionsConfig = useMemo(() => {
+    if (!assistantActionOptions) return undefined;
+
+    const builtInActions = buildBuiltInActions(
+      {
+        copy: assistantActionOptions.copy,
+        regenerate: assistantActionOptions.regenerate,
+        debug: assistantActionOptions.debug,
+        feedback: assistantActionOptions.feedback,
+      },
+      {
+        regenerate,
+        isLoading,
+      }
+    );
+
+    const customActions = assistantActionOptions.custom || [];
+
+    // Combine built-in and custom actions
+    return [...builtInActions, ...customActions];
+  }, [assistantActionOptions, regenerate, isLoading]);
 
   // Unstyled mode: if any ancestor or this component has data-acb-unstyled, suppress base chrome classes
-  const isUnstyled =
-    (props as any)["data-acb-unstyled"] === "" ||
-    (props as any)["data-acb-unstyled"] === true;
+  const isUnstyled = unstyledProp === "" || unstyledProp === true;
   return (
     <div
       data-acb-part="container"
@@ -176,7 +280,7 @@ export function ChatContainer(props: ChatContainerProps) {
         !isUnstyled &&
           "flex flex-col h-full overflow-hidden min-w-0 rounded-md border bg-[var(--acb-chat-container-bg)] border-[var(--acb-chat-container-border)]",
         isUnstyled && "flex flex-col h-full overflow-hidden min-w-0",
-        props.ui?.className
+        ui?.className
       )}
       style={{
         borderRadius: isUnstyled
@@ -186,53 +290,25 @@ export function ChatContainer(props: ChatContainerProps) {
       data-acb-unstyled={isUnstyled ? "" : undefined}
     >
       <ChatHeader
-        title={props.header?.title}
-        subtitle={props.header?.subtitle}
-        avatar={props.header?.avatar}
-        badge={props.header?.badge}
-        showMcpButton={mcpEnabled}
-        onOpenMcpDialog={
-          mcpEnabled ? () => setIsMcpDialogOpen(true) : undefined
-        }
-        actions={
-          props.threads?.enabled ||
-          (typeof process !== "undefined" &&
-            process.env.NODE_ENV !== "production") ||
-          props.header?.actions ? (
-            <>
-              {props.threads?.enabled && (
-                <React.Suspense fallback={null}>
-                  {/* Lazy import to avoid bundle impact if unused */}
-                  <ThreadsDropdownWrapper scopeKey={props.chat.scopeKey} />
-                </React.Suspense>
-              )}
-              {/* Debug tools are only rendered in non-production */}
-              {typeof process !== "undefined" &&
-                process.env.NODE_ENV !== "production" && (
-                  <React.Suspense fallback={null}>
-                    {/* Dynamic import to avoid including debug UI in prod bundles */}
-                    <LazyChatDebugButton />
-                  </React.Suspense>
-                )}
-              {props.header?.actions}
-            </>
-          ) : undefined
-        }
-        className={props.header?.className ?? props.ui?.classes?.header}
+        title={header?.title}
+        subtitle={header?.subtitle}
+        avatar={header?.avatar}
+        badge={header?.badge}
+        actions={headerActions}
+        className={header?.className ?? ui?.classes?.header}
       />
 
       <ChatMessages
         ref={messagesRef}
-        messages={messages}
-        isLoading={isLoading}
-        className={props.ui?.classes?.messages}
-        messageClassName={props.ui?.classes?.message}
-        emptyState={props.ui?.emptyState}
-        threadId={props.chat.threadId}
+        messages={deferredMessages}
+        isLoading={deferredIsLoading}
+        className={ui?.classes?.messages}
+        messageClassName={ui?.classes?.message}
+        emptyState={ui?.emptyState}
+        threadId={threadId}
         useChainOfThought={chainOfThoughtEnabled}
-        renderAssistantActions={renderAssistantActions}
-        renderAssistantLatestActions={renderAssistantLatestActions}
-        assistantActionsClassName={props.ui?.classes?.assistantActions}
+        assistantActionsClassName={ui?.classes?.assistantActions}
+        assistantActionsConfig={assistantActionsConfig}
       />
 
       <div
@@ -245,47 +321,131 @@ export function ChatContainer(props: ChatContainerProps) {
       >
         <ChatInputWithCommands
           onSubmit={onSubmit}
-          value={props.chat.input}
-          onChange={(value: string) => props.chat.setInput(value)}
-          placeholder={props.ui?.placeholder}
-          disabled={isLoading}
+          value={input}
+          onChange={setInput}
+          placeholder={ui?.placeholder}
+          // Keep input enabled during streaming - users can type their next message
+          disabled={false}
+          // Submit is disabled when actually loading (not just streaming)
+          submitDisabled={isLoading}
           status={status}
-          className={props.ui?.classes?.input}
-          models={props.chat.models}
-          selectedModelId={props.chat.model}
-          onModelChange={props.chat.setModel ? (value) => props.chat.setModel(value) : undefined}
+          className={ui?.classes?.input}
+          models={models}
+          selectedModelId={model}
+          onModelChange={setModel}
           // Suggestions props
-          enableSuggestions={props.suggestions?.enabled}
-          suggestions={suggestions}
-          suggestionsCount={props.suggestions?.count ?? 3}
-          onSuggestionClick={handleSuggestionClick}
+          enableSuggestions={suggestionOptions?.enabled}
+          suggestions={deferredSuggestions}
+          suggestionsCount={suggestionOptions?.count ?? 3}
+          onSuggestionClick={suggestionClickHandler}
           // Commands props
-          enableCommands={props.commands?.enabled}
+          enableCommands={commandOptions?.enabled}
           onCommandExecute={undefined}
           onAICommandExecute={handleAICommandExecute}
+          // Performance props - pass deferred store subscriptions to avoid child re-renders
+          allFocusItems={deferredAllFocusItems}
+          clearFocus={clearFocus}
+          error={error}
+          setError={setError}
         />
       </div>
-      {mcpEnabled && (
-        <McpServersDialog
-          open={isMcpDialogOpen}
-          onOpenChange={setIsMcpDialogOpen}
-          configs={mcpConfigurations}
-          onSave={addOrUpdateMcpConfiguration}
-          onRemove={removeMcpConfiguration}
-          serversMap={mcpServersMap}
-        />
-      )}
     </div>
   );
 }
 
-function normalizeActionsRenderer(
-  input: AssistantActionsProp | undefined
-): ((message: UIMessage) => React.ReactNode) | undefined {
-  if (!input) return undefined;
-  if (typeof input === "function") {
-    return input as (message: UIMessage) => React.ReactNode;
-  }
-  const node = input;
-  return () => node;
+function ChatContainerImpl(props: ChatContainerProps) {
+  const {
+    transport,
+    messages: messagesOptions,
+    thread: threadOptions,
+    features,
+    mcp,
+    models: modelsOptions,
+    ...uiProps
+  } = props;
+
+  const chat = useAIChat({
+    transport,
+    messages: messagesOptions,
+    thread: threadOptions,
+    features,
+    mcp,
+    models: modelsOptions,
+  });
+
+  return <ChatContainerView {...uiProps} chat={chat} />;
 }
+
+// Optimized with React.memo to prevent re-renders during streaming
+export const ChatContainer = React.memo(ChatContainerImpl, (prev, next) => {
+  if (prev.transport?.api !== next.transport?.api) return false;
+
+  if (prev.messages?.systemPrompt !== next.messages?.systemPrompt) return false;
+
+  const prevInitialMessages = prev.messages?.initial;
+  const nextInitialMessages = next.messages?.initial;
+  if ((prevInitialMessages?.length ?? 0) !== (nextInitialMessages?.length ?? 0))
+    return false;
+  if (prevInitialMessages && nextInitialMessages) {
+    for (let i = 0; i < prevInitialMessages.length; i++) {
+      if (prevInitialMessages[i].id !== nextInitialMessages[i].id) return false;
+    }
+  }
+
+  if (prev.thread?.id !== next.thread?.id) return false;
+  if (prev.thread?.scopeKey !== next.thread?.scopeKey) return false;
+  if (prev.thread?.autoCreate !== next.thread?.autoCreate) return false;
+  if (prev.thread?.warnOnMissing !== next.thread?.warnOnMissing) return false;
+
+  const prevTitle = prev.thread?.title;
+  const nextTitle = next.thread?.title;
+  if ((prevTitle?.api ?? "") !== (nextTitle?.api ?? "")) return false;
+  if ((prevTitle?.sampleCount ?? 0) !== (nextTitle?.sampleCount ?? 0))
+    return false;
+
+  if (prev.features?.chainOfThought !== next.features?.chainOfThought)
+    return false;
+
+  if (prev.mcp?.enabled !== next.mcp?.enabled) return false;
+  if (prev.mcp?.api !== next.mcp?.api) return false;
+
+  const prevMcpServers = prev.mcp?.servers;
+  const nextMcpServers = next.mcp?.servers;
+  if ((prevMcpServers?.length ?? 0) !== (nextMcpServers?.length ?? 0))
+    return false;
+  if (prevMcpServers && nextMcpServers) {
+    for (let i = 0; i < prevMcpServers.length; i++) {
+      if (prevMcpServers[i].id !== nextMcpServers[i].id) return false;
+    }
+  }
+
+  const prevModelOptions = prev.models?.available;
+  const nextModelOptions = next.models?.available;
+  if ((prevModelOptions?.length ?? 0) !== (nextModelOptions?.length ?? 0))
+    return false;
+  if (prevModelOptions && nextModelOptions) {
+    for (let i = 0; i < prevModelOptions.length; i++) {
+      if (prevModelOptions[i].id !== nextModelOptions[i].id) return false;
+    }
+  }
+
+  if (prev.models?.initial !== next.models?.initial) return false;
+
+  if (prev.ui?.placeholder !== next.ui?.placeholder) return false;
+  if (prev.ui?.className !== next.ui?.className) return false;
+  if (prev.header?.title !== next.header?.title) return false;
+  if (prev.header?.subtitle !== next.header?.subtitle) return false;
+
+  return true;
+});
+
+export interface MockChatContainerProps extends ChatContainerUiProps {
+  chat: ChatAdapter;
+}
+
+export const MockChatContainer = React.memo(function MockChatContainer(
+  props: MockChatContainerProps
+) {
+  const { chat, ...uiProps } = props;
+  return <ChatContainerView {...uiProps} chat={chat} />;
+});

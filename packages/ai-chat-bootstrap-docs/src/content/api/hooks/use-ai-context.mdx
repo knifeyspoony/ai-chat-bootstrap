@@ -198,22 +198,6 @@ interface ContextItem {
 
 ## Performance Considerations
 
-### Preventing Re-render Loops
-
-The `useAIContext` hook follows the critical Zustand pattern to prevent infinite re-renders:
-
-```tsx
-// ✅ Correct - Only include stable values in dependencies
-useEffect(() => {
-  setContextItem(contextData);
-  return () => removeContextItem(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps  
-}, [id, data, opts?.label, opts?.description, opts?.scope, opts?.priority]);
-
-// ❌ Wrong - Including Zustand actions causes infinite loops
-}, [id, data, setContextItem, removeContextItem]); // Don't do this!
-```
-
 ### Memory Management
 
 - Context items are automatically cleaned up when components unmount
@@ -221,16 +205,8 @@ useEffect(() => {
 - Conversation-scoped items are cleared when conversations change
 - Message-scoped items are cleared after each message
 
-## Best Practices
-
-1. **Keep data serializable**: Avoid functions, DOM nodes, or complex objects
-2. **Use meaningful IDs**: Choose descriptive, unique identifiers
-3. **Prioritize wisely**: Ensure critical context has higher priority
-5. **Avoid sensitive data**: Never share passwords, API keys, or PII
-6. **Use `useMemo` for expensive computations**: Optimize performance for complex context
-
 ## See Also
 
-- [Sharing Context guide](/chat/ai-context) - Complete tutorial with live examples
+- [Sharing Context guide](/features/ai-context) - Complete tutorial with live examples
 - [useAIFocus](/api/hooks/use-ai-focus) - For user-controlled focus items
 - [useAIChat](/api/hooks/use-ai-chat) - Main chat hook

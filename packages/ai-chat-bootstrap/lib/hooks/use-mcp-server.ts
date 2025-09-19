@@ -64,19 +64,10 @@ export function useMCPServer(options: UseMCPServerOptions): UseMCPServerReturn {
   );
   const defaultApi = useAIMCPServersStore((state) => state.defaultApi);
 
-  const headersSignature = useMemo(() => {
-    if (!headers) return "";
-    try {
-      return JSON.stringify(Object.fromEntries(Object.entries(headers)));
-    } catch {
-      return "";
-    }
-  }, [headers]);
-
   const transport: MCPServerTransport = useMemo(() => {
     const mappedHeaders = headers ? { ...headers } : undefined;
     return { type: transportType, url, headers: mappedHeaders };
-  }, [url, headersSignature, headers, transportType]);
+  }, [url, headers, transportType]);
 
   const configSignature = useMemo(() => {
     return JSON.stringify({ name: name ?? null, transport });
@@ -128,9 +119,9 @@ export function useMCPServer(options: UseMCPServerOptions): UseMCPServerReturn {
       if (mountedRef.current) {
         setServerTools(serverId, summaries);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message =
-        typeof error?.message === "string"
+        error instanceof Error && typeof error.message === "string"
           ? error.message
           : "Failed to load MCP tools";
       if (mountedRef.current) {

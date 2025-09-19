@@ -1,6 +1,6 @@
 "use client";
 import {
-  ChatContainer,
+  MockChatContainer,
   useAIFrontendTool,
   type UIMessage,
 } from "ai-chat-bootstrap";
@@ -202,7 +202,7 @@ export function ToolRenderingExample() {
       role: "user",
       parts: [{ type: "text", text }],
     };
-    mockChat.setMessages((m) => [...m, userMessage]);
+    mockChat.setMessages((m: UIMessage[]) => [...m, userMessage]);
     mockChat.setIsLoading(true);
 
     // Simulate AI tool usage for demo
@@ -250,7 +250,7 @@ export function ToolRenderingExample() {
             },
           ],
         };
-        mockChat.setMessages((m) => [...m, toolMessage]);
+        mockChat.setMessages((m: UIMessage[]) => [...m, toolMessage]);
       } else if (text.toLowerCase().includes("progress")) {
         const progress = Math.floor(Math.random() * 100) + 1;
 
@@ -279,7 +279,7 @@ export function ToolRenderingExample() {
             },
           ],
         };
-        mockChat.setMessages((m) => [...m, toolMessage]);
+        mockChat.setMessages((m: UIMessage[]) => [...m, toolMessage]);
       } else {
         const assistantMessage: UIMessage = {
           id: crypto.randomUUID(),
@@ -291,7 +291,7 @@ export function ToolRenderingExample() {
             },
           ],
         };
-        mockChat.setMessages((m) => [...m, assistantMessage]);
+        mockChat.setMessages((m: UIMessage[]) => [...m, assistantMessage]);
       }
       mockChat.setIsLoading(false);
     }, 1000);
@@ -304,7 +304,7 @@ export function ToolRenderingExample() {
 
   return (
     <div className="h-[500px] w-full">
-      <ChatContainer
+      <MockChatContainer
         chat={chat}
         header={{
           title: "AI with Custom Tool Rendering",
@@ -319,7 +319,7 @@ export function ToolRenderingExample() {
 // Source code for the frontend implementation
 export const TOOL_RENDERING_SOURCE = `"use client";
 import React, { useState } from "react";
-import { ChatContainer, useAIChat, useAIFrontendTool } from "ai-chat-bootstrap";
+import { ChatContainer, useAIFrontendTool } from "ai-chat-bootstrap";
 import { z } from "zod";
 
 // Custom Chart Component
@@ -386,16 +386,16 @@ export function ToolRenderingDemo() {
     ),
   });
 
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You can create charts using the create_chart tool when users request data visualizations."
-  });
 
   return (
     <ChatContainer
-  header={{ title: "AI with Custom Rendering" }}
-  ui={{ placeholder: "Ask me to create a chart!" }}
-  chat={chat}
+      transport={{ api: "/api/chat" }}
+      messages={{
+        systemPrompt:
+          "You can create charts using the create_chart tool when users request data visualizations.",
+      }}
+      header={{ title: "AI with Custom Rendering" }}
+      ui={{ placeholder: "Ask me to create a chart!" }}
     />
   );
 }`;

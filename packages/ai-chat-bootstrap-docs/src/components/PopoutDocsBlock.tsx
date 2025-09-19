@@ -29,7 +29,7 @@ export function PopoutDocsBlock() {
         value={mode}
         onChangeKey={(k) => setMode(k as "inline" | "overlay")}
       />
-      <div className="mt-3" style={{ height: 420 }}>
+      <div className="mt-3" style={{ height: 600 }}>
         <PopoutChatExample mode={mode} />
       </div>
     </div>

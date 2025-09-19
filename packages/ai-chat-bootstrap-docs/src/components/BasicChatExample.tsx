@@ -1,5 +1,5 @@
 "use client";
-import { ChatContainer } from "ai-chat-bootstrap";
+import { MockChatContainer } from "ai-chat-bootstrap";
 import { useMockAIChat } from "./shared/useMockAIChat";
 
 // A super lightweight mock chat producing a canned assistant reply.
@@ -7,8 +7,8 @@ export function BasicChatExample() {
   const chat = useMockAIChat();
 
   return (
-    <div className="h-[420px] w-full">
-      <ChatContainer
+    <div className="h-[600px] w-full">
+      <MockChatContainer
         chat={chat}
         header={{ title: "AI Assistant", subtitle: "Connected to AI" }}
         ui={{ placeholder: "Ask me anything..." }}
@@ -19,20 +19,16 @@ export function BasicChatExample() {
 
 export const BASIC_CHAT_SOURCE = `"use client";
 import React from "react";
-import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+import { ChatContainer } from "ai-chat-bootstrap";
 
 export function BasicChat() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful AI assistant."
-  });
-
   return (
-    <div className="h-[420px] w-full">
+    <div className="h-[600px] w-full">
       <ChatContainer
-  header={{ title: "AI Assistant", subtitle: "Connected to AI" }}
-  ui={{ placeholder: "Ask me anything..." }}
-  chat={chat}
+        transport={{ api: "/api/chat" }}
+        messages={{ systemPrompt: "You are a helpful AI assistant." }}
+        header={{ title: "AI Assistant", subtitle: "Connected to AI" }}
+        ui={{ placeholder: "Ask me anything..." }}
       />
     </div>
   );

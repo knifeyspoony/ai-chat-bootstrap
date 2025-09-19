@@ -11,6 +11,35 @@
 
 /* Component & feature hook variables with fallbacks to defaults. */
 :root {
+  --acb-font-sans: var(
+    --font-sans,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif
+  );
+  --acb-font-serif: var(
+    --font-serif,
+    ui-serif,
+    Georgia,
+    Cambria,
+    "Times New Roman",
+    serif
+  );
+  --acb-font-mono: var(
+    --font-mono,
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace
+  );
+  --acb-font-body: var(--font-family, var(--acb-font-sans));
   --acb-chat-container-bg: var(--background, var(--acb-default-bg));
   --acb-chat-container-border: var(--secondary, var(--acb-default-secondary));
   --acb-chat-container-radius: var(--radius, var(--acb-default-radius-base));
@@ -167,5 +196,5 @@ html[data-theme="dark"] .acb-scrollbar:hover::-webkit-scrollbar-thumb {
 
 /* Typography globals */
 body {
-  font-family: var(--font-family);
+  font-family: var(--acb-font-body);
 }

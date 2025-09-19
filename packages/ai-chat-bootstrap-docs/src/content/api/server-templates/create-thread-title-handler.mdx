@@ -90,25 +90,19 @@ Enable automatic title generation:
 
 ```tsx
 // Frontend component
-import { ChatContainer, useAIChat } from "ai-chat-bootstrap";
+import { ChatContainer } from "ai-chat-bootstrap";
 
 function ChatWithAutoTitles() {
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt: "You are a helpful assistant.",
-  });
-
   return (
     <ChatContainer
-      chat={chat}
+      transport={{ api: "/api/chat" }}
+      messages={{ systemPrompt: "You are a helpful assistant." }}
       thread={{
-        enabled: true,
-        titleGeneration: {
-          enabled: true,
+        title: {
           api: "/api/thread-title",
-          triggerAfterMessages: 2, // Generate title after 2 messages
-          autoUpdate: false, // Don't update existing titles
-        }
+          sampleCount: 6,
+        },
+        warnOnMissing: true,
       }}
     />
   );
@@ -307,20 +301,18 @@ const handler = createThreadTitleHandler({
 });
 ```
 
-### Debounced Generation
-Frontend should debounce title generation:
+### Automatic Cooldown
+`useAIChat` already applies a cooldown between auto-title requests. Configure the title endpoint once when creating the hook:
 
 ```tsx
 const chat = useAIChat({
-  api: "/api/chat",
+  transport: { api: "/api/chat" },
   thread: {
-    titleGeneration: {
-      enabled: true,
+    title: {
       api: "/api/thread-title",
-      debounceMs: 2000, // Wait 2s after last message
-      triggerAfterMessages: 3,
-    }
-  }
+      sampleCount: 6,
+    },
+  },
 });
 ```
 
@@ -464,106 +456,6 @@ const handler = createThreadTitleHandler({
 
 export { handler as POST };
 ```
-
-## Best Practices
-
-### Performance
-1. **Use fast models** like `gpt-4o-mini` for quick generation
-2. **Limit title length** to 60-80 characters for readability
-3. **Cache generated titles** to avoid regeneration
-4. **Debounce requests** to prevent excessive API calls
-
-### Quality
-1. **Clean up generated titles** by removing quotes and fixing capitalization
-2. **Validate title quality** and provide fallbacks for poor results
-3. **Use consistent style** throughout your application
-4. **Avoid generic titles** like "Chat" or "Conversation"
-
-### User Experience
-1. **Generate titles automatically** after a few messages
-2. **Allow manual editing** of generated titles
-3. **Don't update existing titles** unless explicitly requested
-4. **Show loading states** during title generation
-
-### Security
-1. **Validate requests** in production environments
-2. **Rate limit title generation** to prevent abuse
-3. **Log generation events** for monitoring and analytics
-4. **Sanitize titles** to prevent injection attacks
-
-## Common Patterns
-
-### Conditional Generation
-
-```ts
-const handler = createThreadTitleHandler({
-  model: openai("gpt-4o-mini"),
-
-  validateRequest: async (request) => {
-    const body = await request.json();
-
-    // Only generate if we have enough content
-    const messageCount = body.messages?.length || 0;
-    const totalLength = body.messages?.reduce((sum, msg) =>
-      sum + msg.parts.filter(p => p.type === 'text').reduce((s, p) => s + p.text.length, 0), 0
-    ) || 0;
-
-    return messageCount >= 2 && totalLength >= 50;
-  }
-});
-```
-
-### Context-Aware Titles
-
-```ts
-const handler = createThreadTitleHandler({
-  model: openai("gpt-4o-mini"),
-
-  onTitleGenerated: async (title, context) => {
-    // Include user role or department
-    const userRole = context.userProfile?.role;
-    if (userRole === 'developer') {
-      return `[Dev] ${title}`;
-    } else if (userRole === 'designer') {
-      return `[Design] ${title}`;
-    }
-
-    // Include project context
-    const projectName = context.projectContext?.name;
-    if (projectName) {
-      return `${projectName} - ${title}`;
-    }
-
-    return title;
-  }
-});
-```
-
-### Incremental Updates
-
-```ts
-const handler = createThreadTitleHandler({
-  model: openai("gpt-4o-mini"),
-
-  onTitleGenerated: async (title, context) => {
-    const existingTitle = context.existingTitle;
-
-    // If we already have a good title, only update if significantly different
-    if (existingTitle && existingTitle !== "New Conversation") {
-      const similarity = calculateSimilarity(title, existingTitle);
-      if (similarity > 0.8) {
-        return existingTitle; // Keep existing title
-      }
-    }
-
-    return title;
-  }
-});
-```
-
-## Environment Variables
-
-No additional environment variables required beyond those for the AI model.
 
 ## See Also
 

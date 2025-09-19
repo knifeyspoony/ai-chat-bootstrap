@@ -23,8 +23,8 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 // AI Components from the library
-import type { UIMessage } from "ai-chat-bootstrap";
-import { Action, Actions, ChatPopout, useAIChat } from "ai-chat-bootstrap";
+import type { AssistantAction } from "ai-chat-bootstrap";
+import { ChatPopout } from "ai-chat-bootstrap";
 
 // Custom hook with all AI logic
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -35,13 +35,11 @@ import {
   CalculatorIcon,
   CheckCircle2,
   Circle,
-  CopyIcon,
   Database as DatabaseIcon,
   EyeIcon,
   Focus,
   MinusIcon,
   PlusIcon,
-  RefreshCcwIcon,
   Sparkles,
   User as UserIcon,
   Zap,
@@ -234,7 +232,7 @@ export default function Home() {
           },
           {
             type: "text" as const,
-            text: "## Setting up AI SDK Chat Library\n\nHere's a complete step-by-step guide:\n\n### Step 1: Installation\n```bash\npnpm add ai-sdk-chat @ai-sdk/react ai\n```\n\n### Step 2: Import Styles\n```tsx\nimport 'ai-sdk-chat/lib/styles.css'\n```\n\n### Step 3: Basic Usage\n```tsx\nimport { ChatPopout } from 'ai-sdk-chat'\n\nfunction App() {\n  return (\n    <ChatPopout \n      title=\"AI Assistant\"\n      placeholder=\"Ask me anything...\"\n      api=\"/api/chat\"\n    />\n  )\n}\n```\n\n### Step 4: Add Context & Tools\n```tsx\nimport { useAIContext, useAIFrontendTool } from 'ai-sdk-chat'\n\nfunction MyComponent() {\n  const [counter, setCounter] = useState(0)\n  \n  // Structured context: description + value + priority\n  useAIContext({ description: 'Counter', value: { value: counter }, priority: 50 })\n  \n  useAIFrontendTool({\n    name: 'increment',\n    description: 'Increment counter',\n    execute: async () => {\n      setCounter(c => c + 1)\n      return { newValue: counter + 1 }\n    }\n  })\n  \n  return <div>Counter: {counter}</div>\n}\n```\n\nThat's it! The AI can now interact with your app state and execute tools. Try the examples above to see it in action! 🚀",
+            text: "## Setting up AI SDK Chat Library\n\nHere's a complete step-by-step guide:\n\n### Step 1: Installation\n```bash\npnpm add ai-chat-bootstrap @ai-sdk/react ai\n```\n\n### Step 2: Import Styles\n```css\n@import 'ai-chat-bootstrap/tokens.css';\n@import 'ai-chat-bootstrap/ai-chat.css';\n```\n\n### Step 3: Basic Usage (New Simplified API!)\n```tsx\nimport { ChatPopout } from 'ai-chat-bootstrap'\n\nfunction App() {\n  return (\n    <ChatPopout \n      api=\"/api/chat\"\n      systemPrompt=\"You are a helpful assistant\"\n      header={{ title: \"AI Assistant\" }}\n      ui={{ placeholder: \"Ask me anything...\" }}\n    />\n  )\n}\n```\n\n### Step 4: Add Context & Tools\n```tsx\nimport { useAIContext, useAIFrontendTool } from 'ai-chat-bootstrap'\n\nfunction MyComponent() {\n  const [counter, setCounter] = useState(0)\n  \n  // Structured context: description + value + priority\n  useAIContext({ description: 'Counter', value: { value: counter }, priority: 50 })\n  \n  useAIFrontendTool({\n    name: 'increment',\n    description: 'Increment counter',\n    execute: async () => {\n      setCounter(c => c + 1)\n      return { newValue: counter + 1 }\n    }\n  })\n  \n  return <div>Counter: {counter}</div>\n}\n```\n\n### Step 5: Advanced Configuration\n```tsx\n<ChatPopout \n  api=\"/api/chat\"\n  systemPrompt=\"You are a helpful assistant\"\n  models={[{ id: 'gpt-4o', label: 'GPT-4o' }]}\n  enableChainOfThought={true}\n  mcp={{ enabled: true }}\n  suggestions={{ enabled: true, count: 3 }}\n  threads={{ enabled: true }}\n/>\n```\n\nThat's it! **No hook management needed** - the component handles everything internally for optimal performance! 🚀",
           },
         ],
       },
@@ -253,22 +251,7 @@ export default function Home() {
       "You are a creative AI assistant. When users interact with the demo, suggest interesting and creative ways to use the tools and features. Be imaginative and inspiring.",
   };
 
-  // Create chat hook with dynamic system prompt
-  const chat = useAIChat({
-    api: "/api/chat",
-    systemPrompt:
-      systemPrompts[selectedSystemPrompt as keyof typeof systemPrompts],
-    initialMessages: sampleMessages,
-    enableChainOfThought: true,
-    mcp: {
-      enabled: true,
-    },
-    models: DEMO_MODELS,
-    model: "gpt-4o",
-  });
-
-  const { retryLastMessage } = chat;
-  const isChatLoading = chat.isLoading;
+  // Chat configuration for the new simplified API
 
   // FocusableCard component
   const FocusableCard = ({
@@ -645,24 +628,6 @@ export default function Home() {
     </>
   );
 
-  const handleSummarizeFocus = React.useCallback(() => {
-    if (isChatLoading) return;
-    const focusText =
-      focusedIds.length > 0
-        ? `The focused widgets are: ${focusedIds.join(", ")}.`
-        : "There are currently no focused widgets.";
-    chat.sendMessageWithContext(
-      `Summarize the current state of the demo for the user and suggest a next step. ${focusText}`
-    );
-  }, [chat, focusedIds, isChatLoading]);
-
-  const handleTourPrompt = React.useCallback(() => {
-    if (isChatLoading) return;
-    chat.sendMessageWithContext(
-      "Give me a quick tour of the available demo tools and how they work together."
-    );
-  }, [chat, isChatLoading]);
-
   const handleOpenDocs = React.useCallback(() => {
     window.open(
       "https://ai-sdk.dev/elements/components/actions",
@@ -671,82 +636,52 @@ export default function Home() {
     );
   }, []);
 
-  const buildSharedAssistantActions = React.useCallback(
-    (message: UIMessage) => {
-      const textParts = message.parts?.filter(
-        (part): part is { type: "text"; text: string } =>
-          part.type === "text" && typeof part.text === "string"
-      );
-      const combinedText = textParts
-        ?.map((part) => part.text.trim())
-        .filter(Boolean)
-        .join("\n\n");
-
-      const handleCopy = () => {
-        if (!combinedText) return;
-        void navigator?.clipboard?.writeText(combinedText);
-      };
-
-      if (!combinedText) {
-        return null;
-      }
-
-      return (
-        <Actions className="justify-start">
-          <Action
-            tooltip="Copy response"
-            label="Copy"
-            onClick={handleCopy}
-            disabled={!combinedText}
-          >
-            <CopyIcon className="h-3 w-3" />
-          </Action>
-        </Actions>
-      );
-    },
-    []
+  const customAssistantActions: AssistantAction[] = React.useMemo(
+    () => [
+      {
+        id: "docs",
+        icon: BookOpen,
+        tooltip: "Open documentation",
+        label: "Docs",
+        onlyOnMostRecent: true,
+        onClick: () => handleOpenDocs(),
+      },
+      {
+        id: "view-debug",
+        icon: EyeIcon,
+        tooltip: "View message debug info",
+        label: "Debug",
+        onClick: (message) => {
+          console.log("Message debug info:", message);
+          if (
+            typeof window !== "undefined" &&
+            typeof window.alert === "function"
+          ) {
+            window.alert(
+              `Message ID: ${message.id}\nParts: ${message.parts?.length || 0}`
+            );
+          }
+        },
+        visible: (message) => {
+          // Only show debug for messages with multiple parts or reasoning
+          return (
+            message.parts?.some((part) => part.type === "reasoning") ||
+            (message.parts?.length || 0) > 1
+          );
+        },
+      },
+    ],
+    [handleOpenDocs]
   );
 
-  const buildLatestAssistantActions = React.useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    (_message: UIMessage) => (
-      <Actions className="justify-start">
-        <Action
-          tooltip="Retry response"
-          label="Retry"
-          onClick={() => retryLastMessage?.()}
-          disabled={isChatLoading || !retryLastMessage}
-        >
-          <RefreshCcwIcon className="h-3 w-3" />
-        </Action>
-        <Action
-          tooltip="Summarize focus"
-          label="Summarize"
-          onClick={handleSummarizeFocus}
-          disabled={isChatLoading}
-        >
-          <Focus className="h-3 w-3" />
-        </Action>
-        <Action
-          tooltip="Ask for a tour"
-          label="Tour"
-          onClick={handleTourPrompt}
-          disabled={isChatLoading}
-        >
-          <Sparkles className="h-3 w-3" />
-        </Action>
-        <Action tooltip="Open docs" label="Docs" onClick={handleOpenDocs}>
-          <BookOpen className="h-3 w-3" />
-        </Action>
-      </Actions>
-    ),
-    [
-      isChatLoading,
-      retryLastMessage,
-      handleSummarizeFocus,
-      handleTourPrompt,
-      handleOpenDocs,
-    ]
+  const assistantActions = React.useMemo(
+    () => ({
+      copy: true,
+      regenerate: true,
+      debug: true,
+      custom: customAssistantActions,
+    }),
+    [customAssistantActions]
   );
 
   return (
@@ -768,7 +703,19 @@ export default function Home() {
 
       {/* Chat Interface */}
       <ChatPopout
-        chat={chat}
+        transport={{ api: "/api/chat" }}
+        messages={{
+          systemPrompt:
+            systemPrompts[selectedSystemPrompt as keyof typeof systemPrompts],
+          initial: sampleMessages,
+        }}
+        features={{
+          chainOfThought: true,
+        }}
+        mcp={{
+          enabled: true,
+        }}
+        models={{ available: DEMO_MODELS, initial: DEMO_MODELS[0].id }}
         header={{
           title: "AI Assistant",
           subtitle: `${selectedSystemPrompt} mode • ${focusedIds.length} focused • ${chatMode}`,
@@ -791,8 +738,7 @@ export default function Home() {
         commands={{
           enabled: true,
         }}
-        assistantActions={buildSharedAssistantActions}
-        assistantLatestActions={buildLatestAssistantActions}
+        assistantActions={assistantActions}
       />
     </div>
   );

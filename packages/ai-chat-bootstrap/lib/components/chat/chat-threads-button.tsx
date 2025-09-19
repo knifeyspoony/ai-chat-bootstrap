@@ -58,8 +58,6 @@ export function ChatThreadsButton({
   const renameThread = useChatThreadsStore((s) => s.renameThread);
   const isLoaded = useChatThreadsStore((s) => s.isLoaded);
   const loadThreadMetas = useChatThreadsStore((s) => s.loadThreadMetas);
-  // Subscribe specifically to metas map so the list updates on title changes
-  const metas = useChatThreadsStore((s) => s.metas);
 
   React.useEffect(() => {
     if (!isLoaded) {
@@ -69,7 +67,7 @@ export function ChatThreadsButton({
 
   const threads = React.useMemo(
     () => listThreads(scopeKey),
-    [metas, listThreads, scopeKey]
+    [listThreads, scopeKey]
   );
 
   const handleNew = () => {
@@ -119,7 +117,6 @@ export function ChatThreadsButton({
 
   const confirmDelete = () => {
     if (deleteId) {
-      const wasActive = activeThreadId === deleteId;
       useChatThreadsStore
         .getState()
         .deleteThread(deleteId)

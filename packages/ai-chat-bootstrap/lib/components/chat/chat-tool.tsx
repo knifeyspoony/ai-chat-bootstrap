@@ -104,7 +104,6 @@ const getStatusBadge = (status: ToolUIPart["state"], variant: ChatToolVariant) =
     "output-error": "Error",
   } as const;
 
-  const iconProps = variant === 'xs' ? { className: "text-green-600", width: 8, height: 8 } : { className: "size-4" };
   const icons = {
     "input-streaming": <CircleIcon {...(variant === 'xs' ? { width: 8, height: 8 } : { className: "size-4" })} />,
     "input-available": <ClockIcon {...(variant === 'xs' ? { width: 8, height: 8, className: "animate-pulse" } : { className: "size-4 animate-pulse" })} />,

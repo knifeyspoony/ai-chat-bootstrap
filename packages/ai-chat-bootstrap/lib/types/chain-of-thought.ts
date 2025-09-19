@@ -23,8 +23,8 @@ export interface ChainOfThoughtItem {
   toolCallId?: string;
   toolName?: string;
   displayName?: string;
-  input?: any;
-  output?: any;
+  input?: unknown;
+  output?: unknown;
   error?: string;
   state?: ToolUIPart["state"];
   duration?: number;
@@ -60,7 +60,7 @@ export interface ChainOfThoughtMetadata {
 
 // Extended UIMessage with chain-of-thought metadata
 export interface UIMessageWithChainOfThought extends UIMessage {
-  metadata?: ChainOfThoughtMetadata & Record<string, any>;
+  metadata?: ChainOfThoughtMetadata & Record<string, unknown>;
 }
 
 // Tool execution record for utils
@@ -83,7 +83,7 @@ export type ChainItemType =
 export interface ChainItem {
   type: ChainItemType;
   id: string;
-  data: any;
+  data: unknown;
   status: "complete" | "active" | "pending";
   timestamp: number;
 }
@@ -98,6 +98,6 @@ export type ToolType =
 
 export interface ToolTypeInfo {
   type: ToolType;
-  icon: any; // LucideIcon
+  icon: unknown; // LucideIcon
   category: string;
 }

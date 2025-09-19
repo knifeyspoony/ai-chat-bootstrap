@@ -14,7 +14,6 @@ import {
   MessageContent,
 } from "../../components/ai-elements/message";
 import { Badge } from "../../components/ui/badge";
-import { useAIToolsStore } from "../../stores";
 import { cn } from "../../utils";
 import { AssistantMessage } from "./assistant-message";
 import { ChatMessagePart } from "./chat-message-part";
@@ -48,14 +47,12 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
       emptyState,
       assistantAvatar = "/acb.png",
       userAvatar,
-      threadId,
       renderAssistantActions,
       renderAssistantLatestActions,
       assistantActionsClassName,
     },
     ref
   ) => {
-    const getTool = useAIToolsStore((s) => s.getTool);
 
     const defaultEmptyState = (
       <div className="flex items-center justify-center h-full text-center p-8 animate-in fade-in duration-500">

@@ -19,13 +19,13 @@ export function ChatChainOfThought({
 }: ChainOfThoughtProps) {
   // State machine for COT rendering
   let cotActive = false;
-  let cotSteps: Array<any> = [];
+  const cotSteps: Array<any> = [];
   let cotCurrentStep: any = null;
-  let nonCotParts: Array<any> = [];
+  const nonCotParts: Array<any> = [];
   let planName: string | undefined = undefined;
   let planDescription: string | undefined = undefined;
 
-  message?.parts?.forEach((part: any, idx: number) => {
+  message?.parts?.forEach((part: any) => {
     // Start COT
     if (part.type === "tool-acb_start_chain_of_thought") {
       cotActive = true;

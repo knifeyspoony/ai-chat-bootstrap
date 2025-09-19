@@ -66,7 +66,6 @@ export interface ChatDebugSheetProps {
 export function ChatDebugSheet({ open, onOpenChange }: ChatDebugSheetProps) {
   const contextMap = useAIContextStore((s) => s.contextItems);
   const focusMap = useAIFocusStore((s) => s.focusItems);
-  const toolsMap = useAIToolsStore((s) => s.tools);
   const mcpServersMap = useAIMCPServersStore((s) => s.servers);
 
   const contextItems = React.useMemo(() => {
@@ -85,7 +84,7 @@ export function ChatDebugSheet({ open, onOpenChange }: ChatDebugSheetProps) {
     } catch {
       return [] as unknown[];
     }
-  }, [toolsMap]);
+  }, []);
 
   const mcpServers = React.useMemo(() => {
     try {
@@ -100,10 +99,6 @@ export function ChatDebugSheet({ open, onOpenChange }: ChatDebugSheetProps) {
     }
   }, [mcpServersMap]);
 
-  if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
-    return null;
-  }
-
   const sections = React.useMemo(
     () => [
       { id: "context", label: "Context Items", value: contextItems },
@@ -113,6 +108,10 @@ export function ChatDebugSheet({ open, onOpenChange }: ChatDebugSheetProps) {
     ],
     [contextItems, focusItems, tools, mcpServers]
   );
+
+  if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
+    return null;
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

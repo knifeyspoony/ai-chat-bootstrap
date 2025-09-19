@@ -23,28 +23,28 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 // AI Components from the library
-import { Action, Actions, ChatPopout, useAIChat } from "ai-chat-bootstrap";
 import type { UIMessage } from "ai-chat-bootstrap";
+import { Action, Actions, ChatPopout, useAIChat } from "ai-chat-bootstrap";
 
 // Custom hook with all AI logic
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useDemoAI } from "@/hooks/use-demo-ai";
 import { useEphemeralChatThreads } from "@/hooks/use-ephemeral-chat-threads";
 import {
+  BookOpen,
   CalculatorIcon,
   CheckCircle2,
   Circle,
+  CopyIcon,
   Database as DatabaseIcon,
   EyeIcon,
   Focus,
   MinusIcon,
   PlusIcon,
+  RefreshCcwIcon,
   Sparkles,
   User as UserIcon,
   Zap,
-  CopyIcon,
-  RefreshCcwIcon,
-  BookOpen,
 } from "lucide-react";
 
 const DEMO_MODELS = [
@@ -708,6 +708,7 @@ export default function Home() {
   );
 
   const buildLatestAssistantActions = React.useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     (_message: UIMessage) => (
       <Actions className="justify-start">
         <Action
@@ -739,7 +740,13 @@ export default function Home() {
         </Action>
       </Actions>
     ),
-    [isChatLoading, retryLastMessage, handleSummarizeFocus, handleTourPrompt, handleOpenDocs]
+    [
+      isChatLoading,
+      retryLastMessage,
+      handleSummarizeFocus,
+      handleTourPrompt,
+      handleOpenDocs,
+    ]
   );
 
   return (

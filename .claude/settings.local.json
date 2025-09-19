@@ -14,7 +14,8 @@
       "Bash(pnpm add:*)",
       "WebFetch(domain:mdxjs.com)",
       "WebFetch(domain:shiki.style)",
-      "WebFetch(domain:ui.shadcn.com)"
+      "WebFetch(domain:ui.shadcn.com)",
+      "Bash(pnpm ls:*)"
     ],
     "deny": [],
     "ask": []

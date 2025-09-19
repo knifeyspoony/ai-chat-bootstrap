@@ -60,7 +60,9 @@ export function useMockAIChat(options: MockChatOptions = {}) {
   // Mock functions to match useAIChat interface
   const sendAICommandMessage = (
     content: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _toolName: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _commandSystemPrompt?: string
   ) => {
     // For mock purposes, just use sendMessageWithContext
@@ -83,7 +85,9 @@ export function useMockAIChat(options: MockChatOptions = {}) {
 
   // Mock sendMessage function (from useChat) - matches the AI SDK interface
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sendMessage: any = (message?: any, options?: any): Promise<void> => {
+  const sendMessage = (message?: any,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
+    options?: any): Promise<void> => {
     if (message?.text) {
       sendMessageWithContext(message.text);
     }

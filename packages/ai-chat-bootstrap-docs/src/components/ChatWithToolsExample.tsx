@@ -2,7 +2,6 @@
 import {
   ChatContainer,
   useAIFrontendTool,
-  type UIMessage,
 } from "ai-chat-bootstrap";
 import React, { useState } from "react";
 import { z } from "zod";
@@ -56,7 +55,7 @@ export function ChatWithToolsExample() {
   // Create custom response generator with tool simulation
   const toolAwareResponseGenerator = React.useCallback((text: string) => {
     const lowerInput = text.toLowerCase();
-    let responseText = `You said: "${text}".`;
+    const responseText = `You said: "${text}".`;
 
     if (
       lowerInput.includes("increment") ||

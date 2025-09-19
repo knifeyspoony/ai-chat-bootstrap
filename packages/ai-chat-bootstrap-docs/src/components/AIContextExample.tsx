@@ -3,7 +3,6 @@ import {
   ChatContainer,
   useAIContext,
   useAIContextStore,
-  type UIMessage,
 } from "ai-chat-bootstrap";
 import React, { useMemo, useState } from "react";
 import { useMockAIChat } from "./shared/useMockAIChat";

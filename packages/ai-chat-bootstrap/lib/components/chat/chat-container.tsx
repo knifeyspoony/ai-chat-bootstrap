@@ -7,7 +7,11 @@ import {
   type ChatMessagesHandle,
 } from "../../components/chat/chat-messages";
 import { useAIFocus } from "../../hooks";
-import { useAIChat, type UseAIChatOptions } from "../../hooks/use-ai-chat";
+import {
+  useAIChat,
+  type ThreadsOptions,
+  type UseAIChatOptions,
+} from "../../hooks/use-ai-chat";
 import { useSuggestions } from "../../hooks/use-suggestions";
 import { useChatStore } from "../../stores/chat";
 import type { AssistantAction } from "../../types/actions";
@@ -74,11 +78,6 @@ export interface ChatContainerProps extends UseAIChatOptions {
     enabled?: boolean;
   };
 
-  // Threads group (optional)
-  threads?: {
-    enabled?: boolean;
-  };
-
   /**
    * Assistant actions configuration with built-in and custom actions.
    * Built-in actions can be enabled with simple boolean flags or configuration objects.
@@ -107,6 +106,7 @@ type ChatAdapter = ReturnType<typeof useAIChat>;
 
 interface ChatContainerViewProps extends ChatContainerUiProps {
   chat: ChatAdapter;
+  threads?: ThreadsOptions;
 }
 
 function ChatContainerView(props: ChatContainerViewProps) {
@@ -357,7 +357,7 @@ function ChatContainerImpl(props: ChatContainerProps) {
   const {
     transport,
     messages: messagesOptions,
-    thread: threadOptions,
+    threads: threadsOptions,
     features,
     mcp,
     models: modelsOptions,
@@ -367,13 +367,13 @@ function ChatContainerImpl(props: ChatContainerProps) {
   const chat = useAIChat({
     transport,
     messages: messagesOptions,
-    thread: threadOptions,
+    threads: threadsOptions,
     features,
     mcp,
     models: modelsOptions,
   });
 
-  return <ChatContainerView {...uiProps} chat={chat} />;
+  return <ChatContainerView {...uiProps} threads={threadsOptions} chat={chat} />;
 }
 
 // Optimized with React.memo to prevent re-renders during streaming
@@ -392,13 +392,25 @@ export const ChatContainer = React.memo(ChatContainerImpl, (prev, next) => {
     }
   }
 
-  if (prev.thread?.id !== next.thread?.id) return false;
-  if (prev.thread?.scopeKey !== next.thread?.scopeKey) return false;
-  if (prev.thread?.autoCreate !== next.thread?.autoCreate) return false;
-  if (prev.thread?.warnOnMissing !== next.thread?.warnOnMissing) return false;
+  const prevThreads = prev.threads;
+  const nextThreads = next.threads;
+  if ((prevThreads?.enabled ?? false) !== (nextThreads?.enabled ?? false))
+    return false;
+  if ((prevThreads?.id ?? "") !== (nextThreads?.id ?? "")) return false;
+  if ((prevThreads?.scopeKey ?? "") !== (nextThreads?.scopeKey ?? ""))
+    return false;
+  if ((prevThreads?.autoCreate ?? true) !== (nextThreads?.autoCreate ?? true))
+    return false;
+  if (
+    (prevThreads?.warnOnMissing ?? false) !==
+    (nextThreads?.warnOnMissing ?? false)
+  )
+    return false;
 
-  const prevTitle = prev.thread?.title;
-  const nextTitle = next.thread?.title;
+  const prevTitle = prevThreads?.title;
+  const nextTitle = nextThreads?.title;
+  if ((prevTitle?.enabled ?? false) !== (nextTitle?.enabled ?? false))
+    return false;
   if ((prevTitle?.api ?? "") !== (nextTitle?.api ?? "")) return false;
   if ((prevTitle?.sampleCount ?? 0) !== (nextTitle?.sampleCount ?? 0))
     return false;

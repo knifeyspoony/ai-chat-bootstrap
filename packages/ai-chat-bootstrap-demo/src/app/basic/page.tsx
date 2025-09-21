@@ -20,19 +20,13 @@ export default function BasicChatPage() {
       <ChatContainer
         transport={{ api: "/api/chat" }}
         messages={{
-          systemPrompt: "You are a helpful assistant. Answer as concisely as possible.",
-        }}
-        thread={{
-          scopeKey,
-          autoCreate: true,
-          title: {
-            api: "/api/thread-title",
-          },
+          systemPrompt:
+            "You are a helpful assistant. Answer as concisely as possible.",
         }}
         features={{ chainOfThought: true }}
         models={{
-          options: DEMO_MODELS,
-          initialId: "gpt-4o",
+          available: DEMO_MODELS,
+          initial: "gpt-4o",
         }}
         header={{
           title: "AI Chat Bootstrap Demo",
@@ -40,6 +34,12 @@ export default function BasicChatPage() {
         }}
         threads={{
           enabled: true,
+          scopeKey,
+          autoCreate: true,
+          title: {
+            enabled: true,
+            api: "/api/thread-title",
+          },
         }}
       />
     </div>

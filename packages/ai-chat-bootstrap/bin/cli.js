@@ -19,9 +19,23 @@ function getFlagValue(flagNames) {
   return undefined;
 }
 
-const localPath =
-  getFlagValue(["--local", "--local-path"]) ||
-  process.env.AI_CHAT_BOOTSTRAP_LOCAL;
+
+const localFlagValue = getFlagValue(["--local", "--local-path"]);
+let localPath;
+let localPathError;
+
+if (typeof localFlagValue === "string") {
+  localPath = localFlagValue;
+} else if (localFlagValue === true) {
+  if (process.env.AI_CHAT_BOOTSTRAP_LOCAL) {
+    localPath = process.env.AI_CHAT_BOOTSTRAP_LOCAL;
+  } else {
+    localPathError =
+      "--local flag requires a path (or set AI_CHAT_BOOTSTRAP_LOCAL).";
+  }
+} else if (process.env.AI_CHAT_BOOTSTRAP_LOCAL) {
+  localPath = process.env.AI_CHAT_BOOTSTRAP_LOCAL;
+}
 
 function printHelp() {
   console.log(
@@ -41,6 +55,10 @@ async function main() {
   }
   const projectName = args[1] || "ai-chat-app";
   const tailwindNative = args.includes("--tailwind-native");
+  if (localPathError) {
+    error(localPathError);
+    process.exit(1);
+  }
   await scaffold({ projectName, tailwindNative, localPath });
 }
 

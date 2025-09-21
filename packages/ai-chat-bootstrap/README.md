@@ -341,10 +341,10 @@ If you need additional variant surfaces, open an issue or PR—extending CVA con
 
 - `transport`: `{ api?: string }` – endpoint for AI requests
 - `messages`: `{ systemPrompt?: string; initial?: UIMessage[] }`
-- `thread`: `{ id?: string; scopeKey?: string; autoCreate?: boolean; warnOnMissing?: boolean; title?: { api?: string; sampleCount?: number } }`
+- `threads`: `{ enabled?: boolean; id?: string; scopeKey?: string; autoCreate?: boolean; warnOnMissing?: boolean; title?: { enabled?: boolean; api?: string; sampleCount?: number } }`
 - `features`: `{ chainOfThought?: boolean }`
 - `mcp`: `{ enabled?: boolean; api?: string; servers?: SerializedMCPServer[] }`
-- `models`: `{ options?: ChatModelOption[]; initialId?: string }`
+- `models`: `{ available?: ChatModelOption[]; initial?: string }`
 
 **Optional:**
 
@@ -352,7 +352,6 @@ If you need additional variant surfaces, open an issue or PR—extending CVA con
 - `ui`: placeholder, className, classes (`header`, `messages`, `message`, `input`, `assistantActions`), emptyState
 - `suggestions`: enabled, prompt, count
 - `commands`: enabled
-- `threads`: enabled
 - `assistantActions`: enable built-in buttons (`copy`, `regenerate`, `debug`, `feedback`) or supply a `custom` array of `AssistantAction`s for bespoke controls
 
 ### ChatPopout
@@ -383,11 +382,11 @@ Model selection and chain of thought:
   transport={{ api: "/api/chat" }}
   messages={{ systemPrompt: "You are a helpful AI assistant." }}
   models={{
-    options: [
+    available: [
       { id: "gpt-4o", label: "GPT-4o" },
       { id: "gpt-4o-mini", label: "GPT-4o mini" },
     ],
-    initialId: "gpt-4o",
+    initial: "gpt-4o",
   }}
   features={{ chainOfThought: true }}
 />

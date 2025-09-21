@@ -19,6 +19,7 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
+      "ai-chat-bootstrap": ["./lib/index.ts"],
       "ai-chat-bootstrap/server": ["./lib/server.ts"]
     }
   },

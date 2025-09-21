@@ -8,9 +8,11 @@ import {
   Children,
   createContext,
   isValidElement,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { cn } from "../../utils";
@@ -42,6 +44,7 @@ export type BranchProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 export const Branch = ({
+  children,
   defaultBranch = 0,
   onBranchChange,
   className,
@@ -49,19 +52,47 @@ export const Branch = ({
 }: BranchProps) => {
   const [currentBranch, setCurrentBranch] = useState(defaultBranch);
   const [branches, setBranches] = useState<ReactElement[]>([]);
+  const defaultBranchRef = useRef(Math.max(defaultBranch, 0));
 
-  const handleBranchChange = (newBranch: number) => {
-    setCurrentBranch(newBranch);
-    onBranchChange?.(newBranch);
-  };
+  const handleBranchChange = useCallback(
+    (newBranch: number) => {
+      setCurrentBranch(newBranch);
+      onBranchChange?.(newBranch);
+    },
+    [onBranchChange]
+  );
+
+  useEffect(() => {
+    const targetBranch = Math.max(defaultBranch, 0);
+    if (defaultBranchRef.current !== targetBranch) {
+      defaultBranchRef.current = targetBranch;
+      handleBranchChange(targetBranch);
+    }
+  }, [defaultBranch, handleBranchChange]);
+
+  useEffect(() => {
+    if (branches.length === 0) {
+      return;
+    }
+    const lastIndex = branches.length - 1;
+    if (currentBranch > lastIndex) {
+      handleBranchChange(lastIndex);
+    }
+  }, [branches.length, currentBranch, handleBranchChange]);
 
   const goToPrevious = () => {
+    if (branches.length === 0) {
+      return;
+    }
     const newBranch =
       currentBranch > 0 ? currentBranch - 1 : branches.length - 1;
     handleBranchChange(newBranch);
   };
 
   const goToNext = () => {
+    if (branches.length === 0) {
+      return;
+    }
     const newBranch =
       currentBranch < branches.length - 1 ? currentBranch + 1 : 0;
     handleBranchChange(newBranch);
@@ -81,7 +112,9 @@ export const Branch = ({
       <div
         className={cn("grid w-full gap-2 [&>div]:pb-0", className)}
         {...props}
-      />
+      >
+        {children}
+      </div>
     </BranchContext.Provider>
   );
 };
@@ -121,11 +154,13 @@ export const BranchMessages = ({ children, ...props }: BranchMessagesProps) => {
 
 export type BranchSelectorProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
+  alignment?: "auto" | "inline";
 };
 
 export const BranchSelector = ({
   className,
   from,
+  alignment = "auto",
   ...props
 }: BranchSelectorProps) => {
   const { totalBranches } = useBranch();
@@ -135,11 +170,28 @@ export const BranchSelector = ({
     return null;
   }
 
+  const alignmentClass =
+    alignment === "inline"
+      ? undefined
+      : (() => {
+          switch (from) {
+            case "assistant":
+              return "self-start ml-2 pl-8";
+            case "user":
+              return "self-end mr-2 pr-8";
+            case "system":
+              return "self-start";
+            default:
+              return "self-start";
+          }
+        })();
+
   return (
     <div
       className={cn(
-        "flex items-center gap-2 self-end px-10",
+        "flex items-center gap-2 relative z-[1]",
         from === "assistant" ? "justify-start" : "justify-end",
+        alignmentClass,
         className
       )}
       {...props}
@@ -211,6 +263,10 @@ export type BranchPageProps = HTMLAttributes<HTMLSpanElement>;
 
 export const BranchPage = ({ className, ...props }: BranchPageProps) => {
   const { currentBranch, totalBranches } = useBranch();
+
+  if (totalBranches <= 1) {
+    return null;
+  }
 
   return (
     <span

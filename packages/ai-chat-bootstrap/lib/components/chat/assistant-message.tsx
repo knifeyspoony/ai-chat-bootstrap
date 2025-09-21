@@ -1,18 +1,26 @@
 import type { UIMessage } from "ai";
-import React from "react";
 import isEqual from "fast-deep-equal";
-import type { AssistantActionsConfig } from "../../types/actions";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Message,
   MessageAvatar,
   MessageContent,
 } from "../../components/ai-elements/message";
+import type { AssistantActionsConfig } from "../../types/actions";
 import { cn } from "../../utils";
+import {
+  Branch,
+  BranchMessages,
+  BranchNext,
+  BranchPage,
+  BranchPrevious,
+  BranchSelector,
+} from "../ai-elements/branch";
+import { AssistantActionsRenderer } from "./assistant-actions-renderer";
+import { buildAssistantBranchEntries } from "./assistant-branches";
+import { getAssistantMessageSegments } from "./assistant-message-segments";
 import { ChatChainOfThought } from "./chat-chain-of-thought";
 import { ChatMessagePart } from "./chat-message-part";
-import { AssistantActionsRenderer } from "./assistant-actions-renderer";
-
-type MessagePart = UIMessage["parts"][number];
 
 interface AssistantMessageProps {
   message: UIMessage;
@@ -39,155 +47,231 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
   isLatestAssistant,
   actionsConfig,
 }) => {
-  // Separate COT parts from regular parts
-  const cotParts: MessagePart[] = [];
-  const regularParts: MessagePart[] = [];
-  let cotActive = false;
+  const renderMessageBody = useCallback(
+    (
+      baseMessage: UIMessage,
+      options: { streaming: boolean; isLast: boolean }
+    ): React.ReactElement | null => {
+      const {
+        chainOfThoughtParts,
+        visibleRegularParts,
+        hasChainOfThought,
+        hasRegularContent,
+      } = getAssistantMessageSegments(baseMessage);
 
-  // Helper: filter out non-visible parts
-  const isVisiblePart = (part: MessagePart) => {
-    // Filter out all acb_ tools (they render as null in ChatMessagePart)
-    if (part.type?.startsWith("tool-acb_") || part.type === "dynamic-tool") {
-      return false;
-    }
-    // Filter out step-start parts (they don't render content)
-    if (part.type === "step-start") {
-      return false;
-    }
-    // Filter out empty text parts
-    if (part.type === "text" && (!part.text || part.text.trim() === "")) {
-      return false;
-    }
-    // Filter out empty reasoning parts
-    if (part.type === "reasoning" && (!part.text || part.text.trim() === "")) {
-      return false;
-    }
-    return true;
-  };
+      if (!hasChainOfThought && !hasRegularContent) {
+        return null;
+      }
 
-  message.parts?.forEach((part) => {
-    if (part.type === "tool-acb_start_chain_of_thought") {
-      cotActive = true;
-      cotParts.push(part);
-      return;
-    }
-    if (part.type === "tool-acb_complete_chain_of_thought" && cotActive) {
-      cotParts.push(part);
-      cotActive = false;
-      return;
-    }
-    if (cotActive) {
-      cotParts.push(part);
-    } else {
-      regularParts.push(part);
-    }
-  });
+      return (
+        <Message
+          from="assistant"
+          data-acb-part="message"
+          data-role="assistant"
+          className={cn(
+            "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-assistant-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-assistant-fg)]",
+            messageClassName,
+            "m-0"
+          )}
+        >
+          <div className="flex w-full flex-col gap-3">
+            {hasChainOfThought && (
+              <div className="w-full overflow-x-auto">
+                <ChatChainOfThought
+                  message={{ ...baseMessage, parts: chainOfThoughtParts }}
+                  isStreaming={options.streaming}
+                  isLastMessage={options.isLast}
+                  className="w-full max-w-full"
+                />
+              </div>
+            )}
 
-  const visibleRegularParts = regularParts.filter(isVisiblePart);
-  const hasCOT = cotParts.length > 0;
-  const hasRegularContent = visibleRegularParts.some((part) => {
-    if (part.type === "text" || part.type === "reasoning") {
-      return part.text && part.text.trim() !== "";
-    }
-    return true; // Other types (file, source-url, etc.) are considered content
-  });
+            {hasRegularContent && (
+              <MessageContent
+                data-acb-part="message-content"
+                className="rounded-[var(--acb-chat-message-radius)]"
+              >
+                {visibleRegularParts.map((part, partIndex) => (
+                  <ChatMessagePart
+                    key={partIndex}
+                    part={part}
+                    streaming={options.streaming}
+                  />
+                ))}
+              </MessageContent>
+            )}
+          </div>
+          <MessageAvatar
+            data-acb-part="message-avatar"
+            name="Assistant"
+            src={assistantAvatar}
+          />
+        </Message>
+      );
+    },
+    [assistantAvatar, messageClassName]
+  );
 
-  // If no visible content at all, don't render anything
-  if (!hasCOT && !hasRegularContent) {
+  const branchEntries = useMemo(
+    () =>
+      buildAssistantBranchEntries({
+        message,
+        isStreaming,
+        isLastMessage,
+        renderMessageBody,
+      }),
+    [isLastMessage, isStreaming, message, renderMessageBody]
+  );
+
+  const branchCount = branchEntries.length;
+
+  const defaultBranchIndexRaw = branchEntries.findIndex(
+    (entry) => entry.message.id === message.id
+  );
+  const defaultBranchIndex =
+    defaultBranchIndexRaw === -1 && branchCount > 0
+      ? branchCount - 1
+      : Math.max(defaultBranchIndexRaw, 0);
+  const branchKey = `${message.id ?? "assistant"}-${branchCount}`;
+
+  const [activeBranchIndex, setActiveBranchIndex] =
+    useState(defaultBranchIndex);
+
+  useEffect(() => {
+    setActiveBranchIndex(defaultBranchIndex);
+  }, [branchKey, defaultBranchIndex]);
+
+  if (branchCount === 0) {
     return null;
   }
+
+  const safeActiveIndex = Math.min(
+    Math.max(activeBranchIndex, 0),
+    branchCount - 1
+  );
+
+  const effectiveMessage = branchEntries[safeActiveIndex]?.message ?? message;
+  const showBranchSelector = branchCount > 1;
 
   const hasSharedActions = Boolean(actions);
   const hasLatestActions = Boolean(latestActions);
   const hasConfigActions = Boolean(actionsConfig);
   const showAnyActions =
-    hasSharedActions || (isLatestAssistant && hasLatestActions) || hasConfigActions;
+    hasSharedActions ||
+    (isLatestAssistant && hasLatestActions) ||
+    hasConfigActions;
 
-  return (
-    <div className={cn("group flex flex-col gap-0", !showAnyActions && "pt-4")}>
-      <Message
-        from="assistant"
-        data-acb-part="message"
-        data-role="assistant"
-        className={cn(
-          "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-assistant-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-assistant-fg)]",
-          messageClassName,
-          "m-0"
-        )}
-      >
-        <div className="flex flex-col gap-3 w-full">
-          {/* Render COT first if present */}
-          {hasCOT && (
-            <div className="w-full overflow-x-auto">
-              <ChatChainOfThought
-                message={{ ...message, parts: cotParts }}
-                isStreaming={isStreaming}
-                isLastMessage={isLastMessage ?? false}
-                className="max-w-full w-full"
-              />
-            </div>
-          )}
+  const actionsContent = showAnyActions ? (
+    <div
+      data-acb-part="assistant-actions"
+      className={cn(
+        "flex flex-wrap items-center gap-1 text-xs text-muted-foreground transition-opacity duration-150",
+        isLatestAssistant
+          ? "opacity-100"
+          : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto",
+        actionsClassName
+      )}
+    >
+      {actions}
+      {isLatestAssistant && latestActions ? latestActions : null}
 
-          {/* Render regular message parts */}
-          {hasRegularContent && (
-            <MessageContent
-              data-acb-part="message-content"
-              className="rounded-[var(--acb-chat-message-radius)]"
-            >
-              {visibleRegularParts.map((part, partIndex) => (
-                <ChatMessagePart
-                  key={partIndex}
-                  part={part}
-                  streaming={isStreaming}
-                />
-              ))}
-            </MessageContent>
-          )}
-        </div>
-        <MessageAvatar
-          data-acb-part="message-avatar"
-          name="Assistant"
-          src={assistantAvatar}
+      {hasConfigActions && (
+        <AssistantActionsRenderer
+          message={effectiveMessage}
+          actionsConfig={actionsConfig}
+          isLatestAssistant={isLatestAssistant}
         />
-      </Message>
-      {showAnyActions ? (
-        <div className="ml-2">
-          <div
-            data-acb-part="assistant-actions"
-            className={cn(
-              "flex flex-wrap items-center gap-1 pl-8 -mt-4 pb-4 text-xs text-muted-foreground transition-opacity duration-150",
-              isLatestAssistant
-                ? "opacity-100"
-                : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto",
-              actionsClassName
-            )}
-          >
-            {/* Legacy JSX-based actions */}
-            {actions}
-            {isLatestAssistant && latestActions ? latestActions : null}
-
-            {/* New config-based actions */}
-            {hasConfigActions && (
-              <AssistantActionsRenderer
-                message={message}
-                actionsConfig={actionsConfig}
-                isLatestAssistant={isLatestAssistant}
-              />
-            )}
-          </div>
-        </div>
-      ) : null}
+      )}
     </div>
+  ) : null;
+
+  const widthConstraintClass = "w-full max-w-[80%]";
+
+  const renderControlsRow = (selectorEnabled: boolean) => {
+    if (!showAnyActions && !selectorEnabled) {
+      return null;
+    }
+
+    const controlsJustifyClass = (() => {
+      if (selectorEnabled && showAnyActions) {
+        return "justify-between";
+      }
+      if (selectorEnabled) {
+        return "justify-end";
+      }
+      return "justify-start";
+    })();
+
+    return (
+      <div className="flex w-full items-start gap-2 pb-4">
+        {/* Avatar gutter spacer - matches the size-8 avatar + gap-2 from Message component */}
+        <div aria-hidden="true" className="size-8 shrink-0" />
+        <div
+          className={cn(
+            widthConstraintClass,
+            "flex w-full flex-wrap items-start gap-3 pt-1",
+            controlsJustifyClass
+          )}
+        >
+          {showAnyActions ? (
+            <div className="min-w-0 flex-1">{actionsContent}</div>
+          ) : null}
+          {selectorEnabled ? (
+            <BranchSelector
+              from="assistant"
+              alignment="inline"
+              className="mt-1 shrink-0"
+            >
+              <BranchPrevious />
+              <BranchPage />
+              <BranchNext />
+            </BranchSelector>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
+
+  const containerClass = cn(
+    "group flex flex-col gap-0",
+    !showAnyActions && !showBranchSelector && "pt-4",
+    (showAnyActions || showBranchSelector) && "[&>div]:pb-0"
   );
+
+  const messageContent = showBranchSelector ? (
+    <Branch
+      key={branchKey}
+      defaultBranch={defaultBranchIndex}
+      onBranchChange={setActiveBranchIndex}
+      className="flex flex-col gap-0"
+    >
+      <BranchMessages>
+        {branchEntries.map((entry) => (
+          <React.Fragment key={entry.key}>{entry.content}</React.Fragment>
+        ))}
+      </BranchMessages>
+      {renderControlsRow(true)}
+    </Branch>
+  ) : (
+    <>
+      {branchEntries[0]?.content ?? null}
+      {renderControlsRow(false)}
+    </>
+  );
+
+  return <div className={containerClass}>{messageContent}</div>;
 };
 
 export const AssistantMessage = React.memo(
   AssistantMessageImpl,
   (prev, next) => {
     // Fast path: reference equality check
-    if (prev.message === next.message &&
-        prev.isStreaming === next.isStreaming &&
-        prev.isLatestAssistant === next.isLatestAssistant) return true;
+    if (
+      prev.message === next.message &&
+      prev.isStreaming === next.isStreaming &&
+      prev.isLatestAssistant === next.isLatestAssistant
+    )
+      return true;
 
     // Detailed property comparison
     return (
@@ -201,7 +285,8 @@ export const AssistantMessage = React.memo(
       prev.actions === next.actions &&
       prev.latestActions === next.latestActions &&
       prev.actionsConfig === next.actionsConfig &&
-      isEqual(prev.message.parts, next.message.parts)
+      isEqual(prev.message.parts, next.message.parts) &&
+      isEqual(prev.message.metadata, next.message.metadata)
     );
   }
 );

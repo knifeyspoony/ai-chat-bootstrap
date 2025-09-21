@@ -100,7 +100,7 @@ export default function Home() {
         parts: [
           {
             type: "text" as const,
-            text: "Welcome to the AI SDK Chat Demo! 🎉\n\nThis demo showcases:\n- **Real-time context sharing** - Click widgets to focus them\n- **Tool integration** - AI can interact with the counter, calculator, and other widgets\n- **Dynamic focus management** - The AI knows about focused elements\n- **Multiple message types** - Text, reasoning, files, sources, and tool calls\n\nTry clicking on some widgets below and then ask me about them!",
+            text: "Welcome to the AI Chat Bootstrap Demo! 🎉\n\nThis demo showcases:\n- **Real-time context sharing** - Click widgets to focus them\n- **Tool integration** - AI can interact with the counter, calculator, and other widgets\n- **Dynamic focus management** - The AI knows about focused elements\n- **Multiple message types** - Text, reasoning, files, sources, and tool calls\n\nTry clicking on some widgets below and then ask me about them!",
           },
         ],
       },
@@ -232,7 +232,7 @@ export default function Home() {
           },
           {
             type: "text" as const,
-            text: "## Setting up AI SDK Chat Library\n\nHere's a complete step-by-step guide:\n\n### Step 1: Installation\n```bash\npnpm add ai-chat-bootstrap @ai-sdk/react ai\n```\n\n### Step 2: Import Styles\n```css\n@import 'ai-chat-bootstrap/tokens.css';\n@import 'ai-chat-bootstrap/ai-chat.css';\n```\n\n### Step 3: Basic Usage (New Simplified API!)\n```tsx\nimport { ChatPopout } from 'ai-chat-bootstrap'\n\nfunction App() {\n  return (\n    <ChatPopout \n      api=\"/api/chat\"\n      systemPrompt=\"You are a helpful assistant\"\n      header={{ title: \"AI Assistant\" }}\n      ui={{ placeholder: \"Ask me anything...\" }}\n    />\n  )\n}\n```\n\n### Step 4: Add Context & Tools\n```tsx\nimport { useAIContext, useAIFrontendTool } from 'ai-chat-bootstrap'\n\nfunction MyComponent() {\n  const [counter, setCounter] = useState(0)\n  \n  // Structured context: description + value + priority\n  useAIContext({ description: 'Counter', value: { value: counter }, priority: 50 })\n  \n  useAIFrontendTool({\n    name: 'increment',\n    description: 'Increment counter',\n    execute: async () => {\n      setCounter(c => c + 1)\n      return { newValue: counter + 1 }\n    }\n  })\n  \n  return <div>Counter: {counter}</div>\n}\n```\n\n### Step 5: Advanced Configuration\n```tsx\n<ChatPopout \n  api=\"/api/chat\"\n  systemPrompt=\"You are a helpful assistant\"\n  models={[{ id: 'gpt-4o', label: 'GPT-4o' }]}\n  enableChainOfThought={true}\n  mcp={{ enabled: true }}\n  suggestions={{ enabled: true, count: 3 }}\n  threads={{ enabled: true }}\n/>\n```\n\nThat's it! **No hook management needed** - the component handles everything internally for optimal performance! 🚀",
+            text: "## Setting up AI Chat Bootstrap Library\n\nHere's a complete step-by-step guide:\n\n### Step 1: Installation\n```bash\npnpm add ai-chat-bootstrap @ai-sdk/react ai\n```\n\n### Step 2: Import Styles\n```css\n@import 'ai-chat-bootstrap/tokens.css';\n@import 'ai-chat-bootstrap/ai-chat.css';\n```\n\n### Step 3: Basic Usage (New Simplified API!)\n```tsx\nimport { ChatPopout } from 'ai-chat-bootstrap'\n\nfunction App() {\n  return (\n    <ChatPopout \n      api=\"/api/chat\"\n      systemPrompt=\"You are a helpful assistant\"\n      header={{ title: \"AI Assistant\" }}\n      ui={{ placeholder: \"Ask me anything...\" }}\n    />\n  )\n}\n```\n\n### Step 4: Add Context & Tools\n```tsx\nimport { useAIContext, useAIFrontendTool } from 'ai-chat-bootstrap'\n\nfunction MyComponent() {\n  const [counter, setCounter] = useState(0)\n  \n  // Structured context: description + value + priority\n  useAIContext({ description: 'Counter', value: { value: counter }, priority: 50 })\n  \n  useAIFrontendTool({\n    name: 'increment',\n    description: 'Increment counter',\n    execute: async () => {\n      setCounter(c => c + 1)\n      return { newValue: counter + 1 }\n    }\n  })\n  \n  return <div>Counter: {counter}</div>\n}\n```\n\n### Step 5: Advanced Configuration\n```tsx\n<ChatPopout \n  api=\"/api/chat\"\n  systemPrompt=\"You are a helpful assistant\"\n  models={[{ id: 'gpt-4o', label: 'GPT-4o' }]}\n  enableChainOfThought={true}\n  mcp={{ enabled: true }}\n  suggestions={{ enabled: true, count: 3 }}\n  threads={{ enabled: true }}\n/>\n```\n\nThat's it! **No hook management needed** - the component handles everything internally for optimal performance! 🚀",
           },
         ],
       },
@@ -324,7 +324,7 @@ export default function Home() {
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <Sparkles className="h-6 w-6 text-primary" />
-            <h1 className="text-lg font-semibold">AI SDK Chat Demo</h1>
+            <h1 className="text-lg font-semibold">AI Chat Bootstrap Demo</h1>
           </div>
           <ThemeToggle />
         </div>

@@ -24,12 +24,13 @@ const API_MAP: Record<string, ApiMeta> = {
     signature: `function useAIChat(options?: {
   transport?: { api?: string };
   messages?: { systemPrompt?: string; initial?: UIMessage[] };
-  thread?: {
+  threads?: {
+    enabled?: boolean;
     id?: string;
     scopeKey?: string;
     autoCreate?: boolean;
     warnOnMissing?: boolean;
-    title?: { api?: string; sampleCount?: number };
+    title?: { enabled?: boolean; api?: string; sampleCount?: number };
   };
   features?: { chainOfThought?: boolean };
   mcp?: {
@@ -56,9 +57,10 @@ const API_MAP: Record<string, ApiMeta> = {
         description: "Initial chat transcript",
       },
       {
-        name: "thread",
-        type: "{ id?: string; scopeKey?: string; ... }?",
-        description: "Thread id/scope plus auto-create and title configuration",
+        name: "threads",
+        type: "{ enabled?: boolean; id?: string; scopeKey?: string; ... }?",
+        description:
+          "Enable thread picker, persistence, and auto-title settings",
       },
       {
         name: "features.chainOfThought",

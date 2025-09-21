@@ -64,6 +64,16 @@ export default function Page() {
         transport={{ api: "/api/chat" }}
         messages={{ systemPrompt: "You are a helpful AI assistant." }}
         header={{ title: "AI Assistant" }}
+        threads={{
+          enabled: true,
+          scopeKey: "acb-scaffold-default",
+          title: {
+            enabled: true,
+            api: "/api/thread-title",
+            sampleCount: 6,
+          },
+        }}
+        mcp={{ enabled: true, api: "/api/mcp" }}
         suggestions={{ enabled: true, count: 3 }}
         commands={{ enabled: true }}
         button={{ label: "Open Chat" }}

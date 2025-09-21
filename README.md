@@ -179,21 +179,32 @@ Full styling docs live in `packages/ai-chat-bootstrap/README.md`.
 
 ## ChatContainer props
 
-**AI configuration:**
+**Transport & messages:**
 
-- `api`: chat endpoint (defaults to `/api/chat`)
-- `systemPrompt`: optional system prompt string
-- `initialMessages`: seed UI messages on mount
-- `threadId`: control which persisted thread to load/continue
-- `scopeKey`: partition threads (e.g. per-document)
-- `enableChainOfThought`: surface reasoning traces when available
-- `threadTitleApi`: endpoint to auto-title threads (empty string disables)
-- `threadTitleSampleCount`: number of recent messages to include when generating titles
-- `autoCreateThread`: create a thread automatically when missing (`true`)
-- `warnOnMissingThread`: emit console warning when a thread can't be loaded
-- `mcp`: `{ enabled, api, servers }` to enable MCP integrations
-- `models`: array of model choices for the built-in selector
-- `model`: preferred model id to select initially
+- `transport.api`: chat endpoint (defaults to `/api/chat`)
+- `messages.systemPrompt`: optional system prompt string
+- `messages.initial`: seed `UIMessage[]` on mount
+
+**Thread management:**
+
+- `thread.id`: control which persisted thread to load/continue
+- `thread.scopeKey`: partition threads (e.g. per-document)
+- `thread.autoCreate`: create a thread automatically when missing (`true`)
+- `thread.warnOnMissing`: emit console warning when a thread can't be loaded
+- `thread.title.api`: endpoint to auto-title threads (empty string disables)
+- `thread.title.sampleCount`: number of recent messages to include when generating titles
+
+**Features & models:**
+
+- `features.chainOfThought`: surface reasoning traces when available
+- `models.available`: array of model choices for the built-in selector
+- `models.initial`: preferred model id to select initially
+
+**MCP integrations:**
+
+- `mcp.enabled`: toggle MCP support
+- `mcp.api`: override the MCP bridge endpoint
+- `mcp.servers`: preconfigure MCP servers (serialized descriptors)
 
 **UI configuration:**
 

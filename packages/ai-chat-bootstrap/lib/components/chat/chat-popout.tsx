@@ -39,7 +39,6 @@ export function ChatPopout(props: ChatPopoutProps) {
     // AI configuration props (passed through to ChatContainer)
     transport,
     messages: messagesOptions,
-    thread: threadOptions,
     features,
     mcp,
     models: modelsOptions,
@@ -85,6 +84,8 @@ export function ChatPopout(props: ChatPopoutProps) {
   const [width, setWidth] = useState(defaultWidth);
   const [isDragging, setIsDragging] = useState(false);
 
+  const widthRef = useRef(defaultWidth);
+
 
   // Refs for resizing
   const popoutRef = useRef<HTMLDivElement>(null);
@@ -92,6 +93,34 @@ export function ChatPopout(props: ChatPopoutProps) {
   const startWidthRef = useRef<number>(0);
 
   const effectiveIsOpen = isPermanent ? true : isOpen;
+
+  useEffect(() => {
+    widthRef.current = defaultWidth;
+    setWidth(defaultWidth);
+  }, [defaultWidth]);
+
+  useEffect(() => {
+    widthRef.current = width;
+  }, [width]);
+
+  const applyLiveWidth = useCallback(
+    (nextWidth: number) => {
+      widthRef.current = nextWidth;
+      const target = popoutRef.current;
+
+      if (!target || !effectiveIsOpen) {
+        return;
+      }
+
+      target.style.width = `${nextWidth}px`;
+
+      if (mode === "inline") {
+        target.style.minWidth = `${minWidth}px`;
+        target.style.maxWidth = `${maxWidth}px`;
+      }
+    },
+    [effectiveIsOpen, mode, minWidth, maxWidth]
+  );
 
   // Reusable toggle button element (used in both modes)
   const ToggleButton =
@@ -119,7 +148,6 @@ export function ChatPopout(props: ChatPopoutProps) {
     // Pass through AI configuration
     transport,
     messages: messagesOptions,
-    thread: threadOptions,
     features,
     mcp,
     models: modelsOptions,
@@ -175,9 +203,9 @@ export function ChatPopout(props: ChatPopoutProps) {
         maxWidth
       );
 
-      setWidth(newWidth);
+      applyLiveWidth(newWidth);
     },
-    [position, minWidth, maxWidth]
+    [position, minWidth, maxWidth, applyLiveWidth]
   );
 
   const handleMouseMove = useCallback(
@@ -203,21 +231,24 @@ export function ChatPopout(props: ChatPopoutProps) {
     document.removeEventListener("touchend", handleEnd);
     document.body.style.cursor = "";
     document.body.style.userSelect = "";
-  }, [handleMouseMove, handleTouchMove]);
+    if (widthRef.current !== width) {
+      setWidth(widthRef.current);
+    }
+  }, [handleMouseMove, handleTouchMove, width]);
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       setIsDragging(true);
       startXRef.current = e.clientX;
-      startWidthRef.current = width;
+      startWidthRef.current = widthRef.current;
 
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleEnd);
       document.body.style.cursor = "col-resize";
       document.body.style.userSelect = "none";
     },
-    [width, handleMouseMove, handleEnd]
+    [handleMouseMove, handleEnd]
   );
 
   const handleTouchStart = useCallback(
@@ -225,7 +256,7 @@ export function ChatPopout(props: ChatPopoutProps) {
       e.preventDefault();
       setIsDragging(true);
       startXRef.current = e.touches[0].clientX;
-      startWidthRef.current = width;
+      startWidthRef.current = widthRef.current;
 
       document.addEventListener("touchmove", handleTouchMove, {
         passive: false,
@@ -233,7 +264,7 @@ export function ChatPopout(props: ChatPopoutProps) {
       document.addEventListener("touchend", handleEnd);
       document.body.style.userSelect = "none";
     },
-    [width, handleTouchMove, handleEnd]
+    [handleTouchMove, handleEnd]
   );
 
   // Cleanup event listeners on unmount

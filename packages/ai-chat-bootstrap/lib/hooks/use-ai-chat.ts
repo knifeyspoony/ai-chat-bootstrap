@@ -27,9 +27,30 @@ import type { SerializedTool } from "../stores/tools";
 // Planning types and schemas removed - using flow capture instead
 import type { ChatModelOption, ChatRequest } from "../types/chat";
 import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
+import {
+  appendMessageBranchVersion,
+  getMessageBranchMetadata,
+  MESSAGE_BRANCH_METADATA_KEY,
+  type MessageBranchMetadata,
+} from "../utils/message-branches";
 import { useChainOfThought } from "./use-chain-of-thought";
 
 const EMPTY_MODEL_OPTIONS: ChatModelOption[] = [];
+
+export interface ThreadTitleOptions {
+  enabled?: boolean;
+  api?: string;
+  sampleCount?: number;
+}
+
+export interface ThreadsOptions {
+  enabled?: boolean;
+  id?: string;
+  scopeKey?: string;
+  autoCreate?: boolean;
+  warnOnMissing?: boolean;
+  title?: ThreadTitleOptions;
+}
 
 export interface UseAIChatOptions {
   transport?: {
@@ -39,16 +60,7 @@ export interface UseAIChatOptions {
     systemPrompt?: string;
     initial?: UIMessage[];
   };
-  thread?: {
-    id?: string;
-    scopeKey?: string;
-    autoCreate?: boolean;
-    warnOnMissing?: boolean;
-    title?: {
-      api?: string;
-      sampleCount?: number;
-    };
-  };
+  threads?: ThreadsOptions;
   features?: {
     chainOfThought?: boolean;
   };
@@ -98,7 +110,7 @@ const hasAutoTitledFlag = (metadata?: Record<string, unknown>): boolean => {
 export function useAIChat({
   transport,
   messages,
-  thread,
+  threads,
   features,
   mcp,
   models: modelsGroup,
@@ -106,13 +118,20 @@ export function useAIChat({
   const api = transport?.api ?? "/api/chat";
   const systemPrompt = messages?.systemPrompt;
   const initialMessages = messages?.initial;
-  const threadId = thread?.id;
-  const scopeKey = thread?.scopeKey;
+  const threadsGroup = threads ?? {};
+  const threadId = threadsGroup.id;
+  const scopeKey = threadsGroup.scopeKey;
   const chainOfThoughtEnabled = features?.chainOfThought ?? false;
-  const threadTitleApi = thread?.title?.api ?? "";
-  const threadTitleSampleCount = thread?.title?.sampleCount ?? 8;
-  const autoCreateThread = thread?.autoCreate ?? true;
-  const warnOnMissingThread = thread?.warnOnMissing ?? false;
+  const threadTitleOptions = threadsGroup.title;
+  const threadTitleEnabled =
+    threadTitleOptions?.enabled ?? Boolean(threadTitleOptions?.api);
+  const threadTitleApi =
+    threadTitleEnabled && threadTitleOptions?.api
+      ? threadTitleOptions.api
+      : "";
+  const threadTitleSampleCount = threadTitleOptions?.sampleCount ?? 8;
+  const autoCreateThread = threadsGroup.autoCreate ?? true;
+  const warnOnMissingThread = threadsGroup.warnOnMissing ?? false;
   const incomingModels = modelsGroup?.available ?? EMPTY_MODEL_OPTIONS;
   const providedModel = modelsGroup?.initial;
   const mcpEnabled = mcp?.enabled ?? false;
@@ -601,7 +620,7 @@ export function useAIChat({
               const current = state.threads.get(effectiveId);
               const meta = (current?.metadata || {}) as Record<string, unknown>;
               const manual = meta.manualTitle === true;
-              if (!manual && threadTitleApi) {
+              if (!manual && threadTitleEnabled && threadTitleApi) {
                 const COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
                 const last =
                   typeof meta.lastAutoTitleAt === "number"
@@ -876,6 +895,141 @@ export function useAIChat({
     [threadId, threadStore, chatHook.messages]
   );
 
+  const regenerateWithHistory = useCallback(
+    async (options?: { messageId?: string }) => {
+      const helper = chatHookRef.current ?? chatHook;
+      let targetIndex = -1;
+      let previousMetadata: MessageBranchMetadata | undefined;
+      let appendedMetadata: MessageBranchMetadata | undefined;
+
+      helper.setMessages((prevMessages) => {
+        if (!Array.isArray(prevMessages) || prevMessages.length === 0) {
+          return prevMessages;
+        }
+
+        const explicitId = options?.messageId;
+        let resolvedIndex = -1;
+
+        if (explicitId) {
+          resolvedIndex = prevMessages.findIndex((msg) => msg.id === explicitId);
+        }
+
+        if (resolvedIndex === -1) {
+          for (let i = prevMessages.length - 1; i >= 0; i -= 1) {
+            if (prevMessages[i]?.role === "assistant") {
+              resolvedIndex = i;
+              break;
+            }
+          }
+        }
+
+        if (resolvedIndex === -1) {
+          return prevMessages;
+        }
+
+        const targetMessage = prevMessages[resolvedIndex];
+        if (!targetMessage || targetMessage.role !== "assistant") {
+          return prevMessages;
+        }
+
+        if (!Array.isArray(targetMessage.parts) || targetMessage.parts.length === 0) {
+          return prevMessages;
+        }
+
+        const baseId = targetMessage.id ?? `assistant-${resolvedIndex}`;
+        const { updatedMessage } = appendMessageBranchVersion(
+          targetMessage,
+          (count) => `${baseId}::v${count + 1}`
+        );
+
+        targetIndex = resolvedIndex;
+        previousMetadata = getMessageBranchMetadata(targetMessage);
+        appendedMetadata = getMessageBranchMetadata(updatedMessage);
+
+        const nextMessages = prevMessages.slice();
+        nextMessages[resolvedIndex] = updatedMessage;
+        return nextMessages;
+      });
+
+      if (targetIndex === -1 || !appendedMetadata) {
+        return helper.regenerate(options);
+      }
+
+      const applyBranchMetadata = (messages: UIMessage[]) => {
+        if (!Array.isArray(messages) || targetIndex < 0 || targetIndex >= messages.length) {
+          return messages;
+        }
+        const nextMessages = messages.slice();
+        const targetMessage = nextMessages[targetIndex];
+        if (!targetMessage) {
+          return messages;
+        }
+        const metadata = {
+          ...(targetMessage.metadata ?? {}),
+          [MESSAGE_BRANCH_METADATA_KEY]: appendedMetadata,
+        };
+        nextMessages[targetIndex] = {
+          ...targetMessage,
+          metadata,
+        };
+        return nextMessages;
+      };
+
+      const restoreBranchMetadata = (messages: UIMessage[]) => {
+        if (!Array.isArray(messages) || targetIndex < 0 || targetIndex >= messages.length) {
+          return messages;
+        }
+        const nextMessages = messages.slice();
+        const targetMessage = nextMessages[targetIndex];
+        if (!targetMessage) {
+          return messages;
+        }
+        const metadata = { ...(targetMessage.metadata ?? {}) } as Record<string, unknown>;
+        if (previousMetadata && previousMetadata.versions.length > 0) {
+          metadata[MESSAGE_BRANCH_METADATA_KEY] = previousMetadata;
+        } else {
+          delete metadata[MESSAGE_BRANCH_METADATA_KEY];
+        }
+
+        const hasMetadata = Object.keys(metadata).length > 0;
+        nextMessages[targetIndex] = {
+          ...targetMessage,
+          metadata: hasMetadata ? metadata : undefined,
+        };
+        return nextMessages;
+      };
+
+      try {
+        const result = await helper.regenerate(options);
+
+        helper.setMessages((prev) => applyBranchMetadata(prev));
+
+        queueMicrotask(() => {
+          try {
+            persistMessagesIfChanged("regenerate-history");
+          } catch {
+            /* ignore */
+          }
+        });
+
+        return result;
+      } catch (error) {
+        helper.setMessages((prev) => restoreBranchMetadata(prev));
+
+        queueMicrotask(() => {
+          try {
+            persistMessagesIfChanged("regenerate-rollback");
+          } catch {
+            /* ignore */
+          }
+        });
+
+        throw error;
+      }
+    },
+    [chatHook, persistMessagesIfChanged]
+  );
+
   // Persist whenever messages settle and we are idle (not streaming/submitting)
   useEffect(() => {
     const effectiveId = threadId ?? storeActiveThreadId;
@@ -902,6 +1056,7 @@ export function useAIChat({
 
   return {
     ...chatHook,
+    regenerate: regenerateWithHistory,
     input: draftInput,
     setInput: setDraftInput,
     sendMessageWithContext,

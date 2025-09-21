@@ -21,7 +21,9 @@ interface UseAIChatOptions {
     /** Initial transcript loaded into the chat store. */
     initial?: UIMessage[];
   };
-  thread?: {
+  threads?: {
+    /** Toggle thread features and dropdown UI. */
+    enabled?: boolean;
     /** Explicit thread id to load or create. */
     id?: string;
     /** Logical scope used to group threads (e.g. project id). */
@@ -32,6 +34,8 @@ interface UseAIChatOptions {
     warnOnMissing?: boolean;
     /** Automatic titling configuration. */
     title?: {
+      /** Toggle automatic thread titles (defaults to `api` truthiness). */
+      enabled?: boolean;
       /** API endpoint that will receive sampled messages and return a title. */
       api?: string;
       /** Number of recent messages to send to the title endpoint (default: 8). */
@@ -79,12 +83,14 @@ Per-call override: you can still control the final string by providing `body.enr
 | `transport.api` | `string` | `/api/chat` | HTTP endpoint used by the chat transport |
 | `messages.systemPrompt` | `string` | `undefined` | App-specific directions appended after the enriched prompt |
 | `messages.initial` | `UIMessage[]` | `[]` | Initial transcript seeded into the chat store |
-| `thread.id` | `string` | auto | Explicit thread id to load or create |
-| `thread.scopeKey` | `string` | `undefined` | Scope identifier used when listing threads |
-| `thread.autoCreate` | `boolean` | `true` | Create a thread automatically when none exists |
-| `thread.warnOnMissing` | `boolean` | `false` | Log warnings when a referenced thread is missing |
-| `thread.title.api` | `string` | `""` | Endpoint used to upgrade thread titles |
-| `thread.title.sampleCount` | `number` | `8` | Number of messages sent to the title endpoint |
+| `threads.enabled` | `boolean` | `false` | Renders the thread picker and enables persistence |
+| `threads.id` | `string` | auto | Explicit thread id to load or create |
+| `threads.scopeKey` | `string` | `undefined` | Scope identifier used when listing threads |
+| `threads.autoCreate` | `boolean` | `true` | Create a thread automatically when none exists |
+| `threads.warnOnMissing` | `boolean` | `false` | Log warnings when a referenced thread is missing |
+| `threads.title.enabled` | `boolean` | derived | Toggle automatic thread titles (defaults to `threads.title.api`) |
+| `threads.title.api` | `string` | `""` | Endpoint used to upgrade thread titles |
+| `threads.title.sampleCount` | `number` | `8` | Number of messages sent to the title endpoint |
 | `features.chainOfThought` | `boolean` | `false` | Enables reasoning capture/tooling |
 | `mcp.enabled` | `boolean` | `false` | Turns MCP support on/off |
 | `mcp.api` | `string` | `undefined` | Default MCP server API endpoint |
@@ -226,10 +232,11 @@ const chat = useAIChat({
 
 ```tsx
 const chat = useAIChat({
-  thread: {
+  threads: {
+    enabled: true,
     scopeKey: projectId,
     autoCreate: true,
-    title: { api: "/api/threads/title", sampleCount: 6 },
+    title: { enabled: true, api: "/api/threads/title", sampleCount: 6 },
   },
 });
 

@@ -10,13 +10,7 @@ import {
   useMCPServer,
   useUIChatCommand,
 } from "ai-chat-bootstrap";
-import {
-  Calculator,
-  Clock,
-  Minus,
-  Plus,
-  Settings
-} from "lucide-react";
+import { Calculator, Clock, Minus, Plus, Settings } from "lucide-react";
 import { useMemo } from "react";
 import { z } from "zod";
 
@@ -137,7 +131,7 @@ export function useDemoAI({
   // Memoize pageInfo to prevent recreating object on every render
   const pageInfo = useMemo(
     () => ({
-      title: "AI SDK Chat Demo",
+      title: "AI Chat Bootstrap Demo",
       description: "Interactive demo showcasing AI-app integration",
       timestamp: new Date().toISOString(),
     }),

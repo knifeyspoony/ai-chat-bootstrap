@@ -1,96 +1,203 @@
 const { execSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const readline = require("node:readline/promises");
+const { stdin, stdout } = require("node:process");
 const { log, error, warn } = require("./log");
 // Using raw template source files (.ts / .tsx / .md) copied directly.
+
+let rl;
+let warnedNonInteractive = false;
+let requireOverwriteConfirmation = true;
+
+function getReadlineInterface() {
+  if (!rl) {
+    rl = readline.createInterface({ input: stdin, output: stdout });
+  }
+  return rl;
+}
+
+function cleanupReadline() {
+  if (rl) {
+    rl.close();
+    rl = undefined;
+  }
+}
+
+process.on("exit", cleanupReadline);
+process.on("SIGINT", () => {
+  cleanupReadline();
+  process.exit(1);
+});
+
+async function confirmOverwritePrompt(relativePath) {
+  if (!stdin.isTTY) {
+    if (!warnedNonInteractive) {
+      warn(
+        "Terminal is non-interactive; skipping overwrites that require confirmation."
+      );
+      warnedNonInteractive = true;
+    }
+    return false;
+  }
+  const answer = (
+    await getReadlineInterface().question(
+      `File ${relativePath} already exists. Overwrite? [y/N] `
+    )
+  )
+    .trim()
+    .toLowerCase();
+  return answer === "y" || answer === "yes";
+}
+
+async function writeFileWithConfirmation(filePath, content) {
+  const relativePath = path.relative(process.cwd(), filePath) || filePath;
+  if (fs.existsSync(filePath)) {
+    const existing = fs.readFileSync(filePath, "utf8");
+    if (existing === content) {
+      log(`Skipped ${relativePath} (already up to date)`);
+      return false;
+    }
+    if (requireOverwriteConfirmation) {
+      const shouldOverwrite = await confirmOverwritePrompt(relativePath);
+      if (!shouldOverwrite) {
+        warn(`Skipped ${relativePath} (user declined overwrite)`);
+        return false;
+      }
+    }
+  } else {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  }
+  fs.writeFileSync(filePath, content);
+  log(`Wrote ${relativePath}`);
+  return true;
+}
+
+async function copyFileWithConfirmation(src, dest) {
+  const relativePath = path.relative(process.cwd(), dest) || dest;
+  if (fs.existsSync(dest)) {
+    const existing = fs.readFileSync(dest);
+    const incoming = fs.readFileSync(src);
+    if (existing.equals(incoming)) {
+      log(`Skipped ${relativePath} (already up to date)`);
+      return false;
+    }
+    if (requireOverwriteConfirmation) {
+      const shouldOverwrite = await confirmOverwritePrompt(relativePath);
+      if (!shouldOverwrite) {
+        warn(`Skipped ${relativePath} (user declined overwrite)`);
+        return false;
+      }
+    }
+  } else {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+  }
+  fs.copyFileSync(src, dest);
+  log(`Copied ${relativePath}`);
+  return true;
+}
 
 async function scaffold({ projectName, tailwindNative, localPath }) {
   // Capture directory where the CLI was invoked (before we chdir into scaffolded project)
   const invocationCwd = process.cwd();
   const dir = path.resolve(invocationCwd, projectName);
-
-  if (fs.existsSync(dir)) {
-    const existing = fs.readdirSync(dir).filter((f) => !f.startsWith("."));
-    if (existing.length) {
-      error(`Directory '${projectName}' already exists and is not empty.`);
-      process.exit(1);
-    }
-  } else {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
-  log(`Scaffolding Next.js project in ${projectName} ...`);
-  execSync(
-    `npx --yes create-next-app@latest ${projectName} --turbopack --typescript --eslint --app --tailwind --src-dir --import-alias @/* --no-git`,
-    { stdio: "inherit" }
-  );
-
-  process.chdir(dir);
-
-  // -------------------- Dependency Installation --------------------
-  log("Installing dependencies...");
-  let aiChatSpec = "ai-chat-bootstrap";
-  if (localPath) {
-    // Resolve relative to where the user invoked the CLI (not the new project dir)
-    const resolved = path.isAbsolute(localPath)
-      ? localPath
-      : path.resolve(invocationCwd, localPath);
-    const pkgJson = path.join(resolved, "package.json");
-    if (!fs.existsSync(pkgJson)) {
-      error(
-        `--local path does not contain package.json: ${resolved}\nPass an absolute path or one relative to the directory you ran the CLI from.`
-      );
-      process.exit(1);
-    }
-    try {
-      const pkg = JSON.parse(fs.readFileSync(pkgJson, "utf8"));
-      if (pkg.name !== "ai-chat-bootstrap") {
-        warn(
-          `Local package name mismatch (expected ai-chat-bootstrap, got ${pkg.name}). Proceeding.`
-        );
+  let installingIntoExistingProject = false;
+  try {
+    if (fs.existsSync(dir)) {
+      const existingEntries = fs
+        .readdirSync(dir)
+        .filter((f) => !f.startsWith("."));
+      if (existingEntries.length) {
+        installingIntoExistingProject = true;
       }
-      const distDir = path.join(resolved, "dist");
-      if (!fs.existsSync(distDir)) {
-        warn(
-          "Local package has no dist/ build. Run 'pnpm --filter ai-chat-bootstrap build' before scaffolding."
-        );
-      }
-    } catch {
-      warn("Could not inspect local package.json");
+    } else {
+      fs.mkdirSync(dir, { recursive: true });
     }
-    // Create a packed tarball so npm copies instead of symlinking (avoids Turbopack leaving project root)
-    log("Packing local ai-chat-bootstrap (npm pack)...");
-    let tarballPath;
-    try {
-      const out = execSync("npm pack --silent", { cwd: resolved });
-      const fileName = out.toString().trim().split(/\n/).pop().trim();
-      tarballPath = path.join(resolved, fileName);
-      if (!fs.existsSync(tarballPath)) {
-        error(`npm pack did not produce expected tarball: ${tarballPath}`);
+
+    if (installingIntoExistingProject) {
+      log(`Installing ai-chat-bootstrap into existing project at ${projectName} ...`);
+      const pkgPath = path.join(dir, "package.json");
+      if (!fs.existsSync(pkgPath)) {
+        error(
+          `Cannot install into '${projectName}' because package.json was not found. Run the CLI in a Next.js project root.`
+        );
         process.exit(1);
       }
-      aiChatSpec = tarballPath; // install via absolute path to tgz
-      log(`Using packed tarball: ${aiChatSpec}`);
-    } catch (e) {
-      error(`Failed to pack local package: ${e.message}`);
-      process.exit(1);
+    } else {
+      log(`Scaffolding Next.js project in ${projectName} ...`);
+      execSync(
+        `npx --yes create-next-app@latest ${projectName} --turbopack --typescript --eslint --app --tailwind --src-dir --import-alias @/* --no-git`,
+        { stdio: "inherit" }
+      );
     }
-    // Clean up tarball after install later
-    process.on("exit", () => {
+
+    process.chdir(dir);
+    requireOverwriteConfirmation = installingIntoExistingProject;
+
+    // -------------------- Dependency Installation --------------------
+    log("Installing dependencies...");
+    let aiChatSpec = "ai-chat-bootstrap";
+    if (localPath) {
+      // Resolve relative to where the user invoked the CLI (not the new project dir)
+      const resolved = path.isAbsolute(localPath)
+        ? localPath
+        : path.resolve(invocationCwd, localPath);
+      const pkgJson = path.join(resolved, "package.json");
+      if (!fs.existsSync(pkgJson)) {
+        error(
+          `--local path does not contain package.json: ${resolved}\nPass an absolute path or one relative to the directory you ran the CLI from.`
+        );
+        process.exit(1);
+      }
       try {
-        if (tarballPath && fs.existsSync(tarballPath))
-          fs.unlinkSync(tarballPath);
-      } catch {}
-    });
-  }
-  const deps = [
-    aiChatSpec,
-    "ai",
-    "@ai-sdk/react",
-    "@ai-sdk/openai",
-    "zod",
-    "tw-animate-css",
-  ];
+        const pkg = JSON.parse(fs.readFileSync(pkgJson, "utf8"));
+        if (pkg.name !== "ai-chat-bootstrap") {
+          warn(
+            `Local package name mismatch (expected ai-chat-bootstrap, got ${pkg.name}). Proceeding.`
+          );
+        }
+        const distDir = path.join(resolved, "dist");
+        if (!fs.existsSync(distDir)) {
+          warn(
+            "Local package has no dist/ build. Run 'pnpm --filter ai-chat-bootstrap build' before scaffolding."
+          );
+        }
+      } catch {
+        warn("Could not inspect local package.json");
+      }
+      // Create a packed tarball so npm copies instead of symlinking (avoids Turbopack leaving project root)
+      log("Packing local ai-chat-bootstrap (npm pack)...");
+      let tarballPath;
+      try {
+        const out = execSync("npm pack --silent", { cwd: resolved });
+        const fileName = out.toString().trim().split(/\n/).pop().trim();
+        tarballPath = path.join(resolved, fileName);
+        if (!fs.existsSync(tarballPath)) {
+          error(`npm pack did not produce expected tarball: ${tarballPath}`);
+          process.exit(1);
+        }
+        aiChatSpec = tarballPath; // install via absolute path to tgz
+        log(`Using packed tarball: ${aiChatSpec}`);
+      } catch (e) {
+        error(`Failed to pack local package: ${e.message}`);
+        process.exit(1);
+      }
+      // Clean up tarball after install later
+      process.on("exit", () => {
+        try {
+          if (tarballPath && fs.existsSync(tarballPath))
+            fs.unlinkSync(tarballPath);
+        } catch {}
+      });
+    }
+    const deps = [
+      aiChatSpec,
+      "ai",
+      "@ai-sdk/react",
+      "@ai-sdk/openai",
+      "zod",
+      "tw-animate-css",
+    ];
   try {
     execSync(`npm install ${deps.join(" ")}`, { stdio: "inherit" });
     // Sanity check: ensure the package is now resolvable in node_modules
@@ -149,21 +256,56 @@ async function scaffold({ projectName, tailwindNative, localPath }) {
   const tmplDir = path.join(__dirname, "templates");
   const apiChatDir = path.join("src", "app", "api", "chat");
   const apiSugDir = path.join("src", "app", "api", "suggestions");
+  const apiMcpDir = path.join("src", "app", "api", "mcp");
+  const apiThreadTitleDir = path.join("src", "app", "api", "thread-title");
   fs.mkdirSync(apiChatDir, { recursive: true });
   fs.mkdirSync(apiSugDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(apiChatDir, "route.ts"),
-    fs.readFileSync(path.join(tmplDir, "api-chat-route.ts"), "utf8")
+  fs.mkdirSync(apiMcpDir, { recursive: true });
+  fs.mkdirSync(apiThreadTitleDir, { recursive: true });
+  const chatRoutePath = path.join(apiChatDir, "route.ts");
+  const chatRouteTemplate = fs.readFileSync(
+    path.join(tmplDir, "api-chat-route.ts"),
+    "utf8"
   );
-  fs.writeFileSync(
-    path.join(apiSugDir, "route.ts"),
-    fs.readFileSync(path.join(tmplDir, "api-suggestions-route.ts"), "utf8")
+  await writeFileWithConfirmation(chatRoutePath, chatRouteTemplate);
+
+  const suggestionsRoutePath = path.join(apiSugDir, "route.ts");
+  const suggestionsTemplate = fs.readFileSync(
+    path.join(tmplDir, "api-suggestions-route.ts"),
+    "utf8"
   );
+  await writeFileWithConfirmation(
+    suggestionsRoutePath,
+    suggestionsTemplate
+  );
+
+  const mcpRoutePath = path.join(apiMcpDir, "route.ts");
+  const mcpTemplate = fs.readFileSync(
+    path.join(tmplDir, "api-mcp-route.ts"),
+    "utf8"
+  );
+  await writeFileWithConfirmation(mcpRoutePath, mcpTemplate);
+
+  const threadTitleRoutePath = path.join(apiThreadTitleDir, "route.ts");
+  const threadTitleTemplate = fs.readFileSync(
+    path.join(tmplDir, "api-thread-title-route.ts"),
+    "utf8"
+  );
+  await writeFileWithConfirmation(
+    threadTitleRoutePath,
+    threadTitleTemplate
+  );
+
   const homePagePath = path.join("src", "app", "page.tsx");
-  fs.writeFileSync(
-    homePagePath,
-    fs.readFileSync(path.join(tmplDir, "home-page.tsx"), "utf8")
-  );
+  if (installingIntoExistingProject) {
+    log("Skipped src/app/page.tsx (existing project)");
+  } else {
+    const homePageTemplate = fs.readFileSync(
+      path.join(tmplDir, "home-page.tsx"),
+      "utf8"
+    );
+    await writeFileWithConfirmation(homePagePath, homePageTemplate);
+  }
 
   // Assets (logo / icon)
   try {
@@ -177,7 +319,7 @@ async function scaffold({ projectName, tailwindNative, localPath }) {
         const dest = path.join(publicDir, f);
         try {
           if (fs.statSync(src).isFile()) {
-            fs.copyFileSync(src, dest);
+            await copyFileWithConfirmation(src, dest);
           }
         } catch {}
       }
@@ -194,51 +336,57 @@ async function scaffold({ projectName, tailwindNative, localPath }) {
   }
 
   // Inject favicon (metadata icons) into layout.tsx
-  try {
-    const layoutPath = path.join("src", "app", "layout.tsx");
-    if (fs.existsSync(layoutPath)) {
-      let layout = fs.readFileSync(layoutPath, "utf8");
-      // Ensure dark class + data-theme applied server-side to avoid light-mode flash
-      if (
-        !/className=\"[^\"]*dark/.test(layout) &&
-        /<html[^>]*>/.test(layout)
-      ) {
-        layout = layout.replace(/<html(.*?)>/, (m, attrs) => {
-          if (/data-theme=/.test(m))
-            return m.includes("className=")
-              ? m
-              : m.replace("<html", '<html className="dark"');
-          if (/className=/.test(m)) {
-            return m.replace(
-              /className=\"(.*?)\"/,
-              (mm, cls) => `className="${cls} dark" data-theme=\"dark\"`
-            );
-          }
-          return `<html${attrs} className="dark" data-theme="dark">`;
-        });
-      }
-      const hasIcons = /icons\s*:/m.test(layout);
-      const hasMetadata = /export const metadata/.test(layout);
-      if (hasMetadata && !hasIcons) {
-        // Attempt to augment existing metadata object
-        layout = layout.replace(/export const metadata([^=]*)=\s*\{/, (m) => {
-          return (
-            m +
-            "\n  icons: { icon: '/acb.png', shortcut: '/acb.png', apple: '/acb.png' },"
-          );
-        });
-      } else if (!hasMetadata) {
-        if (!/import type { Metadata } from 'next'/.test(layout)) {
-          layout = "import type { Metadata } from 'next';\n" + layout;
+  if (installingIntoExistingProject) {
+    log("Skipped src/app/layout.tsx updates (existing project)");
+  } else {
+    try {
+      const layoutPath = path.join("src", "app", "layout.tsx");
+      if (fs.existsSync(layoutPath)) {
+        let layout = fs.readFileSync(layoutPath, "utf8");
+        // Ensure dark class + data-theme applied server-side to avoid light-mode flash
+        if (
+          !/className=\"[^\"]*dark/.test(layout) &&
+          /<html[^>]*>/.test(layout)
+        ) {
+          layout = layout.replace(/<html(.*?)>/, (m, attrs) => {
+            if (/data-theme=/.test(m))
+              return m.includes("className=")
+                ? m
+                : m.replace("<html", '<html className="dark"');
+            if (/className=/.test(m)) {
+              return m.replace(
+                /className=\"(.*?)\"/,
+                (mm, cls) => `className="${cls} dark" data-theme=\"dark\"`
+              );
+            }
+            return `<html${attrs} className="dark" data-theme="dark">`;
+          });
         }
-        layout +=
-          "\nexport const metadata: Metadata = { icons: { icon: '/acb.png', shortcut: '/acb.png', apple: '/acb.png' } };\n";
+        const hasIcons = /icons\s*:/m.test(layout);
+        const hasMetadata = /export const metadata/.test(layout);
+        if (hasMetadata && !hasIcons) {
+          // Attempt to augment existing metadata object
+          layout = layout.replace(/export const metadata([^=]*)=\s*\{/, (m) => {
+            return (
+              m +
+              "\n  icons: { icon: '/acb.png', shortcut: '/acb.png', apple: '/acb.png' },"
+            );
+          });
+        } else if (!hasMetadata) {
+          if (!/import type { Metadata } from 'next'/.test(layout)) {
+            layout = "import type { Metadata } from 'next';\n" + layout;
+          }
+          layout +=
+            "\nexport const metadata: Metadata = { icons: { icon: '/acb.png', shortcut: '/acb.png', apple: '/acb.png' } };\n";
+        }
+        const layoutUpdated = await writeFileWithConfirmation(layoutPath, layout);
+        if (layoutUpdated) {
+          log("Injected favicon metadata (acb.png)");
+        }
       }
-      fs.writeFileSync(layoutPath, layout);
-      log("Injected favicon metadata (acb.png)");
+    } catch (e) {
+      warn("Could not inject favicon metadata: " + e.message);
     }
-  } catch (e) {
-    warn("Could not inject favicon metadata: " + e.message);
   }
 
   // Styles
@@ -299,8 +447,13 @@ async function scaffold({ projectName, tailwindNative, localPath }) {
           "",
         ].join("\n");
         lines.splice(insertIdx, 0, insertion);
-        fs.writeFileSync(globalCssPath, lines.join("\n"));
-        log("Injected ai-chat-bootstrap imports + sources into globals.css");
+        const globalsUpdated = await writeFileWithConfirmation(
+          globalCssPath,
+          lines.join("\n")
+        );
+        if (globalsUpdated) {
+          log("Injected ai-chat-bootstrap imports + sources into globals.css");
+        }
       }
     }
   } catch {
@@ -318,7 +471,7 @@ async function scaffold({ projectName, tailwindNative, localPath }) {
           /export default \{/,
           `import preset from 'ai-chat-bootstrap/tailwind.preset';\n\nexport default {\n  presets: [preset],`
         );
-        fs.writeFileSync(twConfigPath, tw);
+        await writeFileWithConfirmation(twConfigPath, tw);
       }
     } else {
       warn("Tailwind config not found to inject preset");
@@ -344,16 +497,23 @@ async function scaffold({ projectName, tailwindNative, localPath }) {
       : `# ${projectName}\n`;
     if (!base.includes("AI Chat Bootstrap Enhancements")) {
       base += "\n" + addition + "\n";
-      fs.writeFileSync(readmePath, base);
+      await writeFileWithConfirmation(readmePath, base);
     }
   } catch {
     warn("Could not update README");
   }
 
-  log("Scaffold complete. Next steps:");
-  console.log(
-    `\n  cd ${projectName}\n  npm run dev\n\n  Open http://localhost:3000/\n`
-  );
+    log("Scaffold complete. Next steps:");
+    const instructions = [];
+    const shouldSkipCdInstruction = dir === invocationCwd;
+    if (!shouldSkipCdInstruction) {
+      instructions.push(`  cd ${projectName}`);
+    }
+    instructions.push("  npm run dev", "", "  Open http://localhost:3000/");
+    console.log(`\n${instructions.join("\n")}\n`);
+  } finally {
+    cleanupReadline();
+  }
 }
 
 module.exports = { scaffold };

@@ -97,8 +97,10 @@ function ChatWithAutoTitles() {
     <ChatContainer
       transport={{ api: "/api/chat" }}
       messages={{ systemPrompt: "You are a helpful assistant." }}
-      thread={{
+      threads={{
+        enabled: true,
         title: {
+          enabled: true,
           api: "/api/thread-title",
           sampleCount: 6,
         },
@@ -307,8 +309,10 @@ const handler = createThreadTitleHandler({
 ```tsx
 const chat = useAIChat({
   transport: { api: "/api/chat" },
-  thread: {
+  threads: {
+    enabled: true,
     title: {
+      enabled: true,
       api: "/api/thread-title",
       sampleCount: 6,
     },

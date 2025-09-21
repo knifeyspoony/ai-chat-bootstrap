@@ -4,9 +4,9 @@ Scaffolded with `ai-chat-bootstrap` CLI.
 
 ### Includes
 
-- API routes: `/api/chat` & `/api/suggestions`
-- Floating chat popout on the home page (toggle button)
-- Suggestions + slash commands ready (enable via `ChatContainer` props)
+- API routes: `/api/chat`, `/api/suggestions`, `/api/thread-title`, `/api/mcp`
+- Floating chat popout on the home page with threads & auto titles enabled
+- Suggestions, slash commands, and MCP tooling ready (configure via `ChatContainer` props)
 - Hooks for context (`useAIContext`), tools (`useAIFrontendTool`), commands (`useAIChatCommand`)
 
 ### Run

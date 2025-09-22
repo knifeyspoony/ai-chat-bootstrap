@@ -711,6 +711,7 @@ export default function Home() {
         }}
         features={{
           chainOfThought: true,
+          branching: true,
         }}
         mcp={{
           enabled: true,

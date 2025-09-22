@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { useAIContextStore } from "../stores";
 
@@ -43,6 +43,15 @@ export function useAIContext(
   const idRef = useRef<string | undefined>(undefined);
   const dumpFn = dump ?? dumpJSON;
   const dumped = dumpFn(description, value);
+
+  const categoriesKey = useMemo(() => {
+    if (!categories) return undefined;
+    try {
+      return JSON.stringify(categories);
+    } catch {
+      return `${categories.length}`;
+    }
+  }, [categories]);
 
   const previousDependenciesRef = useRef<ReadonlyArray<unknown> | undefined>(
     undefined
@@ -91,7 +100,7 @@ export function useAIContext(
     dumped,
     description,
     parentId,
-    categories,
+    categoriesKey,
     setContextItem,
     removeContextItem,
     priority,

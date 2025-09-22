@@ -1,8 +1,17 @@
+import { ThemeProvider } from "@/components/theme-provider";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Oxanium, Merriweather, Fira_Code } from "next/font/google";
+import {
+  Fira_Code,
+  Geist,
+  Geist_Mono,
+  Lora,
+  Merriweather,
+  Oxanium,
+  Plus_Jakarta_Sans,
+  Roboto_Mono,
+} from "next/font/google";
 import React from "react";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,6 +39,25 @@ const firaCode = Fira_Code({
   variable: "--font-fira-code",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
+});
+
+// Claymorphism theme fonts
+const plusJakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-plus-jakarta-sans",
+  subsets: ["latin"],
+  weight: ["200", "300", "400", "500", "600", "700", "800"],
+});
+
+const lora = Lora({
+  variable: "--font-lora",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const robotoMono = Roboto_Mono({
+  variable: "--font-roboto-mono",
+  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -67,7 +95,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${oxanium.variable} ${merriweather.variable} ${firaCode.variable}`}
+      className={`${geistSans.variable} ${geistMono.variable} ${oxanium.variable} ${merriweather.variable} ${firaCode.variable} ${plusJakartaSans.variable} ${lora.variable} ${robotoMono.variable}`}
     >
       <body className="antialiased">
         <ThemeProvider
@@ -75,7 +103,16 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
-          themes={['light', 'dark', 'system', 'solar-dusk', 'solar-dusk-dark', 'alt']}
+          themes={[
+            "light",
+            "dark",
+            "system",
+            "solar-dusk",
+            "solar-dusk-dark",
+            "alt",
+            "claymorphism",
+            "claymorphism-dark",
+          ]}
           storageKey="acb-theme"
         >
           {children}

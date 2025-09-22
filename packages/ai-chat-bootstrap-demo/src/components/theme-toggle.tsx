@@ -1,8 +1,8 @@
 "use client";
 
-import * as React from "react";
-import { Monitor, Moon, Sun, Palette, Sparkles } from "lucide-react";
+import { Monitor, Moon, Palette, Sparkles, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +38,9 @@ export function ThemeToggle() {
       case "solar-dusk":
       case "solar-dusk-dark":
         return <Palette className="h-4 w-4" />;
+      case "claymorphism":
+      case "claymorphism-dark":
+        return <Palette className="h-4 w-4" />;
       case "alt":
         return <Sparkles className="h-4 w-4" />;
       case "system":
@@ -56,6 +59,10 @@ export function ThemeToggle() {
         return "Solar Dusk";
       case "solar-dusk-dark":
         return "Solar Dusk Dark";
+      case "claymorphism":
+        return "Claymorphism";
+      case "claymorphism-dark":
+        return "Claymorphism Dark";
       case "alt":
         return "Alt";
       case "system":
@@ -93,6 +100,15 @@ export function ThemeToggle() {
         <DropdownMenuItem onClick={() => setTheme("solar-dusk-dark")}>
           <Palette className="mr-2 h-4 w-4" />
           Solar Dusk Dark
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => setTheme("claymorphism")}>
+          <Palette className="mr-2 h-4 w-4" />
+          Claymorphism Light
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("claymorphism-dark")}>
+          <Palette className="mr-2 h-4 w-4" />
+          Claymorphism Dark
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => setTheme("alt")}>

@@ -4,6 +4,7 @@
 @import "ai-chat-bootstrap/ai-chat.css";
 @import "../styles/theme-default.css";
 @import "../styles/theme-solar-dusk.css";
+@import "../styles/theme-claymorphism.css";
 
 @custom-variant dark (&:is(.dark *));
 

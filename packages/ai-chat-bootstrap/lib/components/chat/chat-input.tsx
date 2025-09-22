@@ -24,7 +24,10 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
 import type { ChatModelOption, FocusItem, Suggestion } from "../../types/chat";
+import type { CompressionController } from "../../types/compression";
 import { cn } from "../../utils";
+import { CompressionUsageIndicator } from "./compression-usage-indicator";
+import { CompressionArtifactsSheet } from "./compression-artifacts-sheet";
 
 // Pure suggestions button implementation
 interface PureSuggestionsButtonProps {
@@ -247,6 +250,7 @@ interface PureToolbarRightProps {
   suggestions?: Suggestion[];
   suggestionsCount?: number;
   onSuggestionClick?: (suggestion: Suggestion) => void;
+  compression?: CompressionController;
 }
 
 const PureToolbarRight = ({
@@ -257,9 +261,26 @@ const PureToolbarRight = ({
   suggestions = [],
   suggestionsCount = 3,
   onSuggestionClick,
+  compression,
 }: PureToolbarRightProps) => {
+  const compressionEnabled = Boolean(
+    compression &&
+      (compression.config?.enabled ||
+        compression.pinnedMessages.length > 0 ||
+        compression.artifacts.length > 0 ||
+        compression.usage)
+  );
+
   return (
-    <div className="flex gap-1">
+    <div className="flex items-center gap-1">
+      {compressionEnabled && (
+        <CompressionUsageIndicator compression={compression} />
+      )}
+
+      {compressionEnabled && (
+        <CompressionArtifactsSheet compression={compression} />
+      )}
+
       {enableSuggestions && (
         <SuggestionsButton
           suggestions={suggestions}
@@ -284,6 +305,7 @@ const ToolbarRight = memo(PureToolbarRight, (prevProps, nextProps) => {
   if (prevProps.enableSuggestions !== nextProps.enableSuggestions) return false;
   if (prevProps.suggestions !== nextProps.suggestions) return false;
   if (prevProps.suggestionsCount !== nextProps.suggestionsCount) return false;
+  if (prevProps.compression !== nextProps.compression) return false;
 
   // Skip function comparison for better performance
   return true;
@@ -319,6 +341,8 @@ export interface ChatInputProps {
   clearFocus?: (id: string) => void;
   error?: string | null;
   setError?: (error: string | null) => void;
+
+  compression?: CompressionController;
 }
 
 const ChatInputImpl = ({
@@ -349,6 +373,7 @@ const ChatInputImpl = ({
   clearFocus,
   error,
   setError,
+  compression,
 }: ChatInputProps) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -506,6 +531,7 @@ const ChatInputImpl = ({
             suggestions={suggestions}
             suggestionsCount={suggestionsCount}
             onSuggestionClick={onSuggestionClick}
+            compression={compression}
           />
         </PromptInputToolbar>
       </PromptInput>
@@ -527,6 +553,7 @@ export const ChatInput = memo(ChatInputImpl, (prevProps, nextProps) => {
   if (prevProps.models !== nextProps.models) return false;
   if (prevProps.suggestions !== nextProps.suggestions) return false;
   if (prevProps.allFocusItems !== nextProps.allFocusItems) return false;
+  if (prevProps.compression !== nextProps.compression) return false;
 
   // Function props - assume they're stable if parent is using useCallback correctly
   // Skip function comparison to avoid performance overhead

@@ -14,6 +14,7 @@ import React, {
 // z import removed - no longer needed without planning schemas
 import { useShallow } from "zustand/react/shallow";
 import {
+  useAICompressionStore,
   useAIContextStore,
   useAIFocusStore,
   useAIMCPServersStore,
@@ -26,14 +27,11 @@ import type { SerializedMCPServer } from "../stores/mcp";
 import type { SerializedTool } from "../stores/tools";
 // Planning types and schemas removed - using flow capture instead
 import type { ChatModelOption, ChatRequest } from "../types/chat";
+import type { CompressionConfig } from "../types/compression";
 import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
-import {
-  appendMessageBranchVersion,
-  getMessageBranchMetadata,
-  MESSAGE_BRANCH_METADATA_KEY,
-  type MessageBranchMetadata,
-} from "../utils/message-branches";
 import { useChainOfThought } from "./use-chain-of-thought";
+import { useAIChatCompression } from "./use-ai-chat-compression";
+import { useAIChatBranching } from "./use-ai-chat-branching";
 
 const EMPTY_MODEL_OPTIONS: ChatModelOption[] = [];
 
@@ -63,6 +61,7 @@ export interface UseAIChatOptions {
   threads?: ThreadsOptions;
   features?: {
     chainOfThought?: boolean;
+    branching?: boolean;
   };
   mcp?: {
     enabled?: boolean;
@@ -73,6 +72,7 @@ export interface UseAIChatOptions {
     available?: ChatModelOption[];
     initial?: string;
   };
+  compression?: CompressionConfig;
 }
 
 const isSerializedToolArray = (value: unknown): value is SerializedTool[] =>
@@ -101,6 +101,8 @@ const isSerializedMCPServerArray = (
 
 type ChatHelpers = ReturnType<typeof useChat>;
 
+export type { ChatHelpers };
+
 const hasAutoTitledFlag = (metadata?: Record<string, unknown>): boolean => {
   if (!metadata) return false;
   const flag = (metadata as { autoTitled?: unknown }).autoTitled;
@@ -114,6 +116,7 @@ export function useAIChat({
   features,
   mcp,
   models: modelsGroup,
+  compression: compressionOptions,
 }: UseAIChatOptions = {}) {
   const api = transport?.api ?? "/api/chat";
   const systemPrompt = messages?.systemPrompt;
@@ -122,6 +125,7 @@ export function useAIChat({
   const threadId = threadsGroup.id;
   const scopeKey = threadsGroup.scopeKey;
   const chainOfThoughtEnabled = features?.chainOfThought ?? false;
+  const branchingEnabled = features?.branching ?? false;
   const threadTitleOptions = threadsGroup.title;
   const threadTitleEnabled =
     threadTitleOptions?.enabled ?? Boolean(threadTitleOptions?.api);
@@ -144,6 +148,111 @@ export function useAIChat({
   );
   const setModelsInStore = useAIModelsStore((state) => state.setModels);
 
+  const compressionEnabled = compressionOptions?.enabled ?? false;
+
+  if (compressionEnabled) {
+    const missingContextWindow = incomingModels.filter((model) => {
+        const windowSize = model.contextWindowTokens;
+        return (
+          windowSize === undefined ||
+          windowSize === null ||
+          typeof windowSize !== "number" ||
+          !Number.isFinite(windowSize) ||
+          windowSize <= 0
+        );
+      });
+
+    if (missingContextWindow.length > 0) {
+      const missingIds = missingContextWindow
+        .map((model) => model.id ?? "<unknown>")
+        .join(", ");
+      throw new Error(
+        `[acb][useAIChat] compression is enabled but the following models are missing a valid contextWindowTokens value: ${missingIds}`
+      );
+    }
+  }
+
+  const activeModel = useMemo(() => {
+    if (models.length === 0) return null;
+    if (selectedModelId) {
+      const selected = models.find((model) => model.id === selectedModelId);
+      if (selected) {
+        return selected;
+      }
+    }
+    return models[0] ?? null;
+  }, [models, selectedModelId]);
+
+  const resolvedCompressionOptions = useMemo<CompressionConfig | undefined>(() => {
+    if (!compressionOptions) {
+      return compressionEnabled ? { enabled: true } : undefined;
+    }
+
+    const base: CompressionConfig = {
+      ...compressionOptions,
+      enabled: compressionOptions.enabled ?? compressionEnabled,
+    };
+
+    if (!base.enabled) {
+      return base;
+    }
+
+    const modelWindow = activeModel?.contextWindowTokens;
+    if (
+      base.maxTokenBudget === undefined &&
+      modelWindow !== undefined &&
+      modelWindow !== null
+    ) {
+      base.maxTokenBudget = modelWindow;
+    }
+
+    const modelThreshold = activeModel?.contextCompressionThreshold;
+    if (
+      base.compressionThreshold === undefined &&
+      modelThreshold !== undefined &&
+      modelThreshold !== null &&
+      typeof modelThreshold === "number" &&
+      Number.isFinite(modelThreshold)
+    ) {
+      base.compressionThreshold = Math.min(
+        Math.max(modelThreshold, 0),
+        1
+      );
+    }
+
+    return base;
+  }, [
+    compressionOptions,
+    compressionEnabled,
+    activeModel?.contextWindowTokens,
+    activeModel?.contextCompressionThreshold,
+  ]);
+
+  const compressionHelpers = useAIChatCompression({
+    compression: resolvedCompressionOptions,
+  });
+  const buildCompressionPayload = compressionHelpers.buildPayload;
+  const compressionController = compressionHelpers.controller;
+  const setCompressionModelMetadata =
+    compressionController.actions.setModelMetadata;
+
+  const compressionModelMetadata = useMemo(() => {
+    if (!resolvedCompressionOptions?.enabled || !activeModel) {
+      return null;
+    }
+
+    return {
+      modelId: activeModel.id,
+      modelLabel: activeModel.label,
+      contextWindowTokens: activeModel.contextWindowTokens ?? undefined,
+    } as const;
+  }, [
+    resolvedCompressionOptions?.enabled,
+    activeModel?.id,
+    activeModel?.label,
+    activeModel?.contextWindowTokens,
+  ]);
+
   useEffect(() => {
     const state = useAIModelsStore.getState();
     const currentModels = state.models;
@@ -156,7 +265,9 @@ export function useAIChat({
         return (
           model.id === incoming.id &&
           model.label === incoming.label &&
-          model.description === incoming.description
+          model.description === incoming.description &&
+          model.contextWindowTokens === incoming.contextWindowTokens &&
+          model.contextCompressionThreshold === incoming.contextCompressionThreshold
         );
       });
 
@@ -186,6 +297,37 @@ export function useAIChat({
   useEffect(() => {
     selectedModelRef.current = selectedModelId;
   }, [selectedModelId]);
+
+  useEffect(() => {
+    if (!setCompressionModelMetadata) return;
+
+    const currentMetadata = useAICompressionStore.getState().modelMetadata;
+
+    if (!compressionModelMetadata) {
+      if (currentMetadata !== null) {
+        setCompressionModelMetadata(null);
+      }
+      return;
+    }
+
+    const isSame =
+      currentMetadata?.modelId === compressionModelMetadata.modelId &&
+      currentMetadata?.modelLabel === compressionModelMetadata.modelLabel &&
+      currentMetadata?.contextWindowTokens ===
+        compressionModelMetadata.contextWindowTokens;
+
+    if (isSame) {
+      return;
+    }
+
+    setCompressionModelMetadata({
+      ...compressionModelMetadata,
+      lastUpdatedAt: Date.now(),
+    });
+  }, [
+    compressionModelMetadata,
+    setCompressionModelMetadata,
+  ]);
 
   const setModel = React.useCallback((modelId: string) => {
     useAIModelsStore.getState().setSelectedModelId(modelId);
@@ -514,6 +656,12 @@ export function useAIChat({
         });
         const combinedToolSummaries = Array.from(toolSummaryMap.values());
 
+        const compressionPayload = await buildCompressionPayload(
+          options.messages as UIMessage[]
+        );
+
+        const messagesForRequest = compressionPayload.messages;
+
         // Build enriched system prompt unless explicitly supplied
         const enrichedSystemPromptToSend =
           overrideEnrichedSystemPrompt ??
@@ -527,13 +675,19 @@ export function useAIChat({
 
         const body: ChatRequest & Record<string, unknown> = {
           ...callerBody,
-          messages: options.messages as UIMessage[],
+          messages: messagesForRequest,
           context: currentContext,
           tools: toolsToSend,
           mcpServers: mcpServersToSend,
           focus: currentFocusItems, // Send complete focus items
           systemPrompt: systemPromptToSend,
           enrichedSystemPrompt: enrichedSystemPromptToSend,
+        };
+
+        body.compression = {
+          pinnedMessageIds: compressionPayload.pinnedMessageIds,
+          artifactIds: compressionPayload.artifactIds,
+          survivingMessageIds: compressionPayload.survivingMessageIds,
         };
 
         if (overrideModel !== undefined) {
@@ -548,7 +702,7 @@ export function useAIChat({
         };
       },
     });
-  }, [api, chainOfThoughtEnabled]); // systemPrompt removed - now uses stable ref
+  }, [api, chainOfThoughtEnabled, buildCompressionPayload]);
 
   const [draftInput, setDraftInput] = useState("");
 
@@ -895,140 +1049,12 @@ export function useAIChat({
     [threadId, threadStore, chatHook.messages]
   );
 
-  const regenerateWithHistory = useCallback(
-    async (options?: { messageId?: string }) => {
-      const helper = chatHookRef.current ?? chatHook;
-      let targetIndex = -1;
-      let previousMetadata: MessageBranchMetadata | undefined;
-      let appendedMetadata: MessageBranchMetadata | undefined;
-
-      helper.setMessages((prevMessages) => {
-        if (!Array.isArray(prevMessages) || prevMessages.length === 0) {
-          return prevMessages;
-        }
-
-        const explicitId = options?.messageId;
-        let resolvedIndex = -1;
-
-        if (explicitId) {
-          resolvedIndex = prevMessages.findIndex((msg) => msg.id === explicitId);
-        }
-
-        if (resolvedIndex === -1) {
-          for (let i = prevMessages.length - 1; i >= 0; i -= 1) {
-            if (prevMessages[i]?.role === "assistant") {
-              resolvedIndex = i;
-              break;
-            }
-          }
-        }
-
-        if (resolvedIndex === -1) {
-          return prevMessages;
-        }
-
-        const targetMessage = prevMessages[resolvedIndex];
-        if (!targetMessage || targetMessage.role !== "assistant") {
-          return prevMessages;
-        }
-
-        if (!Array.isArray(targetMessage.parts) || targetMessage.parts.length === 0) {
-          return prevMessages;
-        }
-
-        const baseId = targetMessage.id ?? `assistant-${resolvedIndex}`;
-        const { updatedMessage } = appendMessageBranchVersion(
-          targetMessage,
-          (count) => `${baseId}::v${count + 1}`
-        );
-
-        targetIndex = resolvedIndex;
-        previousMetadata = getMessageBranchMetadata(targetMessage);
-        appendedMetadata = getMessageBranchMetadata(updatedMessage);
-
-        const nextMessages = prevMessages.slice();
-        nextMessages[resolvedIndex] = updatedMessage;
-        return nextMessages;
-      });
-
-      if (targetIndex === -1 || !appendedMetadata) {
-        return helper.regenerate(options);
-      }
-
-      const applyBranchMetadata = (messages: UIMessage[]) => {
-        if (!Array.isArray(messages) || targetIndex < 0 || targetIndex >= messages.length) {
-          return messages;
-        }
-        const nextMessages = messages.slice();
-        const targetMessage = nextMessages[targetIndex];
-        if (!targetMessage) {
-          return messages;
-        }
-        const metadata = {
-          ...(targetMessage.metadata ?? {}),
-          [MESSAGE_BRANCH_METADATA_KEY]: appendedMetadata,
-        };
-        nextMessages[targetIndex] = {
-          ...targetMessage,
-          metadata,
-        };
-        return nextMessages;
-      };
-
-      const restoreBranchMetadata = (messages: UIMessage[]) => {
-        if (!Array.isArray(messages) || targetIndex < 0 || targetIndex >= messages.length) {
-          return messages;
-        }
-        const nextMessages = messages.slice();
-        const targetMessage = nextMessages[targetIndex];
-        if (!targetMessage) {
-          return messages;
-        }
-        const metadata = { ...(targetMessage.metadata ?? {}) } as Record<string, unknown>;
-        if (previousMetadata && previousMetadata.versions.length > 0) {
-          metadata[MESSAGE_BRANCH_METADATA_KEY] = previousMetadata;
-        } else {
-          delete metadata[MESSAGE_BRANCH_METADATA_KEY];
-        }
-
-        const hasMetadata = Object.keys(metadata).length > 0;
-        nextMessages[targetIndex] = {
-          ...targetMessage,
-          metadata: hasMetadata ? metadata : undefined,
-        };
-        return nextMessages;
-      };
-
-      try {
-        const result = await helper.regenerate(options);
-
-        helper.setMessages((prev) => applyBranchMetadata(prev));
-
-        queueMicrotask(() => {
-          try {
-            persistMessagesIfChanged("regenerate-history");
-          } catch {
-            /* ignore */
-          }
-        });
-
-        return result;
-      } catch (error) {
-        helper.setMessages((prev) => restoreBranchMetadata(prev));
-
-        queueMicrotask(() => {
-          try {
-            persistMessagesIfChanged("regenerate-rollback");
-          } catch {
-            /* ignore */
-          }
-        });
-
-        throw error;
-      }
-    },
-    [chatHook, persistMessagesIfChanged]
-  );
+  const branching = useAIChatBranching({
+    enabled: branchingEnabled,
+    chatHook,
+    chatHookRef,
+    persistMessagesIfChanged,
+  });
 
   // Persist whenever messages settle and we are idle (not streaming/submitting)
   useEffect(() => {
@@ -1056,7 +1082,7 @@ export function useAIChat({
 
   return {
     ...chatHook,
-    regenerate: regenerateWithHistory,
+    regenerate: branching.regenerate,
     input: draftInput,
     setInput: setDraftInput,
     sendMessageWithContext,
@@ -1078,5 +1104,12 @@ export function useAIChat({
     threadId,
     scopeKey,
     chainOfThoughtEnabled,
+    compression: compressionController,
+    branching: branching.enabled
+      ? ({
+          enabled: true as const,
+          selectBranch: branching.selectBranch,
+        } as const)
+      : ({ enabled: false as const } as const),
   };
 }

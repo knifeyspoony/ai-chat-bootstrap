@@ -26,5 +26,11 @@ export type {
 } from "./types/chat";
 export type { AssistantAction, AssistantActionsConfig } from "./types/actions";
 
+export {
+  DEFAULT_COMPRESSION_THRESHOLD,
+  normalizeCompressionConfig,
+} from "./types/compression";
+export type { NormalizedCompressionConfig } from "./types/compression";
+
 // Optional: Variant helpers (CVA) for consumers wanting pure class composition
 export * from "./variants";

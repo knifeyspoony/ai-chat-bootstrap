@@ -16,9 +16,12 @@ import {
 } from "../../components/ai-elements/message";
 import { Badge } from "../../components/ui/badge";
 import type { AssistantActionsConfig } from "../../types/actions";
+import type { CompressionController } from "../../types/compression";
 import { cn } from "../../utils";
 import { AssistantMessage } from "./assistant-message";
+import { ChatMessagePinToggle } from "./chat-message-pin-toggle";
 import { ChatMessagePart } from "./chat-message-part";
+import { CompressionBanner } from "./compression-banner";
 
 export interface ChatMessagesProps {
   messages: UIMessage[];
@@ -32,6 +35,11 @@ export interface ChatMessagesProps {
   useChainOfThought?: boolean; // Feature flag to toggle between old and new UI
   assistantActionsClassName?: string;
   assistantActionsConfig?: AssistantActionsConfig;
+  compression?: CompressionController;
+  branching?: {
+    enabled: boolean;
+    selectBranch?: (messageId: string, branchId: string) => void;
+  };
 }
 
 export interface ChatMessagesHandle {
@@ -50,6 +58,8 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
       userAvatar,
       assistantActionsClassName,
       assistantActionsConfig,
+      compression,
+      branching,
     },
     ref
   ) => {
@@ -98,6 +108,17 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
 
     const lastMessage = messages[messages.length - 1];
 
+    const compressionConfig = compression?.config;
+    const compressionEnabled = Boolean(compressionConfig?.enabled);
+    const pinnedMessages = compression?.pinnedMessages;
+    const pinnedSet = useMemo(() => {
+      const pins = pinnedMessages ?? [];
+      const ids = pins
+        .map((pin) => pin.message.id)
+        .filter((id): id is string => Boolean(id));
+      return new Set(ids);
+    }, [pinnedMessages]);
+
     return (
       <Conversation className={cn("flex-1 text-left", className)}>
         <ConversationContent>
@@ -112,6 +133,21 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                 if (message.role === "assistant") {
                   const isLatestAssistantMessage =
                     index === latestAssistantIndex;
+                  const messageId = message.id;
+                  const canTogglePin =
+                    compressionEnabled && typeof messageId === "string";
+                  const isPinned =
+                    canTogglePin && messageId && pinnedSet.has(messageId);
+                  const togglePin = () => {
+                    if (!compression || !messageId) return;
+                    if (isPinned) {
+                      compression.actions.unpinMessage(messageId);
+                    } else {
+                      compression.actions.pinMessage(message, {
+                        pinnedBy: "user",
+                      });
+                    }
+                  };
                   return (
                     <AssistantMessage
                       key={message.id ?? index}
@@ -123,9 +159,33 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                       isLatestAssistant={isLatestAssistantMessage}
                       actionsClassName={assistantActionsClassName}
                       actionsConfig={assistantActionsConfig}
+                      branching={branching}
+                      pinState={
+                        canTogglePin
+                          ? {
+                              pinned: Boolean(isPinned),
+                              toggle: togglePin,
+                            }
+                          : undefined
+                      }
                     />
                   );
                 }
+                const messageId = message.id;
+                const canTogglePin =
+                  compressionEnabled && typeof messageId === "string";
+                const isPinned =
+                  canTogglePin && messageId && pinnedSet.has(messageId);
+                const togglePin = () => {
+                  if (!compression || !messageId) return;
+                  if (isPinned) {
+                    compression.actions.unpinMessage(messageId);
+                  } else {
+                    compression.actions.pinMessage(message, {
+                      pinnedBy: "user",
+                    });
+                  }
+                };
                 return (
                   <ChatMessageItem
                     key={message.id ?? index}
@@ -134,9 +194,23 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                     assistantAvatar={assistantAvatar}
                     userAvatar={userAvatar}
                     messageClassName={messageClassName}
+                    pinState={
+                      canTogglePin
+                        ? {
+                            pinned: Boolean(isPinned),
+                            toggle: togglePin,
+                          }
+                        : undefined
+                    }
                   />
                 );
               })}
+          {compression?.snapshot && (
+            <CompressionBanner
+              snapshot={compression.snapshot}
+              usage={compression.usage}
+            />
+          )}
           {isLoading && !lastMessage && (
             <Message
               from="assistant"
@@ -195,6 +269,10 @@ interface ChatMessageItemProps {
   assistantAvatar?: string;
   userAvatar?: string;
   messageClassName?: string;
+  pinState?: {
+    pinned: boolean;
+    toggle: () => void;
+  };
 }
 
 const ChatMessageItem = React.memo(
@@ -204,6 +282,7 @@ const ChatMessageItem = React.memo(
     assistantAvatar,
     userAvatar,
     messageClassName,
+    pinState,
   }: ChatMessageItemProps) {
     const isUser = message.role === "user";
     const isSystem = message.role === "system";
@@ -226,11 +305,14 @@ const ChatMessageItem = React.memo(
       );
     }
 
+    const showPinToggle = Boolean(pinState);
+
     return (
       <Message
         from={message.role}
         data-acb-part="message"
         data-role={message.role}
+        data-acb-pinned={pinState?.pinned ? "" : undefined}
         className={cn(
           "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-assistant-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-assistant-fg)]",
           message.role === "user" &&
@@ -240,18 +322,27 @@ const ChatMessageItem = React.memo(
           messageClassName
         )}
       >
-        <MessageContent
-          data-acb-part="message-content"
-          className={cn("rounded-[var(--acb-chat-message-radius)]")}
-        >
-          {message.parts?.map((part, partIndex: number) => (
-            <ChatMessagePart
-              key={partIndex}
-              part={part}
-              streaming={isStreaming}
+        <div className="relative">
+          {showPinToggle && (
+            <ChatMessagePinToggle
+              side={isUser ? "left" : "right"}
+              pinned={Boolean(pinState?.pinned)}
+              onClick={pinState?.toggle}
             />
-          ))}
-        </MessageContent>
+          )}
+          <MessageContent
+            data-acb-part="message-content"
+            className={cn("rounded-[var(--acb-chat-message-radius)]")}
+          >
+            {message.parts?.map((part, partIndex: number) => (
+              <ChatMessagePart
+                key={partIndex}
+                part={part}
+                streaming={isStreaming}
+              />
+            ))}
+          </MessageContent>
+        </div>
         <MessageAvatar
           data-acb-part="message-avatar"
           name={isUser ? "You" : "Assistant"}
@@ -273,6 +364,7 @@ const ChatMessageItem = React.memo(
       prev.assistantAvatar === next.assistantAvatar &&
       prev.userAvatar === next.userAvatar &&
       prev.messageClassName === next.messageClassName &&
+      prev.pinState?.pinned === next.pinState?.pinned &&
       isEqual(prev.message.parts, next.message.parts)
     );
   }

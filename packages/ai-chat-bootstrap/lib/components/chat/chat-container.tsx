@@ -38,6 +38,9 @@ const ThreadsDropdownWrapper: React.FC<{
 export interface ChatContainerProps extends UseAIChatOptions {
   "data-acb-unstyled"?: "" | boolean;
 
+  /** Convenience toggle for assistant branching. Mirrors `features.branching`. */
+  enableBranching?: boolean;
+
   // ==========================================
   // UI CONFIGURATION
   // ==========================================
@@ -133,10 +136,12 @@ function ChatContainerView(props: ChatContainerViewProps) {
     threadId,
     scopeKey,
     chainOfThoughtEnabled,
+    branching,
     mcpEnabled,
     sendMessageWithContext,
     sendAICommandMessage,
     regenerate,
+    compression,
   } = chat;
 
   // Ref to control scrolling programmatically
@@ -309,6 +314,8 @@ function ChatContainerView(props: ChatContainerViewProps) {
         useChainOfThought={chainOfThoughtEnabled}
         assistantActionsClassName={ui?.classes?.assistantActions}
         assistantActionsConfig={assistantActionsConfig}
+        compression={compression}
+        branching={branching}
       />
 
       <div
@@ -347,6 +354,7 @@ function ChatContainerView(props: ChatContainerViewProps) {
           clearFocus={clearFocus}
           error={error}
           setError={setError}
+          compression={compression}
         />
       </div>
     </div>
@@ -359,18 +367,31 @@ function ChatContainerImpl(props: ChatContainerProps) {
     messages: messagesOptions,
     threads: threadsOptions,
     features,
+    enableBranching,
     mcp,
     models: modelsOptions,
+    compression: compressionOptions,
     ...uiProps
   } = props;
+
+  const mergedFeatures = useMemo(() => {
+    if (enableBranching === undefined) {
+      return features;
+    }
+    return {
+      ...features,
+      branching: enableBranching,
+    } as ChatContainerProps["features"];
+  }, [features, enableBranching]);
 
   const chat = useAIChat({
     transport,
     messages: messagesOptions,
     threads: threadsOptions,
-    features,
+    features: mergedFeatures,
     mcp,
     models: modelsOptions,
+    compression: compressionOptions,
   });
 
   return <ChatContainerView {...uiProps} threads={threadsOptions} chat={chat} />;
@@ -415,8 +436,12 @@ export const ChatContainer = React.memo(ChatContainerImpl, (prev, next) => {
   if ((prevTitle?.sampleCount ?? 0) !== (nextTitle?.sampleCount ?? 0))
     return false;
 
+  if ((prev.enableBranching ?? false) !== (next.enableBranching ?? false))
+    return false;
+
   if (prev.features?.chainOfThought !== next.features?.chainOfThought)
     return false;
+  if (prev.features?.branching !== next.features?.branching) return false;
 
   if (prev.mcp?.enabled !== next.mcp?.enabled) return false;
   if (prev.mcp?.api !== next.mcp?.api) return false;

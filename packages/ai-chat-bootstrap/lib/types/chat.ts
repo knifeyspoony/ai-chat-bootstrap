@@ -7,6 +7,8 @@ export interface ChatModelOption {
   id: string;
   label?: string;
   description?: string;
+  contextWindowTokens?: number;
+  contextCompressionThreshold?: number;
 }
 
 /**
@@ -50,6 +52,14 @@ export interface ChatRequest {
    * should dispatch the request using this model instead of its default.
    */
   model?: string;
+  /**
+   * Compression metadata describing how the payload was constructed on the client.
+   */
+  compression?: {
+    pinnedMessageIds: string[];
+    artifactIds: string[];
+    survivingMessageIds: string[];
+  };
   /**
    * Structured context list (already normalized & optionally priority-sorted).
    */

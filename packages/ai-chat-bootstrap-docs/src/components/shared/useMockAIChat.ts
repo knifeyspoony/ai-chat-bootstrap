@@ -147,6 +147,8 @@ export function useMockAIChat(options: MockChatOptions = {}): MockChat {
     mcpEnabled: false,
     threadId: undefined,
     scopeKey: undefined,
+    compression: undefined,
+    branching: { enabled: false as const },
 
     // Utility functions for tests
     setIsLoading,

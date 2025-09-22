@@ -1,0 +1,202 @@
+// @vitest-environment jsdom
+import React from 'react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, fireEvent, within } from '@testing-library/react';
+
+import { CompressionBanner } from '../lib/components/chat/compression-banner';
+import { CompressionUsageIndicator } from '../lib/components/chat/compression-usage-indicator';
+import { CompressionArtifactsSheet } from '../lib/components/chat/compression-artifacts-sheet';
+import { ChatInput } from '../lib/components/chat/chat-input';
+import type {
+  CompressionArtifact,
+  CompressionController,
+  CompressionSnapshot,
+  CompressionUsage,
+} from '../lib/types/compression';
+
+function makeCompressionController(overrides: Partial<CompressionController> = {}): CompressionController {
+  const noop = () => {};
+  return {
+    config: { enabled: true, maxTokenBudget: 1000, compressionThreshold: 0.8, pinnedMessageLimit: null },
+    pinnedMessages: [],
+    artifacts: [],
+    events: [],
+    usage: null,
+    metadata: null,
+    snapshot: null,
+    shouldCompress: false,
+    overBudget: false,
+    actions: {
+      pinMessage: noop,
+      setPinnedMessages: noop,
+      unpinMessage: noop,
+      clearPinnedMessages: noop,
+      addArtifact: noop,
+      updateArtifact: noop,
+      removeArtifact: noop,
+      setArtifacts: noop,
+      clearArtifacts: noop,
+      recordEvent: noop,
+      setModelMetadata: noop,
+      setUsage: noop,
+      setSnapshot: noop,
+    },
+    ...overrides,
+  };
+}
+
+describe('Compression UI components', () => {
+  it('renders compression banner with snapshot details', () => {
+    const snapshot: CompressionSnapshot = {
+      id: 'snap-1',
+      createdAt: Date.UTC(2025, 1, 16, 12, 30),
+      survivingMessageIds: [],
+      artifactIds: ['a1', 'a2'],
+      tokensBefore: 1200,
+      tokensAfter: 800,
+      tokensSaved: 400,
+      reason: 'over-budget',
+    };
+    const usage: CompressionUsage = {
+      totalTokens: 800,
+      pinnedTokens: 100,
+      artifactTokens: 120,
+      survivingTokens: 580,
+      updatedAt: Date.now(),
+    };
+
+    const { getByText } = render(
+      <CompressionBanner snapshot={snapshot} usage={usage} />
+    );
+
+    expect(getByText(/Context Compressed/i)).toBeTruthy();
+    expect(getByText(/400 tokens/i)).toBeTruthy();
+    expect(getByText(/Artifacts/)).toBeTruthy();
+  });
+
+  it('shows over budget label in usage indicator', () => {
+    const compression = makeCompressionController({
+      overBudget: true,
+      usage: {
+        totalTokens: 1200,
+        pinnedTokens: 200,
+        artifactTokens: 100,
+        survivingTokens: 900,
+        remainingTokens: -200,
+        budget: 1000,
+        updatedAt: Date.now(),
+      },
+    });
+
+    const { getByTitle } = render(
+      <CompressionUsageIndicator compression={compression} />
+    );
+
+    expect(getByTitle(/view compression usage/i).textContent).toContain('Over budget');
+  });
+
+  it('surfaces compression errors in the usage indicator', () => {
+    const compression = makeCompressionController({
+      events: [
+        {
+          id: 'error-1',
+          type: 'error',
+          timestamp: Date.now(),
+          level: 'error',
+          message: 'Summarizer failed',
+          payload: { phase: 'summarizer' },
+        },
+      ],
+    });
+
+    const { getByTitle, getByRole } = render(
+      <CompressionUsageIndicator compression={compression} />
+    );
+
+    const trigger = getByTitle(/compression error/i);
+    expect(trigger.textContent).toContain('Compression error');
+
+    fireEvent.click(trigger);
+
+    const dialog = getByRole('dialog');
+    const dialogUtils = within(dialog);
+    expect(dialogUtils.getByText(/Compression error/)).toBeTruthy();
+    expect(dialogUtils.getByText(/Summarizer failed/)).toBeTruthy();
+    expect(dialogUtils.getByText(/Phase: summarizer/i)).toBeTruthy();
+  });
+
+  it('renders artifact sheet button with badge and triggers updates', () => {
+    const updateArtifact = vi.fn();
+    const removeArtifact = vi.fn();
+    const artifacts: CompressionArtifact[] = [
+      {
+        id: 'artifact-1',
+        title: 'Summary',
+        summary: 'Original summary',
+        category: 'summary',
+        createdAt: Date.now(),
+        editable: true,
+      },
+    ];
+
+    const compression = makeCompressionController({
+      artifacts,
+      actions: {
+        ...makeCompressionController().actions,
+        updateArtifact,
+        removeArtifact,
+      },
+    });
+
+    const { getByTitle, getByPlaceholderText, getByText } = render(
+      <CompressionArtifactsSheet compression={compression} />
+    );
+
+    const trigger = getByTitle(/open compression artifacts/i);
+    expect(trigger.textContent).toContain('1');
+
+    fireEvent.click(trigger);
+
+    const summaryField = getByPlaceholderText(/Describe the condensed/i) as HTMLTextAreaElement;
+    fireEvent.change(summaryField, { target: { value: 'Edited summary' } });
+
+    const saveButton = getByTitle(/save changes/i);
+    fireEvent.click(saveButton);
+
+    expect(updateArtifact).toHaveBeenCalledWith('artifact-1', expect.objectContaining({ summary: 'Edited summary' }));
+
+    const deleteButton = getByTitle(/delete artifact/i);
+    fireEvent.click(deleteButton);
+    expect(removeArtifact).toHaveBeenCalledWith('artifact-1');
+  });
+
+  it('renders compression controls inside ChatInput when compression is provided', () => {
+    const compression = makeCompressionController({
+      usage: {
+        totalTokens: 300,
+        pinnedTokens: 50,
+        artifactTokens: 40,
+        survivingTokens: 210,
+        budget: 1000,
+        remainingTokens: 700,
+        updatedAt: Date.now(),
+      },
+    });
+
+    const { getByTitle } = render(
+      <ChatInput
+        value="hello"
+        onChange={() => {}}
+        onSubmit={() => {}}
+        compression={compression}
+        enableSuggestions={false}
+        suggestions={[]}
+        suggestionsCount={3}
+        allFocusItems={[]}
+      />
+    );
+
+    expect(getByTitle(/view compression usage/i)).toBeTruthy();
+    expect(getByTitle(/open compression artifacts/i)).toBeTruthy();
+  });
+});

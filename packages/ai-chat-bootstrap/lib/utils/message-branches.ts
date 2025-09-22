@@ -10,6 +10,7 @@ export interface MessageBranchVersion {
 
 export interface MessageBranchMetadata {
   versions: MessageBranchVersion[];
+  sequence?: number;
 }
 
 function isMessageBranchVersion(candidate: unknown): candidate is MessageBranchVersion {
@@ -27,12 +28,25 @@ export function getMessageBranchMetadata(message: UIMessage): MessageBranchMetad
   if (!metadata) return undefined;
   const raw = metadata[MESSAGE_BRANCH_METADATA_KEY];
   if (!raw || typeof raw !== "object") return undefined;
-  const rawVersions = (raw as { versions?: unknown }).versions;
+  const rawRecord = raw as {
+    versions?: unknown;
+    sequence?: unknown;
+  };
+  const rawVersions = rawRecord.versions;
   if (!Array.isArray(rawVersions)) return undefined;
 
   const versions = rawVersions.filter(isMessageBranchVersion);
   if (versions.length === 0) return undefined;
-  return { versions };
+
+  const sequence = rawRecord.sequence;
+  const normalizedSequence =
+    typeof sequence === "number" && Number.isFinite(sequence)
+      ? sequence
+      : undefined;
+
+  return normalizedSequence !== undefined
+    ? { versions, sequence: normalizedSequence }
+    : { versions };
 }
 
 function cloneParts(parts: UIMessage["parts"]): UIMessage["parts"] {
@@ -50,14 +64,20 @@ export function appendMessageBranchVersion(
   const existing = getMessageBranchMetadata(message);
   const versions = existing?.versions ?? [];
 
+  const baseSequence =
+    typeof existing?.sequence === "number" && Number.isFinite(existing.sequence)
+      ? existing.sequence
+      : versions.length;
+
   const nextVersion: MessageBranchVersion = {
-    id: createId(versions.length),
+    id: createId(baseSequence),
     parts: cloneParts(message.parts),
     timestamp: Date.now(),
   };
 
   const metadata: MessageBranchMetadata = {
     versions: [...versions, nextVersion],
+    sequence: baseSequence + 1,
   };
 
   return {
@@ -69,6 +89,102 @@ export function appendMessageBranchVersion(
         [MESSAGE_BRANCH_METADATA_KEY]: metadata,
       },
     },
+  };
+}
+
+export interface PromoteMessageBranchOptions {
+  createId?: (versionCount: number) => string;
+  timestamp?: number;
+}
+
+export interface PromoteMessageBranchResult {
+  updatedMessage: UIMessage;
+  changed: boolean;
+}
+
+const DEFAULT_BRANCH_VERSION_ID = (message: UIMessage) => {
+  const baseId = message.id ?? "assistant";
+  return (versionCount: number) => `${baseId}::v${versionCount + 1}`;
+};
+
+function ensureUniqueVersionId(
+  candidate: string,
+  existing: MessageBranchVersion[]
+): string {
+  if (!existing.some((version) => version.id === candidate)) {
+    return candidate;
+  }
+  let suffix = 1;
+  let nextId = `${candidate}::alt-${suffix}`;
+  while (existing.some((version) => version.id === nextId)) {
+    suffix += 1;
+    nextId = `${candidate}::alt-${suffix}`;
+  }
+  return nextId;
+}
+
+export function promoteMessageBranch(
+  message: UIMessage,
+  branchId: string,
+  options: PromoteMessageBranchOptions = {}
+): PromoteMessageBranchResult {
+  if (!message) {
+    return { updatedMessage: message, changed: false };
+  }
+
+  if (!branchId || branchId === message.id) {
+    return { updatedMessage: message, changed: false };
+  }
+
+  const metadata = getMessageBranchMetadata(message);
+  if (!metadata || metadata.versions.length === 0) {
+    return { updatedMessage: message, changed: false };
+  }
+
+  const promotedIndex = metadata.versions.findIndex(
+    (version) => version.id === branchId
+  );
+  if (promotedIndex === -1) {
+    return { updatedMessage: message, changed: false };
+  }
+
+  const promotedVersion = metadata.versions[promotedIndex];
+  const remainingVersions = metadata.versions.filter(
+    (version) => version.id !== branchId
+  );
+
+  const baseSequence =
+    typeof metadata.sequence === "number" && Number.isFinite(metadata.sequence)
+      ? metadata.sequence
+      : metadata.versions.length;
+
+  const createId = options.createId ?? DEFAULT_BRANCH_VERSION_ID(message);
+  const timestamp = options.timestamp ?? Date.now();
+
+  const generatedId = createId(baseSequence);
+  const demotedVersion: MessageBranchVersion = {
+    id: ensureUniqueVersionId(generatedId, remainingVersions),
+    parts: cloneParts(message.parts),
+    timestamp,
+  };
+
+  const nextMetadata: MessageBranchMetadata = {
+    versions: [...remainingVersions, demotedVersion],
+    sequence: baseSequence + 1,
+  };
+
+  const updatedMessage: UIMessage = {
+    ...message,
+    parts: cloneParts(promotedVersion.parts),
+    metadata: {
+      ...(message.metadata ?? {}),
+      [MESSAGE_BRANCH_METADATA_KEY]: nextMetadata,
+    },
+  };
+
+  return {
+    updatedMessage,
+    changed: true,
   };
 }
 

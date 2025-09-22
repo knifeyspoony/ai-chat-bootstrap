@@ -1,5 +1,5 @@
 import { GripVerticalIcon, MessageCircleIcon, XIcon } from "lucide-react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChatContainer,
   type ChatContainerProps,
@@ -40,8 +40,10 @@ export function ChatPopout(props: ChatPopoutProps) {
     transport,
     messages: messagesOptions,
     features,
+    enableBranching,
     mcp,
     models: modelsOptions,
+    compression: compressionOptions,
     // UI configuration props
     header,
     ui,
@@ -67,6 +69,16 @@ export function ChatPopout(props: ChatPopoutProps) {
   const popoutClassName = popout?.className;
   const contentClassName = popout?.contentClassName;
   const isPermanent = popout?.permanent ?? false;
+
+  const mergedFeatures = useMemo(() => {
+    if (enableBranching === undefined) {
+      return features;
+    }
+    return {
+      ...features,
+      branching: enableBranching,
+    } as ChatPopoutProps["features"];
+  }, [features, enableBranching]);
 
   // Button config with defaults
   const showToggleButton = button?.show ?? true;
@@ -148,9 +160,11 @@ export function ChatPopout(props: ChatPopoutProps) {
     // Pass through AI configuration
     transport,
     messages: messagesOptions,
-    features,
+    features: mergedFeatures,
+    enableBranching,
     mcp,
     models: modelsOptions,
+    compression: compressionOptions,
     "data-acb-unstyled": unstyledProp,
     header: {
       ...header,

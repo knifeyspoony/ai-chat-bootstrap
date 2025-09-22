@@ -14,8 +14,10 @@ import {
   TooltipTrigger,
 } from "lib/components/ui/tooltip";
 import { MoreVertical } from "lucide-react";
-import type { ComponentProps, ReactElement } from "react";
+import type { ComponentProps, MouseEvent, ReactElement } from "react";
 import { cn } from "../../utils";
+
+type ButtonClickEvent = Parameters<NonNullable<ComponentProps<typeof Button>["onClick"]>>[0];
 
 export type ActionsProps = ComponentProps<"div"> & {
   maxVisible?: number;
@@ -64,11 +66,15 @@ export const Actions = ({
             const label = actionProps.label;
             const onClick = actionProps.onClick;
             const disabled = actionProps.disabled;
+            const handleOverflowClick = (event: MouseEvent<HTMLDivElement>) => {
+              if (!onClick) return;
+              onClick(event as unknown as ButtonClickEvent);
+            };
 
             return (
               <DropdownMenuItem
                 key={`overflow-${index}`}
-                onClick={(e) => onClick?.(e as any)}
+                onClick={handleOverflowClick}
                 disabled={disabled}
                 className="flex items-center gap-2"
               >

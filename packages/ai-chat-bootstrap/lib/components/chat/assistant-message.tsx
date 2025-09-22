@@ -6,6 +6,7 @@ import {
   MessageAvatar,
   MessageContent,
 } from "../../components/ai-elements/message";
+import { useAIBranchesStore } from "../../stores";
 import type { AssistantActionsConfig } from "../../types/actions";
 import { cn } from "../../utils";
 import {
@@ -21,6 +22,7 @@ import { buildAssistantBranchEntries } from "./assistant-branches";
 import { getAssistantMessageSegments } from "./assistant-message-segments";
 import { ChatChainOfThought } from "./chat-chain-of-thought";
 import { ChatMessagePart } from "./chat-message-part";
+import { ChatMessagePinToggle } from "./chat-message-pin-toggle";
 
 interface AssistantMessageProps {
   message: UIMessage;
@@ -33,6 +35,14 @@ interface AssistantMessageProps {
   actionsClassName?: string;
   isLatestAssistant?: boolean;
   actionsConfig?: AssistantActionsConfig;
+  pinState?: {
+    pinned: boolean;
+    toggle: () => void;
+  };
+  branching?: {
+    enabled: boolean;
+    selectBranch?: (messageId: string, branchId: string) => void;
+  };
 }
 
 const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
@@ -46,7 +56,25 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
   actionsClassName,
   isLatestAssistant,
   actionsConfig,
+  pinState,
+  branching,
 }) => {
+  const branchingEnabled = branching?.enabled ?? false;
+  const messageId = message.id;
+
+  const selectedBranchId = useAIBranchesStore((state) =>
+    messageId ? state.selection.get(messageId) : undefined
+  );
+
+  useEffect(() => {
+    if (!branchingEnabled) return;
+    if (!messageId) return;
+    const store = useAIBranchesStore.getState();
+    if (!store.selection.has(messageId)) {
+      store.setSelectedBranch(messageId, messageId);
+    }
+  }, [branchingEnabled, messageId]);
+
   const renderMessageBody = useCallback(
     (
       baseMessage: UIMessage,
@@ -63,18 +91,21 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
         return null;
       }
 
+      const showPinToggle = Boolean(pinState);
+
       return (
         <Message
           from="assistant"
           data-acb-part="message"
           data-role="assistant"
+          data-acb-pinned={pinState?.pinned ? "" : undefined}
           className={cn(
             "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-assistant-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-assistant-fg)]",
             messageClassName,
             "m-0"
           )}
         >
-          <div className="flex w-full flex-col gap-3">
+          <div className="relative flex w-full flex-col gap-3">
             {hasChainOfThought && (
               <div className="w-full overflow-x-auto">
                 <ChatChainOfThought
@@ -87,18 +118,30 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
             )}
 
             {hasRegularContent && (
-              <MessageContent
-                data-acb-part="message-content"
-                className="rounded-[var(--acb-chat-message-radius)]"
-              >
-                {visibleRegularParts.map((part, partIndex) => (
-                  <ChatMessagePart
-                    key={partIndex}
-                    part={part}
-                    streaming={options.streaming}
-                  />
-                ))}
-              </MessageContent>
+              <div className="flex items-start gap-2 w-full">
+                <MessageContent
+                  data-acb-part="message-content"
+                  className="rounded-[var(--acb-chat-message-radius)] flex-1"
+                >
+                  {visibleRegularParts.map((part, partIndex) => (
+                    <ChatMessagePart
+                      key={partIndex}
+                      part={part}
+                      streaming={options.streaming}
+                    />
+                  ))}
+                </MessageContent>
+                {showPinToggle && (
+                  <div className="flex items-center h-full pt-2">
+                    <ChatMessagePinToggle
+                      side="right"
+                      pinned={Boolean(pinState?.pinned)}
+                      onPressedChange={() => pinState?.toggle()}
+                      inline
+                    />
+                  </div>
+                )}
+              </div>
             )}
           </div>
           <MessageAvatar
@@ -109,7 +152,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
         </Message>
       );
     },
-    [assistantAvatar, messageClassName]
+    [assistantAvatar, messageClassName, pinState]
   );
 
   const branchEntries = useMemo(
@@ -125,8 +168,12 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
 
   const branchCount = branchEntries.length;
 
+  const resolvedBranchId = branchingEnabled
+    ? selectedBranchId ?? message.id
+    : message.id;
+
   const defaultBranchIndexRaw = branchEntries.findIndex(
-    (entry) => entry.message.id === message.id
+    (entry) => entry.message.id === resolvedBranchId
   );
   const defaultBranchIndex =
     defaultBranchIndexRaw === -1 && branchCount > 0
@@ -141,17 +188,13 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
     setActiveBranchIndex(defaultBranchIndex);
   }, [branchKey, defaultBranchIndex]);
 
-  if (branchCount === 0) {
-    return null;
-  }
-
   const safeActiveIndex = Math.min(
     Math.max(activeBranchIndex, 0),
     branchCount - 1
   );
 
   const effectiveMessage = branchEntries[safeActiveIndex]?.message ?? message;
-  const showBranchSelector = branchCount > 1;
+  const showBranchSelector = branchingEnabled && branchCount > 1;
 
   const hasSharedActions = Boolean(actions);
   const hasLatestActions = Boolean(latestActions);
@@ -238,11 +281,38 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
     (showAnyActions || showBranchSelector) && "[&>div]:pb-0"
   );
 
+  const handleBranchChange = useCallback(
+    (nextIndex: number) => {
+      if (isStreaming) return;
+      setActiveBranchIndex(nextIndex);
+      if (!branchingEnabled) return;
+      if (!branching?.selectBranch) return;
+      if (!messageId) return;
+      const target = branchEntries[nextIndex];
+      const targetId = target?.message.id;
+      if (!targetId) return;
+      branching.selectBranch(messageId, targetId);
+    },
+    [branchEntries, branching, branchingEnabled, isStreaming, messageId]
+  );
+
+  const canonicalContent = useMemo(() => {
+    if (branchEntries.length === 0) return null;
+    return (
+      branchEntries.find((entry) => entry.message.id === message.id) ??
+      branchEntries[branchEntries.length - 1]
+    )?.content;
+  }, [branchEntries, message.id]);
+
+  if (branchCount === 0) {
+    return null;
+  }
+
   const messageContent = showBranchSelector ? (
     <Branch
       key={branchKey}
       defaultBranch={defaultBranchIndex}
-      onBranchChange={setActiveBranchIndex}
+      onBranchChange={handleBranchChange}
       className="flex flex-col gap-0"
     >
       <BranchMessages>
@@ -254,7 +324,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
     </Branch>
   ) : (
     <>
-      {branchEntries[0]?.content ?? null}
+      {canonicalContent}
       {renderControlsRow(false)}
     </>
   );
@@ -269,7 +339,8 @@ export const AssistantMessage = React.memo(
     if (
       prev.message === next.message &&
       prev.isStreaming === next.isStreaming &&
-      prev.isLatestAssistant === next.isLatestAssistant
+      prev.isLatestAssistant === next.isLatestAssistant &&
+      prev.pinState?.pinned === next.pinState?.pinned
     )
       return true;
 
@@ -285,6 +356,7 @@ export const AssistantMessage = React.memo(
       prev.actions === next.actions &&
       prev.latestActions === next.latestActions &&
       prev.actionsConfig === next.actionsConfig &&
+      prev.pinState?.pinned === next.pinState?.pinned &&
       isEqual(prev.message.parts, next.message.parts) &&
       isEqual(prev.message.metadata, next.message.metadata)
     );

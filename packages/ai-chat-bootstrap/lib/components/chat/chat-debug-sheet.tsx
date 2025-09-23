@@ -116,8 +116,8 @@ export function ChatDebugSheet({ open, onOpenChange }: ChatDebugSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        side="right"
-        className="flex h-full w-[800px] max-w-[90vw] flex-col gap-6 overflow-hidden px-6 sm:max-w-[800px]"
+        side="top"
+        className="flex h-full max-h-full w-full flex-col gap-6 overflow-hidden px-6"
       >
         <SheetHeader className="gap-2 pb-2">
           <SheetTitle>Chat Debug Info</SheetTitle>

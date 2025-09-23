@@ -1,5 +1,11 @@
 import type { UIMessage } from "ai";
-import React, { useCallback, useDeferredValue, useMemo, useRef } from "react";
+import React, {
+  useCallback,
+  useDeferredValue,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useShallow } from "zustand/react/shallow";
 import { ChatInputWithCommands } from "../../components/chat/chat-input-with-commands";
 import {
@@ -22,6 +28,7 @@ import { ChatThreadsButton } from "./chat-threads-button";
 import { McpServersButton } from "./mcp-servers-button";
 
 import { ChatHeader } from "./chat-header";
+import { SheetPortalProvider } from "../ui/sheet-context";
 
 // Lazily load the debug button (development only) so it is tree-shaken away in production
 const LazyChatDebugButton = React.lazy(async () =>
@@ -146,6 +153,12 @@ function ChatContainerView(props: ChatContainerViewProps) {
 
   // Ref to control scrolling programmatically
   const messagesRef = useRef<ChatMessagesHandle | null>(null);
+  const [sheetContainer, setSheetContainer] = useState<HTMLDivElement | null>(
+    null
+  );
+  const chatContainerRef = useCallback((node: HTMLDivElement | null) => {
+    setSheetContainer((prev) => (prev === node ? prev : node));
+  }, []);
 
   // Defer non-critical updates to prevent input lag
   const deferredMessages = useDeferredValue(messages);
@@ -279,85 +292,88 @@ function ChatContainerView(props: ChatContainerViewProps) {
   // Unstyled mode: if any ancestor or this component has data-acb-unstyled, suppress base chrome classes
   const isUnstyled = unstyledProp === "" || unstyledProp === true;
   return (
-    <div
-      data-acb-part="container"
-      className={cn(
-        !isUnstyled &&
-          "flex flex-col h-full overflow-hidden min-w-0 rounded-md border bg-[var(--acb-chat-container-bg)] border-[var(--acb-chat-container-border)]",
-        isUnstyled && "flex flex-col h-full overflow-hidden min-w-0",
-        ui?.className
-      )}
-      style={{
-        borderRadius: isUnstyled
-          ? undefined
-          : "var(--acb-chat-container-radius)",
-      }}
-      data-acb-unstyled={isUnstyled ? "" : undefined}
-    >
-      <ChatHeader
-        title={header?.title}
-        subtitle={header?.subtitle}
-        avatar={header?.avatar}
-        badge={header?.badge}
-        actions={headerActions}
-        className={header?.className ?? ui?.classes?.header}
-      />
-
-      <ChatMessages
-        ref={messagesRef}
-        messages={deferredMessages}
-        isLoading={deferredIsLoading}
-        className={ui?.classes?.messages}
-        messageClassName={ui?.classes?.message}
-        emptyState={ui?.emptyState}
-        threadId={threadId}
-        useChainOfThought={chainOfThoughtEnabled}
-        assistantActionsClassName={ui?.classes?.assistantActions}
-        assistantActionsConfig={assistantActionsConfig}
-        compression={compression}
-        branching={branching}
-      />
-
+    <SheetPortalProvider container={sheetContainer}>
       <div
-        data-acb-part="input-wrapper"
+        ref={chatContainerRef}
+        data-acb-part="container"
         className={cn(
           !isUnstyled &&
-            "backdrop-blur-sm p-4 rounded-b-md bg-[var(--acb-chat-input-wrapper-bg)]",
-          isUnstyled && "p-0"
+            "relative flex flex-col h-full overflow-hidden min-w-0 rounded-md border bg-[var(--acb-chat-container-bg)] border-[var(--acb-chat-container-border)]",
+          isUnstyled && "relative flex flex-col h-full overflow-hidden min-w-0",
+          ui?.className
         )}
+        style={{
+          borderRadius: isUnstyled
+            ? undefined
+            : "var(--acb-chat-container-radius)",
+        }}
+        data-acb-unstyled={isUnstyled ? "" : undefined}
       >
-        <ChatInputWithCommands
-          onSubmit={onSubmit}
-          value={input}
-          onChange={setInput}
-          placeholder={ui?.placeholder}
-          // Keep input enabled during streaming - users can type their next message
-          disabled={false}
-          // Submit is disabled when actually loading (not just streaming)
-          submitDisabled={isLoading}
-          status={status}
-          className={ui?.classes?.input}
-          models={models}
-          selectedModelId={model}
-          onModelChange={setModel}
-          // Suggestions props
-          enableSuggestions={suggestionOptions?.enabled}
-          suggestions={deferredSuggestions}
-          suggestionsCount={suggestionOptions?.count ?? 3}
-          onSuggestionClick={suggestionClickHandler}
-          // Commands props
-          enableCommands={commandOptions?.enabled}
-          onCommandExecute={undefined}
-          onAICommandExecute={handleAICommandExecute}
-          // Performance props - pass deferred store subscriptions to avoid child re-renders
-          allFocusItems={deferredAllFocusItems}
-          clearFocus={clearFocus}
-          error={error}
-          setError={setError}
-          compression={compression}
+        <ChatHeader
+          title={header?.title}
+          subtitle={header?.subtitle}
+          avatar={header?.avatar}
+          badge={header?.badge}
+          actions={headerActions}
+          className={header?.className ?? ui?.classes?.header}
         />
+
+        <ChatMessages
+          ref={messagesRef}
+          messages={deferredMessages}
+          isLoading={deferredIsLoading}
+          className={ui?.classes?.messages}
+          messageClassName={ui?.classes?.message}
+          emptyState={ui?.emptyState}
+          threadId={threadId}
+          useChainOfThought={chainOfThoughtEnabled}
+          assistantActionsClassName={ui?.classes?.assistantActions}
+          assistantActionsConfig={assistantActionsConfig}
+          compression={compression}
+          branching={branching}
+        />
+
+        <div
+          data-acb-part="input-wrapper"
+          className={cn(
+            !isUnstyled &&
+              "backdrop-blur-sm p-4 rounded-b-md bg-[var(--acb-chat-input-wrapper-bg)]",
+            isUnstyled && "p-0"
+          )}
+        >
+          <ChatInputWithCommands
+            onSubmit={onSubmit}
+            value={input}
+            onChange={setInput}
+            placeholder={ui?.placeholder}
+            // Keep input enabled during streaming - users can type their next message
+            disabled={false}
+            // Submit is disabled when actually loading (not just streaming)
+            submitDisabled={isLoading}
+            status={status}
+            className={ui?.classes?.input}
+            models={models}
+            selectedModelId={model}
+            onModelChange={setModel}
+            // Suggestions props
+            enableSuggestions={suggestionOptions?.enabled}
+            suggestions={deferredSuggestions}
+            suggestionsCount={suggestionOptions?.count ?? 3}
+            onSuggestionClick={suggestionClickHandler}
+            // Commands props
+            enableCommands={commandOptions?.enabled}
+            onCommandExecute={undefined}
+            onAICommandExecute={handleAICommandExecute}
+            // Performance props - pass deferred store subscriptions to avoid child re-renders
+            allFocusItems={deferredAllFocusItems}
+            clearFocus={clearFocus}
+            error={error}
+            setError={setError}
+            compression={compression}
+          />
+        </div>
       </div>
-    </div>
+    </SheetPortalProvider>
   );
 }
 

@@ -161,8 +161,8 @@ function McpServersDialogImpl({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        side="right"
-        className="w-[800px] max-w-[90vw] sm:max-w-[800px]"
+        side="top"
+        className="flex h-full max-h-full w-full flex-col gap-6 overflow-hidden pb-6"
       >
         <SheetHeader>
           <SheetTitle>MCP servers</SheetTitle>

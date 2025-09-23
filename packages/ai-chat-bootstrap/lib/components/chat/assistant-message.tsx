@@ -134,10 +134,8 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
                 {showPinToggle && (
                   <div className="flex items-center h-full pt-2">
                     <ChatMessagePinToggle
-                      side="right"
                       pinned={Boolean(pinState?.pinned)}
                       onPressedChange={() => pinState?.toggle()}
-                      inline
                     />
                   </div>
                 )}

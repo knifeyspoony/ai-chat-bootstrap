@@ -1,11 +1,15 @@
 import {
   ArchiveRestore,
-  NotebookPen,
+  MemoryStick,
   PencilLine,
   Save,
   Trash2,
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { ScrollArea } from "../../components/ui/scroll-area";
 import {
   Sheet,
   SheetContent,
@@ -14,12 +18,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "../../components/ui/sheet";
-import { Button } from "../../components/ui/button";
-import { ScrollArea } from "../../components/ui/scroll-area";
-import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
-import { Badge } from "../../components/ui/badge";
-import type { CompressionController, CompressionArtifact } from "../../types/compression";
+import type {
+  CompressionArtifact,
+  CompressionController,
+} from "../../types/compression";
 import { cn } from "../../utils";
 
 interface ArtifactCardProps {
@@ -28,7 +31,11 @@ interface ArtifactCardProps {
   onDelete: (artifactId: string) => void;
 }
 
-const ArtifactCard: React.FC<ArtifactCardProps> = ({ artifact, onUpdate, onDelete }) => {
+const ArtifactCard: React.FC<ArtifactCardProps> = ({
+  artifact,
+  onUpdate,
+  onDelete,
+}) => {
   const [title, setTitle] = useState(artifact.title ?? "");
   const [summary, setSummary] = useState(artifact.summary ?? "");
 
@@ -71,7 +78,8 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({ artifact, onUpdate, onDelet
             </Badge>
             {tokensSaved !== undefined && (
               <Badge className="text-[11px]" variant="outline">
-                Saved {Math.max(Math.round(tokensSaved), 0).toLocaleString()} tokens
+                Saved {Math.max(Math.round(tokensSaved), 0).toLocaleString()}{" "}
+                tokens
               </Badge>
             )}
           </div>
@@ -119,7 +127,10 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({ artifact, onUpdate, onDelet
       </div>
 
       <div className="space-y-2">
-        <label className="text-xs font-medium text-foreground" htmlFor={`${artifact.id}-title`}>
+        <label
+          className="text-xs font-medium text-foreground"
+          htmlFor={`${artifact.id}-title`}
+        >
           Title
         </label>
         <Input
@@ -132,7 +143,10 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({ artifact, onUpdate, onDelet
       </div>
 
       <div className="space-y-2">
-        <label className="text-xs font-medium text-foreground" htmlFor={`${artifact.id}-summary`}>
+        <label
+          className="text-xs font-medium text-foreground"
+          htmlFor={`${artifact.id}-summary`}
+        >
           Summary
         </label>
         <Textarea
@@ -153,10 +167,9 @@ export interface CompressionArtifactsSheetProps {
   className?: string;
 }
 
-export const CompressionArtifactsSheet: React.FC<CompressionArtifactsSheetProps> = ({
-  compression,
-  className,
-}) => {
+export const CompressionArtifactsSheet: React.FC<
+  CompressionArtifactsSheetProps
+> = ({ compression, className }) => {
   const [open, setOpen] = useState(false);
   const artifacts = compression?.artifacts;
 
@@ -164,7 +177,10 @@ export const CompressionArtifactsSheet: React.FC<CompressionArtifactsSheetProps>
     return artifacts ? [...artifacts] : [];
   }, [artifacts]);
 
-  const handleUpdate = (artifactId: string, patch: Partial<CompressionArtifact>) => {
+  const handleUpdate = (
+    artifactId: string,
+    patch: Partial<CompressionArtifact>
+  ) => {
     if (!compression) return;
     compression.actions.updateArtifact(artifactId, patch);
   };
@@ -188,7 +204,7 @@ export const CompressionArtifactsSheet: React.FC<CompressionArtifactsSheetProps>
           )}
           title="Open compression artifacts"
         >
-          <NotebookPen className="h-4 w-4" />
+          <MemoryStick className="h-4 w-4" />
           {artifactCount > 0 && (
             <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
               {artifactCount}
@@ -203,7 +219,8 @@ export const CompressionArtifactsSheet: React.FC<CompressionArtifactsSheetProps>
         <SheetHeader>
           <SheetTitle>Compression Artifacts</SheetTitle>
           <SheetDescription>
-            Review, edit, or remove summaries that stand in for older conversation turns.
+            Review, edit, or remove summaries that stand in for older
+            conversation turns.
           </SheetDescription>
         </SheetHeader>
         <ScrollArea className="flex-1 pr-3">
@@ -220,7 +237,10 @@ export const CompressionArtifactsSheet: React.FC<CompressionArtifactsSheetProps>
             ) : (
               <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 p-8 text-center text-sm text-muted-foreground">
                 <PencilLine className="h-8 w-8" />
-                <p>No compression artifacts yet. Once the context is summarised, they will appear here.</p>
+                <p>
+                  No compression artifacts yet. Once the context is summarised,
+                  they will appear here.
+                </p>
               </div>
             )}
           </div>

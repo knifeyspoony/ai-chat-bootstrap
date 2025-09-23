@@ -28,6 +28,7 @@ import type { SerializedTool } from "../stores/tools";
 // Planning types and schemas removed - using flow capture instead
 import type { ChatModelOption, ChatRequest } from "../types/chat";
 import type { CompressionConfig } from "../types/compression";
+import { buildCompressionPayload } from "../utils/compression/build-payload";
 import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
 import { useChainOfThought } from "./use-chain-of-thought";
 import { useAIChatCompression } from "./use-ai-chat-compression";
@@ -231,8 +232,9 @@ export function useAIChat({
   const compressionHelpers = useAIChatCompression({
     compression: resolvedCompressionOptions,
   });
-  const buildCompressionPayload = compressionHelpers.buildPayload;
+  const buildCompressionRequestPayload = compressionHelpers.buildPayload;
   const compressionController = compressionHelpers.controller;
+  const compressionConfig = compressionHelpers.config;
   const setCompressionModelMetadata =
     compressionController.actions.setModelMetadata;
 
@@ -656,7 +658,7 @@ export function useAIChat({
         });
         const combinedToolSummaries = Array.from(toolSummaryMap.values());
 
-        const compressionPayload = await buildCompressionPayload(
+        const compressionPayload = await buildCompressionRequestPayload(
           options.messages as UIMessage[]
         );
 
@@ -702,7 +704,7 @@ export function useAIChat({
         };
       },
     });
-  }, [api, chainOfThoughtEnabled, buildCompressionPayload]);
+  }, [api, chainOfThoughtEnabled, buildCompressionRequestPayload]);
 
   const [draftInput, setDraftInput] = useState("");
 
@@ -832,6 +834,61 @@ export function useAIChat({
       setError("Chat error occurred");
     },
   });
+
+  const compressionBaseMessages = useMemo(
+    () => (chatHook.messages as UIMessage[]) ?? [],
+    [chatHook.messages]
+  );
+
+  const compressionUsageSignature = useMemo(() => {
+    if (!compressionConfig.enabled) return null;
+    if (compressionBaseMessages.length === 0) return "__empty__";
+
+    return compressionBaseMessages
+      .map((message, index) => {
+        const idPart = message.id ?? `idx-${index}`;
+        const rolePart = message.role ?? "unknown";
+        const partCount = Array.isArray(message.parts) ? message.parts.length : 0;
+        return `${idPart}:${rolePart}:${partCount}`;
+      })
+      .join("|");
+  }, [compressionConfig.enabled, compressionBaseMessages]);
+
+  useEffect(() => {
+    const store = useAICompressionStore.getState();
+
+    if (!compressionConfig.enabled) {
+      if (store.usage || store.shouldCompress || store.overBudget) {
+        store.setUsage(null, { shouldCompress: false, overBudget: false });
+      }
+      return;
+    }
+
+    if (compressionUsageSignature === null) {
+      return;
+    }
+
+    const snapshot = store.getSnapshot();
+    const result = buildCompressionPayload({
+      baseMessages: compressionBaseMessages,
+      pinnedMessages: snapshot.pinnedMessages,
+      artifacts: snapshot.artifacts,
+      snapshot: snapshot.snapshot,
+      config: compressionConfig,
+    });
+
+    store.setUsage(result.usage, {
+      shouldCompress: result.shouldCompress,
+      overBudget: result.overBudget,
+    });
+  }, [
+    compressionConfig,
+    compressionUsageSignature,
+    compressionBaseMessages,
+    compressionController.pinnedMessages,
+    compressionController.artifacts,
+    compressionController.snapshot,
+  ]);
 
   // Update ref to latest chatHook for stable callback access
   useEffect(() => {

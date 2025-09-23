@@ -74,7 +74,7 @@ describe('Compression UI components', () => {
     expect(getByText(/Artifacts/)).toBeTruthy();
   });
 
-  it('shows over budget label in usage indicator', () => {
+  it('shows over budget state in usage indicator', () => {
     const compression = makeCompressionController({
       overBudget: true,
       usage: {
@@ -88,11 +88,12 @@ describe('Compression UI components', () => {
       },
     });
 
-    const { getByTitle } = render(
+    const { getByRole } = render(
       <CompressionUsageIndicator compression={compression} />
     );
 
-    expect(getByTitle(/view compression usage/i).textContent).toContain('Over budget');
+    const trigger = getByRole('button', { name: /over budget/i });
+    expect(trigger.textContent).toContain('120%');
   });
 
   it('surfaces compression errors in the usage indicator', () => {
@@ -109,12 +110,12 @@ describe('Compression UI components', () => {
       ],
     });
 
-    const { getByTitle, getByRole } = render(
+    const { getByRole } = render(
       <CompressionUsageIndicator compression={compression} />
     );
 
-    const trigger = getByTitle(/compression error/i);
-    expect(trigger.textContent).toContain('Compression error');
+    const trigger = getByRole('button', { name: /compression error/i });
+    expect(trigger.textContent).toMatch(/--%|\d+%/);
 
     fireEvent.click(trigger);
 
@@ -170,7 +171,7 @@ describe('Compression UI components', () => {
     expect(removeArtifact).toHaveBeenCalledWith('artifact-1');
   });
 
-  it('renders compression controls inside ChatInput when compression is provided', () => {
+  it('renders compression usage indicator without artifacts button before compression', () => {
     const compression = makeCompressionController({
       usage: {
         totalTokens: 300,
@@ -181,6 +182,34 @@ describe('Compression UI components', () => {
         remainingTokens: 700,
         updatedAt: Date.now(),
       },
+    });
+
+    const { getByRole, queryByTitle } = render(
+      <ChatInput
+        value="hello"
+        onChange={() => {}}
+        onSubmit={() => {}}
+        compression={compression}
+        enableSuggestions={false}
+        suggestions={[]}
+        suggestionsCount={3}
+        allFocusItems={[]}
+      />
+    );
+
+    expect(getByRole('button', { name: /compression usage/i })).toBeTruthy();
+    expect(queryByTitle(/open compression artifacts/i)).toBeNull();
+  });
+
+  it('shows compression artifacts button once the chat has been compressed', () => {
+    const compression = makeCompressionController({
+      artifacts: [
+        {
+          id: 'artifact-1',
+          summary: 'conversation summary',
+          createdAt: Date.now(),
+        },
+      ],
     });
 
     const { getByTitle } = render(
@@ -196,7 +225,6 @@ describe('Compression UI components', () => {
       />
     );
 
-    expect(getByTitle(/view compression usage/i)).toBeTruthy();
     expect(getByTitle(/open compression artifacts/i)).toBeTruthy();
   });
 });

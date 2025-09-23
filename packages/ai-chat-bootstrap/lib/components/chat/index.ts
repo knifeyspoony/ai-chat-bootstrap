@@ -9,10 +9,11 @@ export { ChatInputWithCommands } from "../../components/chat/chat-input-with-com
 export { ChatMessages } from "../../components/chat/chat-messages";
 export { ChatPopout } from "../../components/chat/chat-popout";
 export { ChatThreadsButton } from "../../components/chat/chat-threads-button";
+export { AssistantMessage } from "./assistant-message";
 export { ChatChainOfThought } from "./chat-chain-of-thought";
-export { CompressionUsageIndicator } from "./compression-usage-indicator";
 export { CompressionArtifactsSheet } from "./compression-artifacts-sheet";
 export { CompressionBanner } from "./compression-banner";
+export { CompressionUsageIndicator } from "./compression-usage-indicator";
 
 // Message part components
 export { ChatMessagePart } from "./chat-message-part";

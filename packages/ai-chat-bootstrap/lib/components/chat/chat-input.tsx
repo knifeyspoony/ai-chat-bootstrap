@@ -26,8 +26,8 @@ import {
 import type { ChatModelOption, FocusItem, Suggestion } from "../../types/chat";
 import type { CompressionController } from "../../types/compression";
 import { cn } from "../../utils";
-import { CompressionUsageIndicator } from "./compression-usage-indicator";
 import { CompressionArtifactsSheet } from "./compression-artifacts-sheet";
+import { CompressionUsageIndicator } from "./compression-usage-indicator";
 
 // Pure suggestions button implementation
 interface PureSuggestionsButtonProps {
@@ -76,8 +76,7 @@ const PureSuggestionsButton = ({
                   <span className="font-medium leading-tight">
                     {suggestion.shortSuggestion}
                   </span>
-                  {suggestion.shortSuggestion !==
-                    suggestion.longSuggestion && (
+                  {suggestion.shortSuggestion !== suggestion.longSuggestion && (
                     <span className="text-xs text-muted-foreground leading-tight">
                       {suggestion.longSuggestion}
                     </span>
@@ -92,14 +91,17 @@ const PureSuggestionsButton = ({
 };
 
 // Memoized suggestions button - only re-renders when suggestions change
-const SuggestionsButton = memo(PureSuggestionsButton, (prevProps, nextProps) => {
-  // Only re-render if suggestions array reference changes
-  if (prevProps.suggestions !== nextProps.suggestions) return false;
-  if (prevProps.suggestionsCount !== nextProps.suggestionsCount) return false;
+const SuggestionsButton = memo(
+  PureSuggestionsButton,
+  (prevProps, nextProps) => {
+    // Only re-render if suggestions array reference changes
+    if (prevProps.suggestions !== nextProps.suggestions) return false;
+    if (prevProps.suggestionsCount !== nextProps.suggestionsCount) return false;
 
-  // Skip function comparison for better performance
-  return true;
-});
+    // Skip function comparison for better performance
+    return true;
+  }
+);
 
 // Pure model selector implementation
 interface PureModelSelectorProps {
@@ -139,19 +141,11 @@ const PureModelSelector = ({
       </PromptInputModelSelectTrigger>
       <PromptInputModelSelectContent align="start">
         {modelOptions.map((option) => (
-          <PromptInputModelSelectItem
-            key={option.id}
-            value={option.id}
-          >
+          <PromptInputModelSelectItem key={option.id} value={option.id}>
             <div className="flex flex-col gap-0.5 py-1">
               <span className="text-sm font-medium leading-tight">
                 {option.label ?? option.id}
               </span>
-              {option.description && (
-                <span className="text-xs text-muted-foreground leading-tight">
-                  {option.description}
-                </span>
-              )}
             </div>
           </PromptInputModelSelectItem>
         ))}
@@ -207,6 +201,7 @@ interface PureToolbarLeftProps {
   onModelChange?: (modelId: string) => void;
   onAttach?: () => void;
   disabled?: boolean;
+  compression?: CompressionController;
 }
 
 const PureToolbarLeft = ({
@@ -215,7 +210,16 @@ const PureToolbarLeft = ({
   onModelChange,
   onAttach,
   disabled = false,
+  compression,
 }: PureToolbarLeftProps) => {
+  const compressionEnabled = Boolean(
+    compression &&
+      (compression.config?.enabled ||
+        compression.pinnedMessages.length > 0 ||
+        compression.artifacts.length > 0 ||
+        compression.usage)
+  );
+
   return (
     <div className="flex items-center gap-1">
       <ModelSelector
@@ -224,6 +228,9 @@ const PureToolbarLeft = ({
         onModelChange={onModelChange}
         disabled={disabled}
       />
+      {compressionEnabled && (
+        <CompressionUsageIndicator compression={compression} />
+      )}
       <PromptInputTools>
         <AttachButton onAttach={onAttach} disabled={disabled} />
       </PromptInputTools>
@@ -236,6 +243,7 @@ const ToolbarLeft = memo(PureToolbarLeft, (prevProps, nextProps) => {
   if (prevProps.models !== nextProps.models) return false;
   if (prevProps.selectedModelId !== nextProps.selectedModelId) return false;
   if (prevProps.disabled !== nextProps.disabled) return false;
+  if (prevProps.compression !== nextProps.compression) return false;
 
   // Skip function comparison for better performance
   return true;
@@ -263,21 +271,13 @@ const PureToolbarRight = ({
   onSuggestionClick,
   compression,
 }: PureToolbarRightProps) => {
-  const compressionEnabled = Boolean(
-    compression &&
-      (compression.config?.enabled ||
-        compression.pinnedMessages.length > 0 ||
-        compression.artifacts.length > 0 ||
-        compression.usage)
+  const hasCompressionArtifacts = Boolean(
+    compression && (compression.artifacts.length > 0 || compression.snapshot)
   );
 
   return (
     <div className="flex items-center gap-1">
-      {compressionEnabled && (
-        <CompressionUsageIndicator compression={compression} />
-      )}
-
-      {compressionEnabled && (
+      {hasCompressionArtifacts && (
         <CompressionArtifactsSheet compression={compression} />
       )}
 
@@ -521,6 +521,7 @@ const ChatInputImpl = ({
             onModelChange={onModelChange}
             onAttach={onAttach}
             disabled={disabled}
+            compression={compression}
           />
 
           <ToolbarRight

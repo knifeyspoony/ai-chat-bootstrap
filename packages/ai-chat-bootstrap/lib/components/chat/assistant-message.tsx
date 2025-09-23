@@ -2,7 +2,6 @@ import type { UIMessage } from "ai";
 import isEqual from "fast-deep-equal";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Message,
   MessageAvatar,
   MessageContent,
 } from "../../components/ai-elements/message";
@@ -94,20 +93,16 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
       const showPinToggle = Boolean(pinState);
 
       return (
-        <Message
-          from="assistant"
-          data-acb-part="message"
-          data-role="assistant"
-          data-acb-pinned={pinState?.pinned ? "" : undefined}
-          className={cn(
-            "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-assistant-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-assistant-fg)]",
-            messageClassName,
-            "m-0"
-          )}
-        >
-          <div className="relative flex w-full flex-col gap-3">
+        <div className="flex items-start gap-2">
+          <MessageAvatar
+            data-acb-part="message-avatar"
+            name="Assistant"
+            src={assistantAvatar}
+            className="shrink-0"
+          />
+          <div className="flex flex-col gap-3">
             {hasChainOfThought && (
-              <div className="w-full overflow-x-auto">
+              <div className="overflow-x-auto">
                 <ChatChainOfThought
                   message={{ ...baseMessage, parts: chainOfThoughtParts }}
                   isStreaming={options.streaming}
@@ -118,10 +113,15 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
             )}
 
             {hasRegularContent && (
-              <div className="flex items-start gap-2 w-full">
+              <div className="flex items-start gap-2">
                 <MessageContent
                   data-acb-part="message-content"
-                  className="rounded-[var(--acb-chat-message-radius)] flex-1"
+                  data-role="assistant"
+                  data-acb-pinned={pinState?.pinned ? "" : undefined}
+                  className={cn(
+                    "rounded-[var(--acb-chat-message-radius)] bg-[var(--acb-chat-message-assistant-bg)] text-[var(--acb-chat-message-assistant-fg)]",
+                    messageClassName
+                  )}
                 >
                   {visibleRegularParts.map((part, partIndex) => (
                     <ChatMessagePart
@@ -132,7 +132,12 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
                   ))}
                 </MessageContent>
                 {showPinToggle && (
-                  <div className="flex items-center h-full pt-2">
+                  <div className={cn(
+                    "flex items-start shrink-0 transition-opacity duration-150 pt-2",
+                    pinState?.pinned
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                  )}>
                     <ChatMessagePinToggle
                       pinned={Boolean(pinState?.pinned)}
                       onPressedChange={() => pinState?.toggle()}
@@ -142,12 +147,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
               </div>
             )}
           </div>
-          <MessageAvatar
-            data-acb-part="message-avatar"
-            name="Assistant"
-            src={assistantAvatar}
-          />
-        </Message>
+        </div>
       );
     },
     [assistantAvatar, messageClassName, pinState]
@@ -226,8 +226,6 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
     </div>
   ) : null;
 
-  const widthConstraintClass = "w-full max-w-[80%]";
-
   const renderControlsRow = (selectorEnabled: boolean) => {
     if (!showAnyActions && !selectorEnabled) {
       return null;
@@ -244,13 +242,12 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
     })();
 
     return (
-      <div className="flex w-full items-start gap-2 pb-4">
-        {/* Avatar gutter spacer - matches the size-8 avatar + gap-2 from Message component */}
+      <div className="flex items-start gap-2 pb-4">
+        {/* Avatar gutter spacer - matches the avatar width + gap */}
         <div aria-hidden="true" className="size-8 shrink-0" />
         <div
           className={cn(
-            widthConstraintClass,
-            "flex w-full flex-wrap items-start gap-3 pt-1",
+            "flex flex-wrap items-start gap-3 pt-1 min-w-0",
             controlsJustifyClass
           )}
         >
@@ -274,7 +271,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
   };
 
   const containerClass = cn(
-    "group flex flex-col gap-0",
+    "group flex flex-col gap-0 max-w-[80%]",
     !showAnyActions && !showBranchSelector && "pt-4",
     (showAnyActions || showBranchSelector) && "[&>div]:pb-0"
   );

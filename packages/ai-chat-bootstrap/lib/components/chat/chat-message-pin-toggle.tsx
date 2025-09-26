@@ -20,6 +20,7 @@ export function ChatMessagePinToggle({
 }: ChatMessagePinToggleProps) {
   return (
     <Toggle
+      size="icon"
       aria-pressed={pinned}
       aria-label={label}
       title={label}
@@ -28,11 +29,11 @@ export function ChatMessagePinToggle({
       onPressedChange={onPressedChange}
       tabIndex={0}
       className={cn(
-        "flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition aspect-square",
+        "flex items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition aspect-square",
         "hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         pinned && "bg-primary text-primary-foreground hover:bg-primary/90",
         disabled && "pointer-events-none opacity-50",
-        "shrink-0 flex items-center justify-center",
+        "shrink-0",
         className
       )}
       {...props}

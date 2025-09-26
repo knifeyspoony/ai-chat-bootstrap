@@ -13,6 +13,7 @@ import {
 } from "../../components/ui/popover";
 import type { CompressionController } from "../../types/compression";
 import { cn } from "../../utils";
+import { calculateTokensForMessages } from "../../utils/compression/token-helpers";
 
 export interface CompressionUsageIndicatorProps {
   compression?: CompressionController;
@@ -108,6 +109,29 @@ export const CompressionUsageIndicator: React.FC<
     if (percentUsed === null) return 0;
     return Math.min(Math.max(percentUsed, 0), 100);
   }, [percentUsed]);
+
+  const computedPinnedTokens = useMemo(() => {
+    const pins = compression?.pinnedMessages ?? [];
+    if (!pins.length) return undefined;
+    const pinMessages = pins
+      .map((pin) => pin.message)
+      .filter((message): message is NonNullable<typeof message> => Boolean(message));
+    if (!pinMessages.length) return 0;
+    return calculateTokensForMessages(pinMessages);
+  }, [compression?.pinnedMessages]);
+
+  const pinnedTokens = useMemo(() => {
+    if (usage?.pinnedTokens !== undefined) {
+      if (
+        computedPinnedTokens !== undefined &&
+        Math.abs(computedPinnedTokens - usage.pinnedTokens) > 0.5
+      ) {
+        return computedPinnedTokens;
+      }
+      return usage.pinnedTokens;
+    }
+    return computedPinnedTokens;
+  }, [computedPinnedTokens, usage?.pinnedTokens]);
 
   const accessibleLabel = useMemo(() => {
     const parts: string[] = [];
@@ -284,12 +308,12 @@ export const CompressionUsageIndicator: React.FC<
                     </div>
                   </div>
                 )}
-                {usage?.pinnedTokens !== undefined && (
+                {pinnedTokens !== undefined && (
                   <div className="flex justify-between items-center py-1">
                     <span className="text-muted-foreground">Pinned:</span>
                     <div className="flex items-center gap-1">
                       <span className="font-semibold text-foreground">
-                        {Math.round(usage.pinnedTokens).toLocaleString()}
+                        {Math.round(pinnedTokens).toLocaleString()}
                       </span>
                       <span className="text-muted-foreground text-[10px]">
                         tokens

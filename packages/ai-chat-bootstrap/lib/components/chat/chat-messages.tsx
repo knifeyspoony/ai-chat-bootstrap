@@ -1,7 +1,7 @@
 import { type UIMessage } from "ai";
 import isEqual from "fast-deep-equal";
 import { MessageSquare, UserIcon } from "lucide-react";
-import React, { forwardRef, useImperativeHandle, useMemo } from "react";
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo } from "react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
 import {
   Conversation,
@@ -16,12 +16,14 @@ import {
 } from "../../components/ai-elements/message";
 import { Badge } from "../../components/ui/badge";
 import type { AssistantActionsConfig } from "../../types/actions";
-import type { CompressionController } from "../../types/compression";
+import type { CompressionController, CompressionUsage } from "../../types/compression";
+import { normalizeCompressionConfig } from "../../types/compression";
 import { cn } from "../../utils";
 import { AssistantMessage } from "./assistant-message";
 import { ChatMessagePinToggle } from "./chat-message-pin-toggle";
 import { ChatMessagePart } from "./chat-message-part";
 import { CompressionBanner } from "./compression-banner";
+import { buildCompressionPayload } from "../../utils/compression/build-payload";
 
 export interface ChatMessagesProps {
   messages: UIMessage[];
@@ -44,6 +46,23 @@ export interface ChatMessagesProps {
 
 export interface ChatMessagesHandle {
   scrollToBottom: () => void;
+}
+
+function compressionUsageEquals(
+  previous: CompressionUsage | null | undefined,
+  next: CompressionUsage
+): boolean {
+  if (!previous) return false;
+  return (
+    previous.totalTokens === next.totalTokens &&
+    previous.pinnedTokens === next.pinnedTokens &&
+    previous.artifactTokens === next.artifactTokens &&
+    previous.survivingTokens === next.survivingTokens &&
+    (previous.remainingTokens ?? null) === (next.remainingTokens ?? null) &&
+    (previous.budget ?? null) === (next.budget ?? null) &&
+    (previous.estimatedResponseTokens ?? null) ===
+      (next.estimatedResponseTokens ?? null)
+  );
 }
 
 const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
@@ -109,6 +128,10 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
     const lastMessage = messages[messages.length - 1];
 
     const compressionConfig = compression?.config;
+    const normalizedCompressionConfig = useMemo(
+      () => normalizeCompressionConfig(compressionConfig),
+      [compressionConfig]
+    );
     const compressionEnabled = Boolean(compressionConfig?.enabled);
     const pinnedMessages = compression?.pinnedMessages;
     const pinnedSet = useMemo(() => {
@@ -118,6 +141,48 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
         .filter((id): id is string => Boolean(id));
       return new Set(ids);
     }, [pinnedMessages]);
+
+    useEffect(() => {
+      if (!compression) return;
+
+      const payload = buildCompressionPayload({
+        baseMessages: messages,
+        pinnedMessages: compression.pinnedMessages ?? [],
+        artifacts: compression.artifacts ?? [],
+        snapshot: compression.snapshot ?? null,
+        config: normalizedCompressionConfig,
+      });
+
+      const usageMatches = compressionUsageEquals(
+        compression.usage,
+        payload.usage
+      );
+
+      const shouldUpdateFlags =
+        compression.shouldCompress !== payload.shouldCompress ||
+        compression.overBudget !== payload.overBudget;
+
+      if (usageMatches && !shouldUpdateFlags) {
+        return;
+      }
+
+      const nextUsage = usageMatches ? compression.usage : payload.usage;
+
+      compression.actions.setUsage(nextUsage ?? payload.usage, {
+        shouldCompress: payload.shouldCompress,
+        overBudget: payload.overBudget,
+      });
+    }, [
+      compression,
+      compression?.pinnedMessages,
+      compression?.artifacts,
+      compression?.snapshot,
+      compression?.usage,
+      compression?.shouldCompress,
+      compression?.overBudget,
+      messages,
+      normalizedCompressionConfig,
+    ]);
 
     return (
       <Conversation className={cn("flex-1 text-left", className)}>
@@ -322,17 +387,16 @@ const ChatMessageItem = React.memo(
           messageClassName
         )}
       >
-        <div className="relative">
-          {showPinToggle && (
-            <ChatMessagePinToggle
-              side={isUser ? "left" : "right"}
-              pinned={Boolean(pinState?.pinned)}
-              onClick={pinState?.toggle}
-            />
+        <div
+          className={cn(
+            "flex min-w-0 items-stretch gap-2",
+            isUser ? "flex-row-reverse" : undefined
           )}
+        >
           <MessageContent
             data-acb-part="message-content"
-            className={cn("rounded-[var(--acb-chat-message-radius)]")}
+            data-acb-pinned={pinState?.pinned ? "" : undefined}
+            className={cn("min-w-0 rounded-[var(--acb-chat-message-radius)]")}
           >
             {message.parts?.map((part, partIndex: number) => (
               <ChatMessagePart
@@ -342,6 +406,25 @@ const ChatMessageItem = React.memo(
               />
             ))}
           </MessageContent>
+          {showPinToggle && (
+            <div
+              className={cn(
+                "flex shrink-0 items-center self-stretch transition-opacity duration-150",
+                pinState?.pinned
+                  ? "opacity-100 pointer-events-auto"
+                  : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100 group-hover:pointer-events-auto group-focus-within:pointer-events-auto"
+              )}
+            >
+              <ChatMessagePinToggle
+                pinned={Boolean(pinState?.pinned)}
+                onPressedChange={(next) => {
+                  if (!pinState) return;
+                  if (next === pinState.pinned) return;
+                  pinState.toggle();
+                }}
+              />
+            </div>
+          )}
         </div>
         <MessageAvatar
           data-acb-part="message-avatar"
@@ -353,7 +436,11 @@ const ChatMessageItem = React.memo(
   },
   (prev, next) => {
     // Fast path: reference equality check
-    if (prev.message === next.message && prev.isStreaming === next.isStreaming)
+    if (
+      prev.message === next.message &&
+      prev.isStreaming === next.isStreaming &&
+      prev.pinState?.pinned === next.pinState?.pinned
+    )
       return true;
 
     // Detailed property comparison

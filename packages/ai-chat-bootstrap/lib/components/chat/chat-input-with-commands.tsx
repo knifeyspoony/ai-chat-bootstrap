@@ -591,6 +591,7 @@ export const ChatInputWithCommands = memo(
     if (prevProps.models !== nextProps.models) return false;
     if (prevProps.suggestions !== nextProps.suggestions) return false;
     if (prevProps.allFocusItems !== nextProps.allFocusItems) return false;
+    if (prevProps.compression !== nextProps.compression) return false;
 
     // Function props - assume they're stable if parent is using useCallback correctly
     // Skip function comparison to avoid performance overhead

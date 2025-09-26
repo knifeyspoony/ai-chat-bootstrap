@@ -18,6 +18,7 @@ import {
 } from "../ai-elements/branch";
 import { AssistantActionsRenderer } from "./assistant-actions-renderer";
 import { buildAssistantBranchEntries } from "./assistant-branches";
+import { reorderBranchEntriesForSelection } from "./assistant-message-helpers";
 import { getAssistantMessageSegments } from "./assistant-message-segments";
 import { ChatChainOfThought } from "./chat-chain-of-thought";
 import { ChatMessagePart } from "./chat-message-part";
@@ -40,7 +41,11 @@ interface AssistantMessageProps {
   };
   branching?: {
     enabled: boolean;
-    selectBranch?: (messageId: string, branchId: string) => void;
+    selectBranch?: (
+      messageId: string,
+      branchId: string,
+      branchIndex: number
+    ) => void;
   };
 }
 
@@ -63,6 +68,9 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
 
   const selectedBranchId = useAIBranchesStore((state) =>
     messageId ? state.selection.get(messageId) : undefined
+  );
+  const selectedBranchIndex = useAIBranchesStore((state) =>
+    messageId ? state.selectionIndex.get(messageId) : undefined
   );
 
   useEffect(() => {
@@ -164,7 +172,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
     [assistantAvatar, handlePinPressedChange, messageClassName, pinState]
   );
 
-  const branchEntries = useMemo(
+  const rawBranchEntries = useMemo(
     () =>
       buildAssistantBranchEntries({
         message,
@@ -175,7 +183,33 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
     [isLastMessage, isStreaming, message, renderMessageBody]
   );
 
+  const branchEntries = useMemo(
+    () =>
+      reorderBranchEntriesForSelection({
+        entries: rawBranchEntries,
+        messageId: message.id,
+        branchingEnabled,
+        selectedBranchIndex,
+      }),
+    [
+      branchingEnabled,
+      message.id,
+      rawBranchEntries,
+      selectedBranchIndex,
+    ]
+  );
+
   const branchCount = branchEntries.length;
+
+  const normalizedSelectedBranchIndex =
+    branchCount > 0 &&
+    typeof selectedBranchIndex === "number" &&
+    Number.isFinite(selectedBranchIndex)
+      ? Math.max(
+          0,
+          Math.min(branchCount - 1, Math.trunc(selectedBranchIndex))
+        )
+      : undefined;
 
   const resolvedBranchId = branchingEnabled
     ? selectedBranchId ?? message.id
@@ -184,9 +218,13 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
   const defaultBranchIndexRaw = branchEntries.findIndex(
     (entry) => entry.message.id === resolvedBranchId
   );
+  const fallbackBranchIndex =
+    defaultBranchIndexRaw === -1
+      ? normalizedSelectedBranchIndex ?? (branchCount > 0 ? branchCount - 1 : 0)
+      : defaultBranchIndexRaw;
   const defaultBranchIndex =
-    defaultBranchIndexRaw === -1 && branchCount > 0
-      ? branchCount - 1
+    defaultBranchIndexRaw === -1
+      ? fallbackBranchIndex
       : Math.max(defaultBranchIndexRaw, 0);
   const branchKey = `${message.id ?? "assistant"}-${branchCount}`;
 
@@ -197,11 +235,25 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
       return branchEntries[branchEntries.length - 1];
     }
 
-    return (
-      branchEntries.find((entry) => entry.message.id === resolvedBranchId) ??
-      branchEntries[branchEntries.length - 1]
+    const matchedEntry = branchEntries.find(
+      (entry) => entry.message.id === resolvedBranchId
     );
-  }, [branchEntries, branchingEnabled, resolvedBranchId]);
+
+    if (matchedEntry) {
+      return matchedEntry;
+    }
+
+    const safeIndex = Math.max(
+      0,
+      Math.min(branchEntries.length - 1, fallbackBranchIndex)
+    );
+    return branchEntries[safeIndex];
+  }, [
+    branchEntries,
+    branchingEnabled,
+    fallbackBranchIndex,
+    resolvedBranchId,
+  ]);
 
   const effectiveMessage = effectiveBranchEntry?.message ?? message;
   const showBranchSelector = branchingEnabled && branchCount > 1;
@@ -294,18 +346,29 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
       if (!branchingEnabled) return;
       if (!branching?.selectBranch) return;
       if (!messageId) return;
+      if (nextIndex < 0 || nextIndex >= branchEntries.length) return;
+
       const target = branchEntries[nextIndex];
       const targetId = target?.message.id;
       if (!targetId) return;
-      if (targetId === resolvedBranchId) return;
-      branching.selectBranch(messageId, targetId);
+
+      if (
+        targetId === resolvedBranchId &&
+        (normalizedSelectedBranchIndex ?? defaultBranchIndex) === nextIndex
+      ) {
+        return;
+      }
+
+      branching.selectBranch(messageId, targetId, nextIndex);
     },
     [
       branchEntries,
       branching,
       branchingEnabled,
+      defaultBranchIndex,
       isStreaming,
       messageId,
+      normalizedSelectedBranchIndex,
       resolvedBranchId,
     ]
   );

@@ -20,7 +20,7 @@ export interface UseAIChatBranchingOptions {
 
 export interface UseAIChatBranchingResult {
   enabled: boolean;
-  selectBranch: (messageId: string, branchId: string) => void;
+  selectBranch: (messageId: string, branchId: string, branchIndex?: number) => void;
   regenerate: ChatHelpers["regenerate"];
 }
 
@@ -75,7 +75,7 @@ export function useAIChatBranching({
   }, [enabled, chatHook.messages]);
 
   const selectBranch = useCallback(
-    (messageId: string, branchId: string) => {
+    (messageId: string, branchId: string, branchIndex?: number) => {
       if (!enabled) return;
       if (!messageId) return;
 
@@ -123,7 +123,8 @@ export function useAIChatBranching({
       const branchesStore = useAIBranchesStore.getState();
       branchesStore.setSelectedBranch(
         messageId,
-        branchId || promotedMessageId || messageId
+        branchId || promotedMessageId || messageId,
+        branchIndex
       );
 
       if (promotedMessage) {

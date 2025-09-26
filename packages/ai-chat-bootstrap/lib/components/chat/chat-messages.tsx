@@ -40,7 +40,11 @@ export interface ChatMessagesProps {
   compression?: CompressionController;
   branching?: {
     enabled: boolean;
-    selectBranch?: (messageId: string, branchId: string) => void;
+    selectBranch?: (
+      messageId: string,
+      branchId: string,
+      branchIndex: number
+    ) => void;
   };
 }
 

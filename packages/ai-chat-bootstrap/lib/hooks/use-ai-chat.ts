@@ -4,6 +4,7 @@ import {
   lastAssistantMessageIsCompleteWithToolCalls,
   UIMessage,
 } from "ai";
+import isEqual from "fast-deep-equal";
 import React, {
   useCallback,
   useEffect,
@@ -27,14 +28,59 @@ import type { SerializedMCPServer } from "../stores/mcp";
 import type { SerializedTool } from "../stores/tools";
 // Planning types and schemas removed - using flow capture instead
 import type { ChatModelOption, ChatRequest } from "../types/chat";
-import type { CompressionConfig } from "../types/compression";
+import {
+  COMPRESSION_THREAD_METADATA_KEY,
+  type CompressionConfig,
+  type CompressionPinnedMessage,
+  type CompressionRunOptions,
+  type PersistedCompressionState,
+  type BuildCompressionPayloadResult,
+  type CompressionUsage,
+} from "../types/compression";
 import { buildCompressionPayload } from "../utils/compression/build-payload";
+import {
+  applyCompressionMetadataToMessages,
+  ensureCompressionEventMessage,
+  extractPinnedMessagesFromMetadata,
+  withCompressionPinnedState,
+  type CompressionMessagePinnedState,
+} from "../utils/compression/message-metadata";
+import {
+  buildPersistedCompressionState,
+  clonePersistedCompressionState,
+} from "../utils/compression/persistence";
 import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
 import { useChainOfThought } from "./use-chain-of-thought";
 import { useAIChatCompression } from "./use-ai-chat-compression";
 import { useAIChatBranching } from "./use-ai-chat-branching";
 
 const EMPTY_MODEL_OPTIONS: ChatModelOption[] = [];
+
+function hasMeaningfulUsageChange(
+  previous: CompressionUsage | null,
+  next: CompressionUsage
+): boolean {
+  if (!previous) return true;
+
+  if (previous.totalTokens !== next.totalTokens) return true;
+  if (previous.pinnedTokens !== next.pinnedTokens) return true;
+  if (previous.artifactTokens !== next.artifactTokens) return true;
+  if (previous.survivingTokens !== next.survivingTokens) return true;
+
+  const prevEstimated = previous.estimatedResponseTokens ?? null;
+  const nextEstimated = next.estimatedResponseTokens ?? null;
+  if (prevEstimated !== nextEstimated) return true;
+
+  const prevRemaining = previous.remainingTokens ?? null;
+  const nextRemaining = next.remainingTokens ?? null;
+  if (prevRemaining !== nextRemaining) return true;
+
+  const prevBudget = previous.budget ?? null;
+  const nextBudget = next.budget ?? null;
+  if (prevBudget !== nextBudget) return true;
+
+  return false;
+}
 
 export interface ThreadTitleOptions {
   enabled?: boolean;
@@ -233,10 +279,10 @@ export function useAIChat({
     compression: resolvedCompressionOptions,
   });
   const buildCompressionRequestPayload = compressionHelpers.buildPayload;
-  const compressionController = compressionHelpers.controller;
+  const baseCompressionController = compressionHelpers.controller;
   const compressionConfig = compressionHelpers.config;
   const setCompressionModelMetadata =
-    compressionController.actions.setModelMetadata;
+    baseCompressionController.actions.setModelMetadata;
 
   const compressionModelMetadata = useMemo(() => {
     if (!resolvedCompressionOptions?.enabled || !activeModel) {
@@ -835,6 +881,317 @@ export function useAIChat({
     },
   });
 
+  const baseCompressionActions = baseCompressionController.actions;
+
+  const getLatestChat = useCallback(() => chatHookRef.current ?? chatHook, [
+    chatHook,
+  ]);
+
+  const mutateMessageById = useCallback(
+    (
+      messageId: string,
+      updater: (message: UIMessage) => UIMessage
+    ): UIMessage | undefined => {
+      if (!messageId) return undefined;
+      const latestHook = getLatestChat();
+      const currentMessages = latestHook.messages as UIMessage[];
+      const targetIndex = currentMessages.findIndex(
+        (message) => message?.id === messageId
+      );
+      if (targetIndex === -1) return undefined;
+
+      const currentMessage = currentMessages[targetIndex];
+      const updated = updater(currentMessage);
+      if (!updated || updated === currentMessage) {
+        return currentMessage;
+      }
+
+      const nextMessages = currentMessages.slice();
+      nextMessages[targetIndex] = updated;
+      latestHook.setMessages(nextMessages);
+      return updated;
+    },
+    [getLatestChat]
+  );
+
+  const applyPinnedStateToMessage = useCallback(
+    (message: UIMessage, pinned: CompressionMessagePinnedState | null) => {
+      if (!message?.id) {
+        return withCompressionPinnedState(message, pinned);
+      }
+      const updated = mutateMessageById(message.id, (current) =>
+        withCompressionPinnedState(current, pinned)
+      );
+      return updated ?? withCompressionPinnedState(message, pinned);
+    },
+    [mutateMessageById]
+  );
+
+  const enhancedPinMessage = useCallback(
+    (
+      message: UIMessage,
+      options?: Parameters<typeof baseCompressionActions.pinMessage>[1]
+    ) => {
+      const pinnedAt = options?.pinnedAt ?? Date.now();
+      const pinnedState: CompressionMessagePinnedState = {
+        pinnedAt,
+        pinnedBy: options?.pinnedBy,
+        reason: options?.reason,
+      };
+
+      const updatedMessage = applyPinnedStateToMessage(message, pinnedState);
+
+      baseCompressionActions.pinMessage(updatedMessage, {
+        ...options,
+        pinnedAt,
+      });
+    },
+    [applyPinnedStateToMessage, baseCompressionActions]
+  );
+
+  const enhancedUnpinMessage = useCallback(
+    (messageId: string) => {
+      if (messageId) {
+        mutateMessageById(messageId, (current) =>
+          withCompressionPinnedState(current, null)
+        );
+      }
+      baseCompressionActions.unpinMessage(messageId);
+    },
+    [mutateMessageById, baseCompressionActions]
+  );
+
+  const enhancedSetPinnedMessages = useCallback(
+    (pins: CompressionPinnedMessage[]) => {
+      baseCompressionActions.setPinnedMessages(pins);
+
+      const targetStates = new Map<string, CompressionMessagePinnedState>();
+      pins.forEach((pin) => {
+        const id = pin.message?.id ?? pin.id;
+        if (!id) return;
+        const pinnedAt =
+          typeof pin.pinnedAt === "number" && Number.isFinite(pin.pinnedAt)
+            ? pin.pinnedAt
+            : Date.now();
+        targetStates.set(id, {
+          pinnedAt,
+          pinnedBy: pin.pinnedBy,
+          reason: pin.reason,
+        });
+      });
+
+      const latestHook = getLatestChat();
+      const currentMessages = latestHook.messages as UIMessage[];
+      let changed = false;
+      const nextMessages = currentMessages.map((current) => {
+        if (!current?.id) return current;
+        const nextState = targetStates.get(current.id) ?? null;
+        const updated = withCompressionPinnedState(current, nextState);
+        if (updated !== current) {
+          changed = true;
+          return updated;
+        }
+        return current;
+      });
+
+      if (changed) {
+        latestHook.setMessages(nextMessages);
+      }
+    },
+    [baseCompressionActions, getLatestChat]
+  );
+
+  const enhancedClearPinnedMessages = useCallback(() => {
+    baseCompressionActions.clearPinnedMessages();
+
+    const latestHook = getLatestChat();
+    const currentMessages = latestHook.messages as UIMessage[];
+    let changed = false;
+    const nextMessages = currentMessages.map((current) => {
+      const updated = withCompressionPinnedState(current, null);
+      if (updated !== current) {
+        changed = true;
+        return updated;
+      }
+      return current;
+    });
+
+    if (changed) {
+      latestHook.setMessages(nextMessages);
+    }
+  }, [baseCompressionActions, getLatestChat]);
+
+  const compressionActions = useMemo(
+    () => ({
+      ...baseCompressionActions,
+      pinMessage: enhancedPinMessage,
+      setPinnedMessages: enhancedSetPinnedMessages,
+      unpinMessage: enhancedUnpinMessage,
+      clearPinnedMessages: enhancedClearPinnedMessages,
+    }),
+    [
+      baseCompressionActions,
+      enhancedClearPinnedMessages,
+      enhancedPinMessage,
+      enhancedSetPinnedMessages,
+      enhancedUnpinMessage,
+    ]
+  );
+
+  const runCompression = useCallback(
+    async (
+      options?: CompressionRunOptions
+    ): Promise<BuildCompressionPayloadResult> => {
+      const latestHook = getLatestChat();
+      const baseMessages = (latestHook.messages as UIMessage[]) ?? [];
+      return buildCompressionRequestPayload(baseMessages, options);
+    },
+    [buildCompressionRequestPayload, getLatestChat]
+  );
+
+  const compressionController = useMemo(
+    () => ({
+      ...baseCompressionController,
+      actions: compressionActions,
+      runCompression,
+    }),
+    [baseCompressionController, compressionActions, runCompression]
+  );
+
+  const lastPersistedCompressionRef = useRef<PersistedCompressionState | null>(
+    null
+  );
+  const lastHydratedCompressionRef = useRef<PersistedCompressionState | null>(
+    null
+  );
+
+  useEffect(() => {
+    const store = useAICompressionStore.getState();
+
+    if (!resolvedCompressionOptions?.enabled) {
+      if (store.listPinnedMessages().length > 0) {
+        store.clearPinnedMessages();
+      }
+      return;
+    }
+
+    const metadataPins = extractPinnedMessagesFromMetadata(
+      (chatHook.messages as UIMessage[]) ?? []
+    );
+    const existingPins = store.listPinnedMessages();
+
+    if (existingPins.length === metadataPins.length) {
+      const byId = new Map(metadataPins.map((pin) => [pin.id, pin]));
+      const unchanged = existingPins.every((pin) => {
+        const candidate = byId.get(pin.id);
+        return (
+          !!candidate &&
+          candidate.pinnedAt === pin.pinnedAt &&
+          candidate.pinnedBy === pin.pinnedBy &&
+          candidate.reason === pin.reason
+        );
+      });
+
+      if (unchanged) {
+        return;
+      }
+    }
+
+    store.setPinnedMessages(metadataPins);
+  }, [resolvedCompressionOptions?.enabled, chatHook.messages]);
+
+  useEffect(() => {
+    if (!compressionConfig.enabled) {
+      lastHydratedCompressionRef.current = null;
+      return;
+    }
+
+    const effectiveThreadId = threadId ?? storeActiveThreadId;
+    if (!effectiveThreadId) return;
+
+    const state = threadStore.getState();
+    const thread = state.getThreadIfLoaded?.(effectiveThreadId);
+    if (!thread) return;
+
+    const rawPersisted = thread.metadata
+      ? (thread.metadata[COMPRESSION_THREAD_METADATA_KEY] as
+          | PersistedCompressionState
+          | null
+          | undefined)
+      : undefined;
+    const persisted = clonePersistedCompressionState(rawPersisted ?? null);
+
+    if (isEqual(lastHydratedCompressionRef.current, persisted)) {
+      return;
+    }
+
+    lastHydratedCompressionRef.current = clonePersistedCompressionState(
+      persisted
+    );
+
+    const compressionStore = useAICompressionStore.getState();
+
+    if (!persisted) {
+      compressionStore.setSnapshot(null);
+      compressionStore.setArtifacts([]);
+      compressionStore.setUsage(null, {
+        shouldCompress: false,
+        overBudget: false,
+      });
+      compressionStore.setModelMetadata(null);
+
+      const cleared = applyCompressionMetadataToMessages(
+        (chatHook.messages as UIMessage[]) ?? [],
+        null
+      );
+
+      if (cleared.changed) {
+        chatHook.setMessages(cleared.messages);
+      }
+      return;
+    }
+
+    compressionStore.setSnapshot(persisted.snapshot);
+    compressionStore.setArtifacts(persisted.artifacts);
+    compressionStore.setUsage(persisted.usage, {
+      shouldCompress: persisted.shouldCompress,
+      overBudget: persisted.overBudget,
+    });
+    compressionStore.setModelMetadata(persisted.metadata);
+
+    const applied = applyCompressionMetadataToMessages(
+      (chatHook.messages as UIMessage[]) ?? [],
+      persisted.snapshot
+    );
+
+    let nextMessages = applied.messages;
+    let changed = applied.changed;
+
+    if (persisted.snapshot) {
+      const ensured = ensureCompressionEventMessage(nextMessages, {
+        snapshot: persisted.snapshot,
+        artifacts: persisted.artifacts,
+        usage: persisted.usage,
+      });
+
+      if (ensured.changed) {
+        nextMessages = ensured.messages;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      chatHook.setMessages(nextMessages);
+    }
+  }, [
+    chatHook,
+    chatHook.messages,
+    compressionConfig.enabled,
+    storeActiveThreadId,
+    threadId,
+    threadStore,
+  ]);
+
   const compressionBaseMessages = useMemo(
     () => (chatHook.messages as UIMessage[]) ?? [],
     [chatHook.messages]
@@ -877,6 +1234,14 @@ export function useAIChat({
       config: compressionConfig,
     });
 
+    const usageChanged = hasMeaningfulUsageChange(store.usage, result.usage);
+    const shouldCompressChanged = store.shouldCompress !== result.shouldCompress;
+    const overBudgetChanged = store.overBudget !== result.overBudget;
+
+    if (!usageChanged && !shouldCompressChanged && !overBudgetChanged) {
+      return;
+    }
+
     store.setUsage(result.usage, {
       shouldCompress: result.shouldCompress,
       overBudget: result.overBudget,
@@ -888,6 +1253,120 @@ export function useAIChat({
     compressionController.pinnedMessages,
     compressionController.artifacts,
     compressionController.snapshot,
+  ]);
+
+  useEffect(() => {
+    const effectiveThreadId = threadId ?? storeActiveThreadId;
+
+    if (!compressionConfig.enabled) {
+      const cleared = applyCompressionMetadataToMessages(
+        (chatHook.messages as UIMessage[]) ?? [],
+        null
+      );
+      if (cleared.changed) {
+        chatHook.setMessages(cleared.messages);
+        if (effectiveThreadId) {
+          try {
+            threadStore
+              .getState()
+              .updateThreadMessages(effectiveThreadId, cleared.messages);
+          } catch {
+            /* ignore persistence errors */
+          }
+        }
+      }
+
+      if (effectiveThreadId) {
+        try {
+          threadStore
+            .getState()
+            .updateThreadMetadata(effectiveThreadId, {
+              [COMPRESSION_THREAD_METADATA_KEY]: null,
+            });
+        } catch {
+          /* ignore persistence errors */
+        }
+      }
+
+      lastPersistedCompressionRef.current = null;
+      lastHydratedCompressionRef.current = null;
+      return;
+    }
+
+    const persisted = buildPersistedCompressionState(compressionController);
+
+    if (isEqual(lastPersistedCompressionRef.current, persisted)) {
+      return;
+    }
+
+    const normalizedPersisted = clonePersistedCompressionState(persisted);
+    lastPersistedCompressionRef.current = clonePersistedCompressionState(
+      normalizedPersisted
+    );
+
+    let nextMessages = (chatHook.messages as UIMessage[]) ?? [];
+    let changed = false;
+
+    const applied = applyCompressionMetadataToMessages(
+      nextMessages,
+      normalizedPersisted?.snapshot ?? null
+    );
+
+    nextMessages = applied.messages;
+    changed = applied.changed;
+
+    if (normalizedPersisted?.snapshot) {
+      const ensured = ensureCompressionEventMessage(nextMessages, {
+        snapshot: normalizedPersisted.snapshot,
+        artifacts: normalizedPersisted.artifacts,
+        usage: normalizedPersisted.usage,
+      });
+      if (ensured.changed) {
+        nextMessages = ensured.messages;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      chatHook.setMessages(nextMessages);
+      if (effectiveThreadId) {
+        try {
+          threadStore
+            .getState()
+            .updateThreadMessages(effectiveThreadId, nextMessages);
+        } catch {
+          /* ignore persistence errors */
+        }
+      }
+    }
+
+    if (effectiveThreadId) {
+      try {
+        threadStore
+          .getState()
+          .updateThreadMetadata(effectiveThreadId, {
+            [COMPRESSION_THREAD_METADATA_KEY]: normalizedPersisted,
+          });
+        lastHydratedCompressionRef.current = clonePersistedCompressionState(
+          normalizedPersisted
+        );
+      } catch {
+        /* ignore persistence errors */
+      }
+    }
+  }, [
+    chatHook,
+    chatHook.messages,
+    compressionConfig.enabled,
+    compressionController.artifacts,
+    compressionController.metadata,
+    compressionController.overBudget,
+    compressionController.shouldCompress,
+    compressionController.snapshot,
+    compressionController.usage,
+    storeActiveThreadId,
+    threadId,
+    threadStore,
   ]);
 
   // Update ref to latest chatHook for stable callback access

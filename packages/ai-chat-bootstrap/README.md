@@ -105,6 +105,7 @@ export { handler as POST };
 Available handlers:
 
 - `createAIChatHandler` - Main chat streaming
+- `createCompressionHandler` - Conversation compression API (all summarization happens server-side)
 - `createSuggestionsHandler` - AI-generated suggestions
 - `createThreadTitleHandler` - Auto thread titles
 - `createMcpToolsHandler` - MCP server tools
@@ -120,6 +121,7 @@ Each handler accepts model configuration and error handling options.
 - Frontend tool registration (execute functions client side)
 - Context sharing hooks (inject dynamic UI state as model context)
 - Focus/selection tracking for contextual relevance
+- Automatic context compression via remote API callback
 - AI suggestion queue + UI components
 - Reasoning / tool / sources / code block message parts
 - Tailwind + shadcn/ui base components

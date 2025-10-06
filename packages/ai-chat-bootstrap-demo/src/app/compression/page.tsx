@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { ChatContainer, type UIMessage } from "ai-chat-bootstrap";
 
 const LOW_BUDGET_MODEL = [
@@ -46,6 +47,14 @@ const STARTER_MESSAGES: UIMessage[] = [
 ];
 
 export default function CompressionDemoPage() {
+  const compressionConfig = useMemo(
+    () => ({
+      enabled: true,
+      model: LOW_BUDGET_MODEL[0]?.id,
+    }),
+    []
+  );
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10 h-screen overflow-hidden">
       <div className="space-y-3 ">
@@ -63,9 +72,7 @@ export default function CompressionDemoPage() {
 
       <ChatContainer
         transport={{ api: "/api/chat" }}
-        compression={{
-          enabled: true,
-        }}
+        compression={compressionConfig}
         messages={{
           initial: STARTER_MESSAGES,
           systemPrompt:

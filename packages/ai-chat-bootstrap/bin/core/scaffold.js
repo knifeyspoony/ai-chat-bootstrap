@@ -258,10 +258,12 @@ async function scaffold({ projectName, tailwindNative, localPath }) {
   const apiSugDir = path.join("src", "app", "api", "suggestions");
   const apiMcpDir = path.join("src", "app", "api", "mcp");
   const apiThreadTitleDir = path.join("src", "app", "api", "thread-title");
+  const apiCompressionDir = path.join("src", "app", "api", "compression");
   fs.mkdirSync(apiChatDir, { recursive: true });
   fs.mkdirSync(apiSugDir, { recursive: true });
   fs.mkdirSync(apiMcpDir, { recursive: true });
   fs.mkdirSync(apiThreadTitleDir, { recursive: true });
+  fs.mkdirSync(apiCompressionDir, { recursive: true });
   const chatRoutePath = path.join(apiChatDir, "route.ts");
   const chatRouteTemplate = fs.readFileSync(
     path.join(tmplDir, "api-chat-route.ts"),
@@ -277,6 +279,16 @@ async function scaffold({ projectName, tailwindNative, localPath }) {
   await writeFileWithConfirmation(
     suggestionsRoutePath,
     suggestionsTemplate
+  );
+
+  const compressionRoutePath = path.join(apiCompressionDir, "route.ts");
+  const compressionTemplate = fs.readFileSync(
+    path.join(tmplDir, "api-compression-route.ts"),
+    "utf8"
+  );
+  await writeFileWithConfirmation(
+    compressionRoutePath,
+    compressionTemplate
   );
 
   const mcpRoutePath = path.join(apiMcpDir, "route.ts");

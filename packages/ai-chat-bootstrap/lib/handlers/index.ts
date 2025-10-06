@@ -1,6 +1,9 @@
 export { createAIChatHandler } from "./create-ai-chat-handler";
 export type { CreateAIChatHandlerOptions } from "./create-ai-chat-handler";
 
+export { createCompressionHandler } from "./create-compression-handler";
+export type { CreateCompressionHandlerOptions } from "./create-compression-handler";
+
 export { createSuggestionsHandler } from "./create-suggestions-handler";
 export type { CreateSuggestionsHandlerOptions } from "./create-suggestions-handler";
 

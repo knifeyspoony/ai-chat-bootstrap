@@ -1,11 +1,13 @@
 import {
   BotMessageSquare,
   Calculator,
+  Loader2,
   Percent,
   TriangleAlert,
 } from "lucide-react";
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
 import {
   Popover,
   PopoverContent,
@@ -115,7 +117,9 @@ export const CompressionUsageIndicator: React.FC<
     if (!pins.length) return undefined;
     const pinMessages = pins
       .map((pin) => pin.message)
-      .filter((message): message is NonNullable<typeof message> => Boolean(message));
+      .filter((message): message is NonNullable<typeof message> =>
+        Boolean(message)
+      );
     if (!pinMessages.length) return 0;
     return calculateTokensForMessages(pinMessages);
   }, [compression?.pinnedMessages]);
@@ -169,6 +173,21 @@ export const CompressionUsageIndicator: React.FC<
     "relative font-mono text-[11px] font-semibold leading-none",
     showAlert ? "text-destructive" : "text-muted-foreground"
   );
+
+  const runCompression = compression?.runCompression;
+  const canManuallyCompress = Boolean(runCompression);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const handleManualCompression = useCallback(async () => {
+    if (!runCompression || isCompressing) return;
+    setIsCompressing(true);
+    try {
+      await runCompression({ force: true, reason: "manual" });
+    } catch {
+      /* swallow errors - event stream handles surfacing */
+    } finally {
+      setIsCompressing(false);
+    }
+  }, [isCompressing, runCompression]);
 
   return (
     <Popover>
@@ -350,6 +369,25 @@ export const CompressionUsageIndicator: React.FC<
                   </div>
                 )}
               </div>
+              {canManuallyCompress && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="default"
+                  className="w-full justify-center"
+                  onClick={handleManualCompression}
+                  disabled={isCompressing}
+                >
+                  {isCompressing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Compressing...
+                    </>
+                  ) : (
+                    "Compress conversation"
+                  )}
+                </Button>
+              )}
             </div>
 
             {budget !== null && (

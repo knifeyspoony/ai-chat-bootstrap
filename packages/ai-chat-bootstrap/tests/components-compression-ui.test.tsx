@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent, within } from '@testing-library/react';
+import { render, fireEvent, within, waitFor } from '@testing-library/react';
 
 import { CompressionBanner } from '../lib/components/chat/compression-banner';
 import { CompressionUsageIndicator } from '../lib/components/chat/compression-usage-indicator';
@@ -41,6 +41,7 @@ function makeCompressionController(overrides: Partial<CompressionController> = {
       setUsage: noop,
       setSnapshot: noop,
     },
+    runCompression: undefined,
     ...overrides,
   };
 }
@@ -124,6 +125,61 @@ describe('Compression UI components', () => {
     expect(dialogUtils.getByText(/Compression error/i)).toBeTruthy();
     expect(dialogUtils.getByText(/Summarizer failed/)).toBeTruthy();
     expect(dialogUtils.getAllByText(/summarizer/i).length).toBeGreaterThan(0);
+  });
+
+  it('allows manually triggering compression from the usage popover', async () => {
+    const runCompression = vi.fn().mockResolvedValue({
+      messages: [],
+      pinnedMessageIds: [],
+      artifactIds: [],
+      survivingMessageIds: [],
+      usage: {
+        totalTokens: 0,
+        pinnedTokens: 0,
+        artifactTokens: 0,
+        survivingTokens: 0,
+        updatedAt: Date.now(),
+      },
+      shouldCompress: false,
+      overBudget: false,
+    });
+
+    const compression = makeCompressionController({
+      runCompression,
+      usage: {
+        totalTokens: 200,
+        pinnedTokens: 20,
+        artifactTokens: 15,
+        survivingTokens: 165,
+        remainingTokens: 800,
+        budget: 1000,
+        updatedAt: Date.now(),
+      },
+    });
+
+    const { getByRole } = render(
+      <CompressionUsageIndicator compression={compression} />
+    );
+
+    const trigger = getByRole('button', { name: /compression usage/i });
+    fireEvent.click(trigger);
+
+    const dialog = getByRole('dialog');
+    const popoverUtils = within(dialog);
+    const manualButton = popoverUtils.getByRole('button', {
+      name: /compress conversation/i,
+    });
+
+    expect(manualButton.hasAttribute('disabled')).toBe(false);
+
+    fireEvent.click(manualButton);
+
+    await waitFor(() => {
+      expect(runCompression).toHaveBeenCalledWith({
+        force: true,
+        reason: 'manual',
+      });
+    });
   });
 
   it('renders artifact sheet button with badge and triggers updates', () => {

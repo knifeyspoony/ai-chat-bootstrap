@@ -11,6 +11,7 @@ export { buildEnrichedSystemPrompt } from "./utils/prompt-utils";
 export * from "./utils/token-utils";
 export {
   createAIChatHandler,
+  createCompressionHandler,
   createSuggestionsHandler,
   createThreadTitleHandler,
   createMcpToolsHandler,

@@ -1,5 +1,7 @@
 import type { UIMessage } from "ai";
 import type {
+  BuildCompressionPayloadInput,
+  BuildCompressionPayloadResult,
   CompressionArtifact,
   CompressionPinnedMessage,
   CompressionSnapshot,
@@ -10,24 +12,6 @@ import {
   calculateTokensForArtifacts,
   calculateTokensForMessages,
 } from "./token-helpers";
-
-export interface BuildCompressionPayloadInput {
-  baseMessages: UIMessage[];
-  pinnedMessages: CompressionPinnedMessage[];
-  artifacts: CompressionArtifact[];
-  snapshot: CompressionSnapshot | null;
-  config: NormalizedCompressionConfig;
-}
-
-export interface BuildCompressionPayloadResult {
-  messages: UIMessage[];
-  pinnedMessageIds: string[];
-  artifactIds: string[];
-  survivingMessageIds: string[];
-  usage: CompressionUsage;
-  shouldCompress: boolean;
-  overBudget: boolean;
-}
 
 const ARTIFACT_MESSAGE_PREFIX = "artifact";
 

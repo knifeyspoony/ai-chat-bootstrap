@@ -75,6 +75,25 @@ export interface CompressionSnapshot {
   tokensAfter?: number;
   tokensSaved?: number;
   reason?: string;
+  excludedMessageIds?: string[];
+}
+
+export interface BuildCompressionPayloadInput {
+  baseMessages: UIMessage[];
+  pinnedMessages: CompressionPinnedMessage[];
+  artifacts: CompressionArtifact[];
+  snapshot: CompressionSnapshot | null;
+  config: NormalizedCompressionConfig;
+}
+
+export interface BuildCompressionPayloadResult {
+  messages: UIMessage[];
+  pinnedMessageIds: string[];
+  artifactIds: string[];
+  survivingMessageIds: string[];
+  usage: CompressionUsage;
+  shouldCompress: boolean;
+  overBudget: boolean;
 }
 
 export interface CompressionSummarizerContext {
@@ -110,15 +129,69 @@ export interface CompressionErrorEvent {
   context?: Record<string, unknown>;
 }
 
+export type CompressionTriggerReason = "threshold" | "over-budget" | "manual";
+
+export interface CompressionRunOptions {
+  force?: boolean;
+  reason?: CompressionTriggerReason;
+}
+
+export interface CompressionServiceRequest {
+  messages: UIMessage[];
+  pinnedMessages: CompressionPinnedMessage[];
+  artifacts: CompressionArtifact[];
+  snapshot: CompressionSnapshot | null;
+  usage: CompressionUsage;
+  config: {
+    maxTokenBudget: number | null;
+    compressionThreshold: number;
+    pinnedMessageLimit: number | null;
+    model?: string | null;
+  };
+  metadata?: CompressionModelMetadata | null;
+  reason: CompressionTriggerReason;
+}
+
+export interface CompressionServiceResponse {
+  snapshot: CompressionSnapshot;
+  artifacts: CompressionArtifact[];
+  usage?: CompressionUsage;
+  pinnedMessages?: CompressionPinnedMessage[];
+}
+
+export interface CompressionServiceOptions {
+  signal?: AbortSignal;
+  api?: string;
+}
+
+export type CompressionServiceFetcher = (
+  request: CompressionServiceRequest,
+  options?: CompressionServiceOptions
+) => Promise<CompressionServiceResponse>;
+
 export interface CompressionConfig {
   enabled?: boolean;
   maxTokenBudget?: number | null;
   compressionThreshold?: number;
   pinnedMessageLimit?: number | null;
-  summarizer?: CompressionSummarizer;
+   model?: string | null;
   onCompression?: (payload: CompressionResultPayload) => void;
   onError?: (payload: CompressionErrorEvent) => void;
+  api?: string;
+  fetcher?: CompressionServiceFetcher;
 }
+
+export interface PersistedCompressionState {
+  snapshot: CompressionSnapshot | null;
+  artifacts: CompressionArtifact[];
+  usage: CompressionUsage | null;
+  metadata: CompressionModelMetadata | null;
+  shouldCompress: boolean;
+  overBudget: boolean;
+  updatedAt: number;
+}
+
+export const COMPRESSION_THREAD_METADATA_KEY = "acbCompression" as const;
 
 export interface CompressionControllerActions {
   pinMessage: (message: UIMessage, options?: { reason?: string; pinnedBy?: "user" | "system"; pinnedAt?: number }) => void;
@@ -147,6 +220,7 @@ export interface CompressionController {
   shouldCompress: boolean;
   overBudget: boolean;
   actions: CompressionControllerActions;
+  runCompression?: (options?: CompressionRunOptions) => Promise<BuildCompressionPayloadResult>;
 }
 
 export interface NormalizedCompressionConfig {
@@ -154,9 +228,11 @@ export interface NormalizedCompressionConfig {
   maxTokenBudget: number | null;
   compressionThreshold: number;
   pinnedMessageLimit: number | null;
-  summarizer?: CompressionSummarizer;
+  model: string | null;
   onCompression?: CompressionCallback;
   onError?: CompressionErrorCallback;
+  api: string;
+  fetcher?: CompressionServiceFetcher;
 }
 
 export const DEFAULT_COMPRESSION_THRESHOLD = 0.85;
@@ -166,6 +242,8 @@ export const DEFAULT_COMPRESSION_CONFIG: NormalizedCompressionConfig = {
   maxTokenBudget: null,
   compressionThreshold: DEFAULT_COMPRESSION_THRESHOLD,
   pinnedMessageLimit: null,
+  model: null,
+  api: "/api/compression",
 };
 
 export function normalizeCompressionConfig(
@@ -186,8 +264,15 @@ export function normalizeCompressionConfig(
     compressionThreshold:
       config.compressionThreshold ?? DEFAULT_COMPRESSION_THRESHOLD,
     pinnedMessageLimit,
-    summarizer: config.summarizer,
+    model:
+      config.model === undefined || config.model === null || config.model === ""
+        ? null
+        : config.model,
     onCompression: config.onCompression,
     onError: config.onError,
+    api: typeof config.api === "string" && config.api.trim().length > 0
+      ? config.api
+      : DEFAULT_COMPRESSION_CONFIG.api,
+    fetcher: config.fetcher,
   };
 }

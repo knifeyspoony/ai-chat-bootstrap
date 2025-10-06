@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ChatRequest, SuggestionsRequest } from "../lib/types/chat";
+import type { CompressionServiceResponse } from "../lib/types/compression";
 import type { UIMessage } from "ai";
 
 vi.mock("ai", () => ({
@@ -24,6 +25,7 @@ vi.mock("../lib/utils/backend-tool-utils", async () => {
 
 import {
   createAIChatHandler,
+  createCompressionHandler,
   createSuggestionsHandler,
   createThreadTitleHandler,
   createMcpToolsHandler,
@@ -138,6 +140,142 @@ describe("createAIChatHandler", () => {
     );
     expect(res.status).toBe(400);
     expect(streamText).not.toHaveBeenCalled();
+  });
+});
+
+describe("createCompressionHandler", () => {
+  console.log("createCompressionHandler tests starting");
+  const sampleMessages: UIMessage[] = [
+    {
+      id: "m1",
+      role: "user",
+      parts: [{ type: "text", text: "Hello" } as any],
+    },
+    {
+      id: "m2",
+      role: "assistant",
+      parts: [{ type: "text", text: "Hi there" } as any],
+    },
+  ];
+
+  it("calls the configured model to produce compression artifacts", async () => {
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    const modelResolver = vi.fn().mockReturnValue("compression-model");
+    (generateObject as unknown as vi.Mock).mockResolvedValue({
+      object: {
+        surviving_message_ids: ["m2"],
+        artifacts: [
+          {
+            title: "Summary",
+            summary: "Condensed summary",
+            category: "actions",
+            source_message_ids: ["m1"],
+          },
+        ],
+      },
+    });
+
+    const handler = createCompressionHandler({
+      model: ({ requestedModel }) => {
+        expect(requestedModel).toBe("gpt-4o-mini");
+        return modelResolver();
+      },
+    });
+
+    const requestBody = {
+      messages: sampleMessages,
+      pinnedMessages: [],
+      artifacts: [],
+      snapshot: null,
+      usage: {
+        totalTokens: 40,
+        pinnedTokens: 0,
+        artifactTokens: 0,
+        survivingTokens: 40,
+        updatedAt: 0,
+      },
+      config: {
+        maxTokenBudget: 100,
+        compressionThreshold: 0.8,
+        pinnedMessageLimit: null,
+        model: "gpt-4o-mini",
+      },
+      reason: "threshold" as const,
+    };
+
+    let response: Response;
+    try {
+      response = await handler(
+        new Request("http://test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        })
+      );
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    expect(response.status).toBe(200);
+    expect(modelResolver).toHaveBeenCalled();
+    expect(generateObject).toHaveBeenCalledWith(
+      expect.objectContaining({ model: "compression-model" })
+    );
+
+    const payload = (await response.json()) as CompressionServiceResponse;
+    expect(payload.artifacts).toHaveLength(1);
+    expect(payload.snapshot.artifactIds).toHaveLength(1);
+    expect(payload.snapshot.survivingMessageIds).toContain("m2");
+  });
+
+  it("returns 400 when messages are missing", async () => {
+    const handler = createCompressionHandler({ model: () => "model" });
+
+    const response = await handler(
+      new Request("http://test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      })
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("returns 400 when the resolver cannot provide a model", async () => {
+    const handler = createCompressionHandler({ model: () => null });
+
+    const requestBody = {
+      messages: sampleMessages,
+      pinnedMessages: [],
+      artifacts: [],
+      snapshot: null,
+      usage: {
+        totalTokens: 40,
+        pinnedTokens: 0,
+        artifactTokens: 0,
+        survivingTokens: 40,
+        updatedAt: 0,
+      },
+      config: {
+        maxTokenBudget: 100,
+        compressionThreshold: 0.8,
+        pinnedMessageLimit: null,
+        model: null,
+      },
+      reason: "threshold" as const,
+    };
+
+    const response = await handler(
+      new Request("http://test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(generateObject).not.toHaveBeenCalled();
   });
 });
 

@@ -9,6 +9,8 @@ const BASE_CONFIG: NormalizedCompressionConfig = {
   maxTokenBudget: null,
   compressionThreshold: 0.85,
   pinnedMessageLimit: null,
+  model: null,
+  api: '/api/compression',
 };
 
 describe('buildCompressionPayload', () => {
@@ -143,6 +145,8 @@ describe('buildCompressionPayload', () => {
       maxTokenBudget: 10,
       compressionThreshold: 0.5,
       pinnedMessageLimit: null,
+      model: null,
+      api: '/api/compression',
     };
 
     const payload = buildCompressionPayload({

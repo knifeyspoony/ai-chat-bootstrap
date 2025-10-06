@@ -3,6 +3,11 @@ import defaultTheme from "tailwindcss/defaultTheme";
 
 const config: Config = {
   content: ["./lib/**/*.{js,ts,jsx,tsx}"],
+  safelist: [
+    "hover:bg-primary/90",
+    "hover:bg-destructive/90",
+    "hover:bg-secondary/80",
+  ],
   theme: {
     extend: {
       fontFamily: {

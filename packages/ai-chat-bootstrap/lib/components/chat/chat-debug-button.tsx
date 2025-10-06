@@ -12,7 +12,12 @@ export function ChatDebugButton() {
 
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setOpen(true)}
+        aria-label="Open debug tools"
+      >
         <BugIcon size={20} />
       </Button>
       <ChatDebugSheet open={open} onOpenChange={setOpen} />

@@ -108,6 +108,12 @@ export interface ChatContainerProps extends UseAIChatOptions {
     /** Custom actions with full control over behavior and appearance */
     custom?: AssistantAction[];
   };
+
+  /** Development tooling configuration */
+  devtools?: {
+    /** Show the header debug button (development only, defaults to false) */
+    headerDebugButton?: boolean;
+  };
 }
 
 type ChatContainerUiProps = Omit<ChatContainerProps, keyof UseAIChatOptions>;
@@ -129,6 +135,7 @@ function ChatContainerView(props: ChatContainerViewProps) {
     threads: threadsOptions,
     assistantActions: assistantActionOptions,
     ["data-acb-unstyled"]: unstyledProp,
+    devtools,
   } = props;
 
   const {
@@ -236,8 +243,10 @@ function ChatContainerView(props: ChatContainerViewProps) {
   // Memoize header actions to prevent recreating on every render
   const headerActions = useMemo(() => {
     const hasThreads = threadsOptions?.enabled;
-    const hasDebug =
-      typeof process !== "undefined" && process.env.NODE_ENV !== "production";
+    const isProduction =
+      typeof process !== "undefined" && process.env.NODE_ENV === "production";
+    const debugButtonEnabled = devtools?.headerDebugButton ?? false;
+    const hasDebug = !isProduction && debugButtonEnabled;
     const hasMcp = mcpEnabled;
     const hasCustomActions = header?.actions;
 
@@ -264,7 +273,13 @@ function ChatContainerView(props: ChatContainerViewProps) {
         {hasCustomActions && header?.actions}
       </>
     );
-  }, [threadsOptions?.enabled, scopeKey, mcpEnabled, header?.actions]);
+  }, [
+    threadsOptions?.enabled,
+    scopeKey,
+    mcpEnabled,
+    header?.actions,
+    devtools?.headerDebugButton,
+  ]);
 
   // Build assistant actions configuration from built-in and custom actions
   const assistantActionsConfig = useMemo(() => {

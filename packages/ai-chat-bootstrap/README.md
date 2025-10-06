@@ -353,6 +353,7 @@ If you need additional variant surfaces, open an issue or PR—extending CVA con
 - `suggestions`: enabled, prompt, count
 - `commands`: enabled
 - `assistantActions`: enable built-in buttons (`copy`, `regenerate`, `debug`, `feedback`) or supply a `custom` array of `AssistantAction`s for bespoke controls
+- `devtools`: `{ headerDebugButton?: boolean }` – development-only header debug toggle (defaults to `false`)
 
 ### ChatPopout
 

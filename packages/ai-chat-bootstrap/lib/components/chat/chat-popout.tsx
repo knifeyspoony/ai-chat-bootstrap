@@ -44,6 +44,7 @@ export function ChatPopout(props: ChatPopoutProps) {
     mcp,
     models: modelsOptions,
     compression: compressionOptions,
+    devtools,
     // UI configuration props
     header,
     ui,
@@ -166,6 +167,7 @@ export function ChatPopout(props: ChatPopoutProps) {
     models: modelsOptions,
     compression: compressionOptions,
     "data-acb-unstyled": unstyledProp,
+    devtools,
     header: {
       ...header,
       actions: (

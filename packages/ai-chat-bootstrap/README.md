@@ -108,9 +108,9 @@ Available handlers:
 - `createCompressionHandler` - Conversation compression API (all summarization happens server-side)
 - `createSuggestionsHandler` - AI-generated suggestions
 - `createThreadTitleHandler` - Auto thread titles
-- `createMcpToolsHandler` - MCP server tools
+- `createMcpToolsHandler` - MCP tool discovery bridge used by `useMCPServer`
 
-Each handler accepts model configuration and error handling options.
+Each handler ships focused options; see the API docs for details. (`createMcpToolsHandler` only exposes an optional `onError` callback because MCP server descriptors are supplied by the client.)
 
 ## Features
 

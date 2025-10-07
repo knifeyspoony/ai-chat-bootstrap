@@ -50,6 +50,7 @@ import {
   clonePersistedCompressionState,
 } from "../utils/compression/persistence";
 import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
+import { logDevError } from "../utils/dev-logger";
 import { useChainOfThought } from "./use-chain-of-thought";
 import { useAIChatCompression } from "./use-ai-chat-compression";
 import { useAIChatBranching } from "./use-ai-chat-branching";
@@ -425,8 +426,11 @@ export function useAIChat({
       if (Array.isArray(mcp?.servers)) {
         setMcpConfigurations(mcp.servers);
       }
-    } catch {
-      /* ignore */
+    } catch (error) {
+      logDevError(
+        "[acb][useAIChat] failed to configure MCP servers from props",
+        error
+      );
     }
   }, [
     mcpEnabled,
@@ -448,12 +452,25 @@ export function useAIChat({
       const scopeChanged = state.scopeKey !== scopeKey;
       if (scopeChanged) {
         state.setScopeKey(scopeKey);
-        state.loadThreadMetas(scopeKey).catch(() => {});
+        state.loadThreadMetas(scopeKey).catch((error) => {
+          logDevError(
+            `[acb][useAIChat] failed to load thread metadata for scope "${scopeKey}"`,
+            error
+          );
+        });
       } else if (!state.isLoaded) {
-        state.loadThreadMetas(scopeKey).catch(() => {});
+        state.loadThreadMetas(scopeKey).catch((error) => {
+          logDevError(
+            `[acb][useAIChat] failed to load thread metadata for scope "${scopeKey}"`,
+            error
+          );
+        });
       }
-    } catch {
-      /* ignore */
+    } catch (error) {
+      logDevError(
+        "[acb][useAIChat] failed to resolve thread scope metadata",
+        error
+      );
     }
   }, [scopeKey, threadStore]);
 
@@ -467,8 +484,11 @@ export function useAIChat({
         if (!state.isLoaded) {
           try {
             await state.loadThreadMetas(scope);
-          } catch {
-            /* ignore */
+          } catch (error) {
+            logDevError(
+              `[acb][useAIChat] failed to load thread metadata before selecting default thread (scope "${scope ?? "(default)"}")`,
+              error
+            );
           }
         }
         // Prefer existing active if present
@@ -512,8 +532,11 @@ export function useAIChat({
         }
       }
       pickOrCreateLatest();
-    } catch {
-      /* ignore */
+    } catch (error) {
+      logDevError(
+        "[acb][useAIChat] failed to select or create a default thread",
+        error
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId, scopeKey]);
@@ -525,7 +548,11 @@ export function useAIChat({
       (() => {
         try {
           return useChatThreadsStore.getState().activeThreadId;
-        } catch {
+        } catch (error) {
+          logDevError(
+            "[acb][useAIChat] failed to read active thread id from store",
+            error
+          );
           return undefined;
         }
       })();
@@ -534,7 +561,11 @@ export function useAIChat({
         const state = useChatThreadsStore.getState();
         const t = state.getThreadIfLoaded?.(effectiveId);
         return t?.messages;
-      } catch {
+      } catch (error) {
+        logDevError(
+          `[acb][useAIChat] failed to read cached messages for thread "${effectiveId}"`,
+          error
+        );
         return undefined;
       }
     }
@@ -586,20 +617,27 @@ export function useAIChat({
             }
           }
         })
-        .catch(() => {
+        .catch((error) => {
           if (warnOnMissingThread) {
             console.warn(
               `[acb][useAIChat] failed loading threadId "${threadId}" from persistence`
             );
           }
+          logDevError(
+            `[acb][useAIChat] failed loading threadId "${threadId}" from persistence`,
+            error
+          );
           const s2 = threadStore.getState();
           if (autoCreateThread && !s2.threads.get(threadId)) {
             s2.createThread({ id: threadId, scopeKey });
             s2.setActiveThread(threadId);
           }
         });
-    } catch {
-      /* ignore */
+    } catch (error) {
+      logDevError(
+        `[acb][useAIChat] failed handling provided threadId "${threadId}"`,
+        error
+      );
     }
     // We intentionally exclude dependencies that would retrigger this unnecessarily
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -866,14 +904,27 @@ export function useAIChat({
                         });
                       }
                     })
-                    .catch(() => {});
+                    .catch((error) => {
+                      logDevError(
+                        `[acb][useAIChat] failed to fetch auto title for thread "${effectiveId}"`,
+                        error
+                      );
+                    });
                 }
               }
-            } catch {
-              /* ignore */
+            } catch (error) {
+              logDevError(
+                `[acb][useAIChat] failed to apply auto-title logic for thread "${effectiveId}"`,
+                error
+              );
             }
           }
-        } catch {}
+        } catch (error) {
+          logDevError(
+            "[acb][useAIChat] failed to persist messages after completion",
+            error
+          );
+        }
       }
     },
     onError: () => {
@@ -1270,8 +1321,11 @@ export function useAIChat({
             threadStore
               .getState()
               .updateThreadMessages(effectiveThreadId, cleared.messages);
-          } catch {
-            /* ignore persistence errors */
+          } catch (error) {
+            logDevError(
+              `[acb][useAIChat] failed to persist cleared compression messages for thread "${effectiveThreadId}"`,
+              error
+            );
           }
         }
       }
@@ -1283,8 +1337,11 @@ export function useAIChat({
             .updateThreadMetadata(effectiveThreadId, {
               [COMPRESSION_THREAD_METADATA_KEY]: null,
             });
-        } catch {
-          /* ignore persistence errors */
+        } catch (error) {
+          logDevError(
+            `[acb][useAIChat] failed to clear compression metadata for thread "${effectiveThreadId}"`,
+            error
+          );
         }
       }
 
@@ -1334,8 +1391,11 @@ export function useAIChat({
           threadStore
             .getState()
             .updateThreadMessages(effectiveThreadId, nextMessages);
-        } catch {
-          /* ignore persistence errors */
+        } catch (error) {
+          logDevError(
+            `[acb][useAIChat] failed to persist compression-updated messages for thread "${effectiveThreadId}"`,
+            error
+          );
         }
       }
     }
@@ -1350,8 +1410,11 @@ export function useAIChat({
         lastHydratedCompressionRef.current = clonePersistedCompressionState(
           normalizedPersisted
         );
-      } catch {
-        /* ignore persistence errors */
+      } catch (error) {
+        logDevError(
+          `[acb][useAIChat] failed to persist compression metadata for thread "${effectiveThreadId}"`,
+          error
+        );
       }
     }
   }, [
@@ -1388,7 +1451,12 @@ export function useAIChat({
         const st = threadStore.getState();
         // Keep it loaded if we might come back? For now, unload to save memory.
         st.unloadThread?.(prev);
-      } catch {}
+      } catch (error) {
+        logDevError(
+          `[acb][useAIChat] failed to unload thread "${prev}"`,
+          error
+        );
+      }
     }
     if (effectiveId) {
       // Ensure loaded
@@ -1405,7 +1473,12 @@ export function useAIChat({
                 existing.some((m, i) => storeMsgs[i]?.id !== m.id);
               if (differs) chatHook.setMessages(storeMsgs);
             })
-            .catch(() => {});
+            .catch((error) => {
+              logDevError(
+                `[acb][useAIChat] failed to hydrate thread "${effectiveId}"`,
+                error
+              );
+            });
         } else {
           const t = st.getThreadIfLoaded(effectiveId);
           if (t) {
@@ -1417,7 +1490,12 @@ export function useAIChat({
             if (differs) chatHook.setMessages(storeMsgs);
           }
         }
-      } catch {}
+      } catch (error) {
+        logDevError(
+          `[acb][useAIChat] failed to access thread state for "${effectiveId}"`,
+          error
+        );
+      }
     } else {
       // no active thread
       chatHook.setMessages([]);
@@ -1438,7 +1516,12 @@ export function useAIChat({
         toolCallId: toolCall.toolCallId,
         output: output,
       });
-    } catch {}
+    } catch (error) {
+      logDevError(
+        `[acb][useAIChat] failed to append tool result for "${toolCall.toolName}"`,
+        error
+      );
+    }
   }
 
   const sendMessageWithContext = useCallback(
@@ -1482,7 +1565,12 @@ export function useAIChat({
                 }
               }
             }
-          } catch {}
+          } catch (error) {
+            logDevError(
+              "[acb][useAIChat] failed to persist thread state after sending message",
+              error
+            );
+          }
         });
       }
     },
@@ -1519,7 +1607,12 @@ export function useAIChat({
                 chatHookRef.current?.messages as UIMessage[]
               );
             }
-          } catch {}
+          } catch (error) {
+            logDevError(
+              "[acb][useAIChat] failed to persist thread state after command message",
+              error
+            );
+          }
         });
       }
     },
@@ -1563,7 +1656,11 @@ export function useAIChat({
         (() => {
           try {
             return threadStore.getState().activeThreadId;
-          } catch {
+          } catch (error) {
+            logDevError(
+              "[acb][useAIChat] failed to read active thread id during persistence",
+              error
+            );
             return undefined;
           }
         })();
@@ -1578,8 +1675,11 @@ export function useAIChat({
         store.updateThreadMessages(effectiveId, msgs);
         lastSavedSignatureRef.current = sig;
         // Optionally debug: console.debug('[acb][autosave]', reason, sig)
-      } catch {
-        /* ignore */
+      } catch (error) {
+        logDevError(
+          `[acb][useAIChat] failed to persist messages for thread "${effectiveId}"`,
+          error
+        );
       }
     },
     [threadId, threadStore, chatHook.messages]

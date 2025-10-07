@@ -24,6 +24,7 @@ import type { AssistantAction } from "../../types/actions";
 import type { Suggestion } from "../../types/chat";
 import { cn } from "../../utils";
 import { buildBuiltInActions } from "../../utils/built-in-actions";
+import { logDevError } from "../../utils/dev-logger";
 import { ChatThreadsButton } from "./chat-threads-button";
 import { McpServersButton } from "./mcp-servers-button";
 
@@ -184,8 +185,11 @@ function ChatContainerView(props: ChatContainerViewProps) {
         const text = String(fd.get("message") || "").trim();
         if (!text) return;
         sendMessageWithContext(text);
-      } catch {
-        /* ignore */
+      } catch (error) {
+        logDevError(
+          "[acb][ChatContainer] failed to submit message with context",
+          error
+        );
       }
     },
     [sendMessageWithContext]

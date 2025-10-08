@@ -212,13 +212,7 @@ const PureToolbarLeft = ({
   disabled = false,
   compression,
 }: PureToolbarLeftProps) => {
-  const compressionEnabled = Boolean(
-    compression &&
-      (compression.config?.enabled ||
-        compression.pinnedMessages.length > 0 ||
-        compression.artifacts.length > 0 ||
-        compression.usage)
-  );
+  const compressionEnabled = compression?.config?.enabled === true;
 
   return (
     <div className="flex items-center gap-1">

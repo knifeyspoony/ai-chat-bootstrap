@@ -13,7 +13,7 @@ const isAssistantVisiblePart = (part: MessagePart) => {
   if (!part) {
     return false;
   }
-  if (part.type?.startsWith("tool-acb_") || part.type === "dynamic-tool") {
+  if (part.type?.startsWith("tool-acb_")) {
     return false;
   }
   if (part.type === "step-start") {

@@ -27,10 +27,10 @@ function sortArtifacts(
 ): CompressionArtifact[] {
   const entries = Array.from(artifacts.values());
   entries.sort((a, b) => {
-    const aTime = a.updatedAt ?? a.createdAt;
-    const bTime = b.updatedAt ?? b.createdAt;
+    const aTime = a.createdAt ?? 0;
+    const bTime = b.createdAt ?? 0;
     if (aTime !== bTime) {
-      return aTime - bTime;
+      return bTime - aTime;
     }
     return a.id.localeCompare(b.id);
   });

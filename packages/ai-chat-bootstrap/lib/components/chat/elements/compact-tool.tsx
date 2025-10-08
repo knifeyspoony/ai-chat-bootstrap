@@ -21,11 +21,15 @@ import {
 
 export interface CompactToolProps {
   className?: string;
-  type: ToolUIPart["type"];
+  type: ToolUIPart["type"] | "dynamic-tool";
   state: ToolUIPart["state"];
-  input?: ToolUIPart["input"];
+  input?: unknown;
   output?: ReactNode;
-  errorText?: ToolUIPart["errorText"];
+  errorText?: string;
+  /**
+   * Label to display instead of the raw type string.
+   */
+  label?: string;
 }
 
 const getStatusBadge = (status: ToolUIPart["state"]) => {
@@ -65,6 +69,7 @@ export function CompactTool({
   input,
   output,
   errorText,
+  label,
 }: CompactToolProps) {
   return (
     <Collapsible
@@ -80,10 +85,18 @@ export function CompactTool({
           "bg-[var(--acb-tool-header-bg)] text-[var(--acb-tool-header-fg)]"
         )}
       >
-        <div className="flex items-center gap-1">
-          <WrenchIcon size={12} className="size-2.5 text-muted-foreground" />
-          <span className="font-medium text-[12px]">{type}</span>
-          {getStatusBadge(state)}
+        <div className="flex min-w-0 items-center gap-1">
+          <WrenchIcon
+            size={12}
+            className="size-2.5 shrink-0 text-muted-foreground"
+          />
+          <span
+            className="max-w-[10rem] truncate text-[11px] font-medium leading-tight"
+            title={label ?? type}
+          >
+            {label ?? type}
+          </span>
+          <div className="shrink-0">{getStatusBadge(state)}</div>
         </div>
         <ChevronDownIcon className="size-2.5 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
       </CollapsibleTrigger>

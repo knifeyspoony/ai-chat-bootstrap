@@ -1,12 +1,6 @@
-import { generateObject } from "ai";
 import type { LanguageModel, ModelMessage, UIMessage } from "ai";
+import { generateObject } from "ai";
 import { z } from "zod";
-import { buildCompressionPayload } from "../utils/compression/build-payload";
-import {
-  calculateTokensForMessages,
-  estimateTokenLength,
-  extractMessageText,
-} from "../utils/compression/token-helpers";
 import {
   normalizeCompressionConfig,
   type BuildCompressionPayloadResult,
@@ -15,27 +9,35 @@ import {
   type CompressionServiceResponse,
   type CompressionSnapshot,
 } from "../types/compression";
+import { buildCompressionPayload } from "../utils/compression/build-payload";
+import {
+  calculateTokensForMessages,
+  estimateTokenLength,
+  extractMessageText,
+} from "../utils/compression/token-helpers";
 import { JSON_HEADERS, type GenerateObjectOptions } from "./shared";
 
-const DEFAULT_SYSTEM_PROMPT = `You compress chat transcripts so future LLM calls stay within token limits. Summaries must be precise, retain action items, decisions, and user preferences, and never omit pinned messages. Always preserve the latest important turns so the assistant keeps context.`;
+const DEFAULT_SYSTEM_PROMPT = `You compress chat transcripts so future LLM calls stay within token limits. Summaries must be precise, retain action items, decisions, and user preferences, and never omit pinned messages. Always preserve the latest important turns so the assistant keeps context. Always emit a primary_summary object that reflects the conversation state. Do not decide which message IDs survive; focus on accurate summarization only.`;
 
 const MAX_RECENT_SURVIVORS_DEFAULT = 4;
 const MAX_ARTIFACTS_DEFAULT = 3;
 const MESSAGE_SNIPPET_LENGTH = 640;
 let snapshotSequence = 0;
 
+const ArtifactBlueprintSchema = z.object({
+  title: z.string().min(1).max(160).optional(),
+  summary: z.string().min(1),
+  category: z.string().min(1).max(64).optional(),
+  source_message_ids: z.array(z.string().min(1)).optional(),
+});
+
+const PrimarySummaryBlueprintSchema = ArtifactBlueprintSchema.extend({
+  category: z.literal("primary_summary").optional(),
+});
+
 const SummarizationSchema = z.object({
-  surviving_message_ids: z.array(z.string().min(1)).optional(),
-  artifacts: z
-    .array(
-      z.object({
-        title: z.string().min(1).max(160).optional(),
-        summary: z.string().min(1),
-        category: z.string().min(1).max(64).optional(),
-        source_message_ids: z.array(z.string().min(1)).optional(),
-      })
-    )
-    .optional(),
+  primary_summary: PrimarySummaryBlueprintSchema,
+  artifacts: z.array(ArtifactBlueprintSchema).optional(),
   notes: z.string().optional(),
 });
 
@@ -64,7 +66,13 @@ interface ModelResolverContext {
 
 type ModelResolver =
   | LanguageModel
-  | ((ctx: ModelResolverContext) => Promise<LanguageModel | null | undefined> | LanguageModel | null | undefined);
+  | ((
+      ctx: ModelResolverContext
+    ) =>
+      | Promise<LanguageModel | null | undefined>
+      | LanguageModel
+      | null
+      | undefined);
 
 export interface CreateCompressionHandlerOptions {
   model?: ModelResolver;
@@ -76,9 +84,10 @@ export interface CreateCompressionHandlerOptions {
   maxRecentMessages?: number;
   maxArtifacts?: number;
   generateOptions?: GenerateObjectOptions;
-  buildGenerateOptions?: (
-    ctx: { req: Request; body: CompressionServiceRequest }
-  ) => Promise<GenerateObjectOptions> | GenerateObjectOptions;
+  buildGenerateOptions?: (ctx: {
+    req: Request;
+    body: CompressionServiceRequest;
+  }) => Promise<GenerateObjectOptions> | GenerateObjectOptions;
   onError?: (
     error: unknown,
     ctx: { req: Request; body?: CompressionServiceRequest }
@@ -128,7 +137,9 @@ function buildConversationEntries(
   });
 }
 
-function buildArtifactsContext(artifacts: CompressionArtifact[]): ArtifactContextEntry[] {
+function buildArtifactsContext(
+  artifacts: CompressionArtifact[]
+): ArtifactContextEntry[] {
   if (!Array.isArray(artifacts) || artifacts.length === 0) {
     return [];
   }
@@ -136,7 +147,12 @@ function buildArtifactsContext(artifacts: CompressionArtifact[]): ArtifactContex
     id: artifact.id,
     title: artifact.title,
     category: artifact.category,
-    summary: artifact.summary ? truncateText(normalizeWhitespace(artifact.summary), MESSAGE_SNIPPET_LENGTH) : undefined,
+    summary: artifact.summary
+      ? truncateText(
+          normalizeWhitespace(artifact.summary),
+          MESSAGE_SNIPPET_LENGTH
+        )
+      : undefined,
   }));
 }
 
@@ -162,12 +178,18 @@ function composePrompt(params: {
   const lines: string[] = [];
 
   lines.push(
-    `Compression trigger: ${reason ?? "unknown"}. Current transcript tokens (approx): ${usageTotalTokens}.`
+    `Compression trigger: ${
+      reason ?? "unknown"
+    }. Current transcript tokens (approx): ${usageTotalTokens}.`
   );
   if (budget !== null) {
-    lines.push(`Token budget: ${budget}. Maintain safe headroom for upcoming replies.`);
+    lines.push(
+      `Token budget: ${budget}. Maintain safe headroom for upcoming replies.`
+    );
   } else {
-    lines.push("Token budget: unknown. Focus on keeping the transcript concise without losing critical context.");
+    lines.push(
+      "Token budget: unknown. Focus on keeping the transcript concise without losing critical context."
+    );
   }
 
   lines.push(
@@ -178,7 +200,9 @@ function composePrompt(params: {
     lines.push("Pinned message details:");
     pinnedEntries.forEach((entry) => {
       lines.push(
-        `  • id=${entry.id} role=${entry.role ?? "unknown"} text="${entry.text}"`
+        `  • id=${entry.id} role=${entry.role ?? "unknown"} text="${
+          entry.text
+        }"`
       );
     });
   } else {
@@ -211,13 +235,19 @@ function composePrompt(params: {
       .filter(Boolean)
       .join(" ");
 
-    lines.push(`  • ${meta || `#${entry.index}`}: ${entry.text || "(no text)"}`);
+    lines.push(
+      `  • ${meta || `#${entry.index}`}: ${entry.text || "(no text)"}`
+    );
   });
 
+  lines.push("Respond with JSON that matches the provided schema.");
   lines.push(
-    "Respond with JSON that matches the provided schema. Focus on emitting concise artifacts that replace older context."
+    "Populate primary_summary with the canonical summary and use artifacts for any extra pinned notes or action items."
   );
-  lines.push("Artifacts should cite source_message_ids for the turns they replace.");
+  lines.push("Do not decide which message IDs survive; rely on summarization only.");
+  lines.push(
+    "Artifacts should cite source_message_ids for the turns they replace."
+  );
   lines.push("Summaries must remain factual and omit speculation.");
 
   return lines.join("\n");
@@ -297,10 +327,10 @@ export function createCompressionHandler(
       body = (await req.json()) as CompressionServiceRequest;
     } catch (error) {
       onError?.(error, { req });
-      return new Response(
-        JSON.stringify({ error: "Invalid JSON body" }),
-        { status: 400, headers: JSON_HEADERS }
-      );
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+        status: 400,
+        headers: JSON_HEADERS,
+      });
     }
 
     try {
@@ -386,7 +416,15 @@ export function createCompressionHandler(
         ...(dynamicGenerateOptions ?? {}),
       });
 
-      const llmPayload = (generationResult.object ?? {}) as SummarizationPayload;
+      const llmPayload = (generationResult.object ??
+        {}) as SummarizationPayload;
+      const primarySummaryBlueprint = llmPayload.primary_summary;
+      const additionalArtifactBlueprints = Array.isArray(llmPayload.artifacts)
+        ? llmPayload.artifacts
+        : [];
+      const summaryCategoryNames = new Set(["primary_summary", "summary"]);
+      const effectiveMaxArtifacts = Math.max(maxArtifacts, 1);
+      const maxAdditionalArtifacts = Math.max(effectiveMaxArtifacts - 1, 0);
 
       const knownMessageIds = new Set(
         body.messages
@@ -403,33 +441,69 @@ export function createCompressionHandler(
 
       const now = Date.now();
       const snapshotId = generateSnapshotId(now);
-      const existingArtifacts = Array.isArray(body.artifacts)
+      const existingArtifacts: CompressionArtifact[] = Array.isArray(body.artifacts)
         ? body.artifacts
-            .filter((artifact): artifact is CompressionArtifact => Boolean(artifact?.id))
+            .filter((artifact): artifact is CompressionArtifact =>
+              Boolean(artifact?.id)
+            )
             .map((artifact) => ({ ...artifact }))
         : [];
 
-      const artifactBlueprints = Array.isArray(llmPayload.artifacts)
-        ? llmPayload.artifacts.slice(0, Math.max(maxArtifacts, 0))
-        : [];
+      const previousSummary =
+        existingArtifacts.find((artifact) => {
+          const category = artifact.category?.toLowerCase();
+          return category ? summaryCategoryNames.has(category) : false;
+        }) ??
+        existingArtifacts[0] ??
+        null;
+
+      type ArtifactBlueprint = z.infer<typeof ArtifactBlueprintSchema>;
+      type PrimarySummaryBlueprint = z.infer<typeof PrimarySummaryBlueprintSchema>;
+      const artifactCandidates: Array<{
+        blueprint: ArtifactBlueprint | PrimarySummaryBlueprint;
+        isPrimary: boolean;
+      }> = [];
+
+      if (primarySummaryBlueprint) {
+        artifactCandidates.push({
+          blueprint: {
+            ...primarySummaryBlueprint,
+            category: primarySummaryBlueprint.category ?? "primary_summary",
+          },
+          isPrimary: true,
+        });
+      }
+
+      if (maxAdditionalArtifacts > 0 && additionalArtifactBlueprints.length > 0) {
+        additionalArtifactBlueprints
+          .slice(0, maxAdditionalArtifacts)
+          .forEach((blueprint) => {
+            artifactCandidates.push({
+              blueprint,
+              isPrimary: false,
+            });
+          });
+      }
 
       const newArtifacts: CompressionArtifact[] = [];
-      artifactBlueprints.forEach((artifact, index) => {
-        const summary = normalizeWhitespace(artifact.summary ?? "");
+      artifactCandidates.forEach(({ blueprint, isPrimary }, index) => {
+        const summary = normalizeWhitespace(blueprint.summary ?? "");
         if (!summary) {
           return;
         }
 
-        const title = artifact.title
-          ? normalizeWhitespace(artifact.title)
+        const title = blueprint.title
+          ? normalizeWhitespace(blueprint.title)
           : undefined;
-        const category = artifact.category
-          ? normalizeWhitespace(artifact.category)
+        const category = blueprint.category
+          ? normalizeWhitespace(blueprint.category)
+          : isPrimary
+          ? "primary_summary"
           : undefined;
 
         const sourceIds = ensureUniqueIds(
-          Array.isArray(artifact.source_message_ids)
-            ? artifact.source_message_ids.filter((id) =>
+          Array.isArray(blueprint.source_message_ids)
+            ? blueprint.source_message_ids.filter((id) =>
                 id ? knownMessageIds.has(id) : false
               )
             : []
@@ -446,9 +520,10 @@ export function createCompressionHandler(
         });
 
         const tokensSaved = Math.max(trimmedTokens - summaryTokens, 0);
+        const artifactIdPrefix = isPrimary ? "primary-summary" : "artifact";
 
         newArtifacts.push({
-          id: `artifact-${now}-${index}`,
+          id: `${artifactIdPrefix}-${now}-${index}`,
           title,
           summary,
           category,
@@ -460,15 +535,47 @@ export function createCompressionHandler(
         });
       });
 
-      const artifactMap = new Map<string, CompressionArtifact>();
-      existingArtifacts.forEach((artifact) => {
-        if (!artifact?.id) return;
-        artifactMap.set(artifact.id, artifact);
+      const combinedArtifacts = [...newArtifacts];
+
+      const hasNewSummary = combinedArtifacts.some((artifact) => {
+        const category = artifact.category?.toLowerCase();
+        return category ? summaryCategoryNames.has(category) : false;
       });
-      newArtifacts.forEach((artifact) => {
-        artifactMap.set(artifact.id, artifact);
-      });
-      const combinedArtifacts = Array.from(artifactMap.values());
+
+      if (!hasNewSummary && previousSummary) {
+        const summaryId = previousSummary.id;
+        if (summaryId) {
+          const summaryIndex = combinedArtifacts.findIndex(
+            (artifact) => artifact.id === summaryId
+          );
+          const summaryCopy: CompressionArtifact = {
+            ...previousSummary,
+            updatedAt: now,
+          };
+          if (summaryIndex !== -1) {
+            combinedArtifacts[summaryIndex] = summaryCopy;
+          } else {
+            combinedArtifacts.unshift(summaryCopy);
+          }
+        }
+
+        const pinnedCarryovers = existingArtifacts.filter(
+          (artifact) => artifact.pinned === true
+        );
+        pinnedCarryovers.forEach((pinnedArtifact) => {
+          if (!pinnedArtifact?.id) return;
+          const alreadyPresent = combinedArtifacts.some(
+            (artifact) => artifact.id === pinnedArtifact.id
+          );
+          if (alreadyPresent) {
+            return;
+          }
+          combinedArtifacts.unshift({
+            ...pinnedArtifact,
+            updatedAt: now,
+          });
+        });
+      }
 
       const pinnedMessagesForTokens = pinnedMessages.map((pin) => {
         const candidateId = pin.message?.id ?? pin.id;
@@ -476,8 +583,8 @@ export function createCompressionHandler(
         return messageMap.get(candidateId) ?? pin.message;
       });
       const pinnedTokenCount = calculateTokensForMessages(
-        pinnedMessagesForTokens.filter(
-          (message): message is UIMessage => Boolean(message)
+        pinnedMessagesForTokens.filter((message): message is UIMessage =>
+          Boolean(message)
         )
       );
 
@@ -555,6 +662,12 @@ export function createCompressionHandler(
         }
       });
 
+      const excludedMessageIds = body.messages
+        .map((message) => message.id)
+        .filter(
+          (id): id is string => Boolean(id) && !survivorSet.has(id as string)
+        );
+
       const snapshot: CompressionSnapshot = {
         id: snapshotId,
         createdAt: now,
@@ -563,6 +676,7 @@ export function createCompressionHandler(
         tokensBefore:
           body.usage?.totalTokens ?? baselineResult.usage.totalTokens,
         reason: body.reason,
+        excludedMessageIds,
       };
 
       const finalResult = buildCompressionPayload({
@@ -592,9 +706,7 @@ export function createCompressionHandler(
     } catch (error) {
       onError?.(error, { req, body });
       const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to run compression";
+        error instanceof Error ? error.message : "Failed to run compression";
       return new Response(JSON.stringify({ error: message }), {
         status: 500,
         headers: JSON_HEADERS,

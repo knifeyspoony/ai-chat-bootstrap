@@ -31,7 +31,8 @@
   },
   "pnpm": {
     "overrides": {
-      "title@4.0.1>chalk": "5.3.0"
+      "title@4.0.1>chalk": "5.3.0",
+      "@modelcontextprotocol/sdk": "npm:@socotra/modelcontextprotocol-sdk"
     }
   }
 }

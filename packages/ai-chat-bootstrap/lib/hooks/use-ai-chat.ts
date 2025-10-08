@@ -746,25 +746,40 @@ export function useAIChat({
 
         const toolSummaryMap = new Map<
           string,
-          { name: string; description?: string }
+          {
+            name: string;
+            description?: string;
+            source?: "frontend" | "mcp";
+          }
         >();
+        const upsertToolSummary = (
+          name: string,
+          description: string | undefined,
+          source: "frontend" | "mcp"
+        ) => {
+          const existing = toolSummaryMap.get(name);
+          const nextDescription =
+            description?.trim() !== ""
+              ? description
+              : existing?.description ?? description;
+          const nextSource =
+            source === "mcp" || existing?.source === "mcp"
+              ? "mcp"
+              : existing?.source ?? source;
+          toolSummaryMap.set(name, {
+            name,
+            description: nextDescription,
+            source: nextSource,
+          });
+        };
+
         toolsToSend.forEach((tool) => {
           if (!tool?.name) return;
-          if (!toolSummaryMap.has(tool.name)) {
-            toolSummaryMap.set(tool.name, {
-              name: tool.name,
-              description: tool.description,
-            });
-          }
+          upsertToolSummary(tool.name, tool.description, "frontend");
         });
         mcpToolSummaries.forEach((tool) => {
           if (!tool?.name) return;
-          if (!toolSummaryMap.has(tool.name)) {
-            toolSummaryMap.set(tool.name, {
-              name: tool.name,
-              description: tool.description,
-            });
-          }
+          upsertToolSummary(tool.name, tool.description, "mcp");
         });
         const combinedToolSummaries = Array.from(toolSummaryMap.values());
 

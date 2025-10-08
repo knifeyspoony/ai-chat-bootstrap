@@ -1,4 +1,9 @@
-import { getToolName, UIMessage, type ToolUIPart } from "ai";
+import {
+  getToolName,
+  UIMessage,
+  type DynamicToolUIPart,
+  type ToolUIPart,
+} from "ai";
 import isEqual from "fast-deep-equal";
 import React, { ReactNode } from "react";
 import { CodeBlock } from "../../components/ai-elements/code-block";
@@ -61,10 +66,31 @@ function ChatMessagePartImpl({
 
     default:
       // Handle tool-* parts (data-* could be added later)
-      if (part.type?.startsWith("tool-") || part.type == "dynamic-tool") {
-        const toolPart = part as ToolUIPart;
-        // Extract the base tool name (library helper handles variations)
-        const baseName = getToolName(toolPart);
+      if (part.type?.startsWith("tool-") || part.type === "dynamic-tool") {
+        const isDynamicTool = part.type === "dynamic-tool";
+        const toolPart = part as ToolUIPart | DynamicToolUIPart;
+
+        const baseName = isDynamicTool
+          ? (toolPart as DynamicToolUIPart).toolName
+          : getToolName(toolPart as ToolUIPart);
+        const displayLabel = (() => {
+          if (typeof baseName === "string" && baseName.trim() !== "") {
+            return baseName;
+          }
+          if (!isDynamicTool && toolPart.type.startsWith("tool-")) {
+            const trimmed = toolPart.type.slice("tool-".length);
+            if (trimmed) {
+              return trimmed;
+            }
+          }
+          if (isDynamicTool) {
+            const dynamicName = (toolPart as DynamicToolUIPart).toolName;
+            if (dynamicName?.trim()) {
+              return dynamicName;
+            }
+          }
+          return toolPart.type;
+        })();
 
         if (baseName?.startsWith("acb_")) {
           return null;
@@ -133,6 +159,7 @@ function ChatMessagePartImpl({
             <ToolHeader
               type={toolPart.type}
               state={toolPart.state || "input-streaming"}
+              label={displayLabel}
             />
             <ToolContent>
               {Boolean(toolPart.input) && <ToolInput input={toolPart.input} />}

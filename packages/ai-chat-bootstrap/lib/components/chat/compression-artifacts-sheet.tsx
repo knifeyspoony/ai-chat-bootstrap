@@ -1,7 +1,10 @@
 import {
   ArchiveRestore,
+  Info,
   MemoryStick,
   PencilLine,
+  Pin,
+  PinOff,
   Save,
   Trash2,
 } from "lucide-react";
@@ -19,6 +22,12 @@ import {
   SheetTrigger,
 } from "../../components/ui/sheet";
 import { Textarea } from "../../components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 import type {
   CompressionArtifact,
   CompressionController,
@@ -29,12 +38,14 @@ interface ArtifactCardProps {
   artifact: CompressionArtifact;
   onUpdate: (artifactId: string, patch: Partial<CompressionArtifact>) => void;
   onDelete: (artifactId: string) => void;
+  onTogglePin: (artifactId: string, nextPinned: boolean) => void;
 }
 
 const ArtifactCard: React.FC<ArtifactCardProps> = ({
   artifact,
   onUpdate,
   onDelete,
+  onTogglePin,
 }) => {
   const [title, setTitle] = useState(artifact.title ?? "");
   const [summary, setSummary] = useState(artifact.summary ?? "");
@@ -67,6 +78,9 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({
   };
 
   const tokensSaved = artifact.tokensSaved;
+  const pinned = artifact.pinned === true;
+  const isPrimarySummary =
+    (artifact.category ?? "").toLowerCase() === "primary_summary";
 
   return (
     <div className="space-y-3 rounded-lg border border-border bg-card/60 p-4">
@@ -82,6 +96,11 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({
                 tokens
               </Badge>
             )}
+            {pinned && (
+              <Badge className="text-[11px]" variant="outline">
+                Pinned
+              </Badge>
+            )}
           </div>
           <span className="text-[10px] text-muted-foreground">
             Artifact ID: {artifact.id}
@@ -89,6 +108,38 @@ const ArtifactCard: React.FC<ArtifactCardProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
+          {isPrimarySummary ? (
+            <TooltipProvider delayDuration={200} skipDelayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 cursor-default text-muted-foreground"
+                    aria-label="Primary summaries are always sent to the LLM."
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs text-xs">
+                  Primary summaries are always sent to the LLM and reused in future
+                  compression summaries.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : (
+            <Button
+              type="button"
+              size="icon"
+              variant={pinned ? "default" : "ghost"}
+              className="h-8 w-8 text-muted-foreground"
+              onClick={() => onTogglePin(artifact.id, !pinned)}
+              title={pinned ? "Unpin artifact" : "Pin artifact"}
+            >
+              {pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+            </Button>
+          )}
           {editable && (
             <Button
               type="button"
@@ -173,8 +224,20 @@ export const CompressionArtifactsSheet: React.FC<
   const [open, setOpen] = useState(false);
   const artifacts = compression?.artifacts;
 
-  const sortedArtifacts = useMemo(() => {
-    return artifacts ? [...artifacts] : [];
+  const orderedArtifacts = useMemo(() => {
+    if (!artifacts || artifacts.length === 0) return [];
+    const items = [...artifacts];
+    const primaryIndex = items.findIndex(
+      (artifact) => (artifact.category ?? "").toLowerCase() === "primary_summary"
+    );
+    let primary: CompressionArtifact | undefined;
+    if (primaryIndex >= 0) {
+      [primary] = items.splice(primaryIndex, 1);
+    }
+    const pinned = items.filter((artifact) => artifact.pinned === true);
+    const unpinned = items.filter((artifact) => artifact.pinned !== true);
+    const combined = [...pinned, ...unpinned];
+    return primary ? [primary, ...combined] : combined;
   }, [artifacts]);
 
   const handleUpdate = (
@@ -190,8 +253,16 @@ export const CompressionArtifactsSheet: React.FC<
     compression.actions.removeArtifact(artifactId);
   };
 
-  const hasArtifacts = sortedArtifacts.length > 0;
-  const artifactCount = sortedArtifacts.length;
+  const handleTogglePin = (artifactId: string, nextPinned: boolean) => {
+    if (!compression) return;
+    compression.actions.updateArtifact(artifactId, {
+      pinned: nextPinned,
+      updatedAt: Date.now(),
+    });
+  };
+
+  const hasArtifacts = orderedArtifacts.length > 0;
+  const artifactCount = orderedArtifacts.length;
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -225,12 +296,13 @@ export const CompressionArtifactsSheet: React.FC<
         <ScrollArea className="flex-1 pr-3">
           <div className="space-y-4 pb-6">
             {hasArtifacts ? (
-              sortedArtifacts.map((artifact) => (
+              orderedArtifacts.map((artifact) => (
                 <ArtifactCard
                   key={artifact.id}
                   artifact={artifact}
                   onUpdate={handleUpdate}
                   onDelete={handleDelete}
+                  onTogglePin={handleTogglePin}
                 />
               ))
             ) : (

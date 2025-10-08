@@ -1,4 +1,9 @@
-import { getToolName, UIMessage, type ToolUIPart } from "ai";
+import {
+  getToolName,
+  UIMessage,
+  type DynamicToolUIPart,
+  type ToolUIPart,
+} from "ai";
 import isEqual from "fast-deep-equal";
 import React, { ReactNode } from "react";
 import { CodeBlock } from "../../components/ai-elements/code-block";
@@ -50,9 +55,30 @@ function ChatMessagePartCompactImpl({
       );
 
     default:
-      if (part.type?.startsWith("tool-") || part.type == "dynamic-tool") {
-        const toolPart = part as ToolUIPart;
-        const baseName = getToolName(toolPart);
+      if (part.type?.startsWith("tool-") || part.type === "dynamic-tool") {
+        const isDynamicTool = part.type === "dynamic-tool";
+        const toolPart = part as ToolUIPart | DynamicToolUIPart;
+        const baseName = isDynamicTool
+          ? (toolPart as DynamicToolUIPart).toolName
+          : getToolName(toolPart as ToolUIPart);
+        const displayLabel = (() => {
+          if (typeof baseName === "string" && baseName.trim() !== "") {
+            return baseName;
+          }
+          if (!isDynamicTool && toolPart.type.startsWith("tool-")) {
+            const trimmed = toolPart.type.slice("tool-".length);
+            if (trimmed) {
+              return trimmed;
+            }
+          }
+          if (isDynamicTool) {
+            const dynamicName = (toolPart as DynamicToolUIPart).toolName;
+            if (dynamicName?.trim()) {
+              return dynamicName;
+            }
+          }
+          return toolPart.type;
+        })();
 
         if (baseName?.startsWith("acb_")) {
           return null;
@@ -116,6 +142,7 @@ function ChatMessagePartCompactImpl({
           <CompactTool
             type={toolPart.type}
             state={toolPart.state || "input-streaming"}
+            label={displayLabel}
             input={toolPart.input}
             output={fallbackOutput}
             errorText={combinedErrorText}

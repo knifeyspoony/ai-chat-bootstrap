@@ -12,6 +12,7 @@ import {
   calculateTokensForArtifacts,
   calculateTokensForMessages,
 } from "./token-helpers";
+import { getCompressionMessageCompressionState } from "./message-metadata";
 
 const ARTIFACT_MESSAGE_PREFIX = "artifact";
 
@@ -83,10 +84,53 @@ function resolveSurvivingMessageIds(
   baseMessages: UIMessage[],
   snapshot: CompressionSnapshot | null
 ): string[] {
-  if (snapshot && Array.isArray(snapshot.survivingMessageIds)) {
-    return [...snapshot.survivingMessageIds];
+  if (!snapshot) {
+    return baseMessages.map((message) => message.id).filter(Boolean);
   }
-  return baseMessages.map((message) => message.id).filter(Boolean);
+
+  const snapshotId = snapshot.id;
+  const survivorSet = new Set(
+    Array.isArray(snapshot.survivingMessageIds)
+      ? snapshot.survivingMessageIds.filter(Boolean)
+      : []
+  );
+  const excludedSet = new Set(
+    Array.isArray(snapshot.excludedMessageIds)
+      ? snapshot.excludedMessageIds.filter(Boolean)
+      : []
+  );
+  const hasExplicitSurvivors = survivorSet.size > 0;
+  const ordered: string[] = [];
+  const seen = new Set<string>();
+
+  baseMessages.forEach((message) => {
+    const id = message?.id;
+    if (!id || seen.has(id)) return;
+
+    if (excludedSet.has(id)) {
+      return;
+    }
+
+    if (survivorSet.has(id)) {
+      ordered.push(id);
+      seen.add(id);
+      return;
+    }
+
+    const metadata = getCompressionMessageCompressionState(message);
+    const matchesSnapshot = metadata?.snapshotId === snapshotId;
+    const isExcluded = matchesSnapshot && metadata?.surviving === false;
+    if (isExcluded) {
+      return;
+    }
+
+    if (!matchesSnapshot || !hasExplicitSurvivors) {
+      ordered.push(id);
+      seen.add(id);
+    }
+  });
+
+  return ordered;
 }
 
 export function buildCompressionPayload({

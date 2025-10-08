@@ -11,7 +11,11 @@ export interface BuildEnrichedSystemPromptParams {
   originalSystemPrompt?: string;
   context?: ContextItem[];
   focus?: FocusItem[];
-  tools?: { name: string; description?: string }[];
+  tools?: {
+    name: string;
+    description?: string;
+    source?: "mcp" | "frontend" | (string & {});
+  }[];
   chainOfThoughtEnabled?: boolean;
   chainOfThought?: {
     chainId?: string;
@@ -123,11 +127,19 @@ export function buildEnrichedSystemPrompt(
   });
 
   if (tools.length > 0) {
+    const hasMcpTools = tools.some((t) => t.source === "mcp");
+    lines.push("## Tools\n");
+    if (hasMcpTools) {
+      lines.push(
+        "Tools marked with [MCP] come from the Model Context Protocol (MCP), a standard that exposes remote data and actions from connected servers so the assistant can invoke them safely."
+      );
+    }
     lines.push(
-      "## Tools\nThe following callable helpers may be relevant to assist the user. Invoke only when they clearly help advance the task.\n"
+      "The following callable helpers may be relevant to assist the user. Invoke only when they clearly help advance the task.\n"
     );
     tools.forEach((t) => {
-      lines.push(`- **${t.name}**: ${t.description ?? ""}`);
+      const prefix = t.source === "mcp" ? "[MCP] " : "";
+      lines.push(`- ${prefix}**${t.name}**: ${t.description ?? ""}`);
     });
     lines.push("");
   }

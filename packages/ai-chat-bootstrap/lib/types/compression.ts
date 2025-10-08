@@ -21,6 +21,7 @@ export interface CompressionArtifact {
   sourceMessageIds?: string[];
   author?: string;
   editable?: boolean;
+  pinned?: boolean;
 }
 
 export interface CompressionEvent {

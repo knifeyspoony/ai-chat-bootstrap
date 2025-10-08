@@ -34,9 +34,13 @@ export const Tool = ({ className, ...props }: ToolProps) => (
 );
 
 export type ToolHeaderProps = {
-  type: ToolUIPart["type"];
+  type: ToolUIPart["type"] | "dynamic-tool";
   state: ToolUIPart["state"];
   className?: string;
+  /**
+   * Readable label to display in place of the raw type (e.g. strip tool- prefix or surface MCP name).
+   */
+  label?: string;
 };
 
 const getStatusBadge = (status: ToolUIPart["state"]) => {
@@ -66,6 +70,7 @@ export const ToolHeader = ({
   className,
   type,
   state,
+  label,
   ...props
 }: ToolHeaderProps) => (
   <CollapsibleTrigger
@@ -77,10 +82,15 @@ export const ToolHeader = ({
     )}
     {...props}
   >
-    <div className="flex items-center gap-2">
-      <WrenchIcon className="size-4 text-muted-foreground" />
-      <span className="font-medium text-sm">{type}</span>
-      {getStatusBadge(state)}
+    <div className="flex min-w-0 items-center gap-2">
+      <WrenchIcon className="size-4 shrink-0 text-muted-foreground" />
+      <span
+        className="max-w-[16rem] truncate text-xs font-medium leading-tight"
+        title={label ?? type}
+      >
+        {label ?? type}
+      </span>
+      <div className="shrink-0">{getStatusBadge(state)}</div>
     </div>
     <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
   </CollapsibleTrigger>

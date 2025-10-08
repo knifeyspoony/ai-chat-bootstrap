@@ -257,6 +257,37 @@ describe('Compression UI components', () => {
     expect(queryByTitle(/open compression artifacts/i)).toBeNull();
   });
 
+  it('does not render compression usage indicator when compression is disabled', () => {
+    const defaultConfig = makeCompressionController().config!;
+    const compression = makeCompressionController({
+      config: { ...defaultConfig, enabled: false },
+      usage: {
+        totalTokens: 300,
+        pinnedTokens: 50,
+        artifactTokens: 40,
+        survivingTokens: 210,
+        budget: 1000,
+        remainingTokens: 700,
+        updatedAt: Date.now(),
+      },
+    });
+
+    const { queryByRole } = render(
+      <ChatInput
+        value="hello"
+        onChange={() => {}}
+        onSubmit={() => {}}
+        compression={compression}
+        enableSuggestions={false}
+        suggestions={[]}
+        suggestionsCount={3}
+        allFocusItems={[]}
+      />
+    );
+
+    expect(queryByRole('button', { name: /compression usage/i })).toBeNull();
+  });
+
   it('shows compression artifacts button once the chat has been compressed', () => {
     const compression = makeCompressionController({
       artifacts: [

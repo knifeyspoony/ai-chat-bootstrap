@@ -83,7 +83,7 @@ function resolveSurvivingMessageIds(
   baseMessages: UIMessage[],
   snapshot: CompressionSnapshot | null
 ): string[] {
-  if (snapshot?.survivingMessageIds?.length) {
+  if (snapshot && Array.isArray(snapshot.survivingMessageIds)) {
     return [...snapshot.survivingMessageIds];
   }
   return baseMessages.map((message) => message.id).filter(Boolean);

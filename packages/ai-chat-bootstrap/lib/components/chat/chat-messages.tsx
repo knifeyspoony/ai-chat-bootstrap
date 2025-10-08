@@ -470,7 +470,6 @@ const ChatMessageItem = React.memo(
               "flex w-full justify-center px-6 py-4 text-center",
               messageClassName
             )}
-            title={systemText || undefined}
           >
             <span className="rounded-full bg-[var(--acb-chat-message-system-bg)]/70 px-3 py-1 text-xs text-muted-foreground">
               {label}

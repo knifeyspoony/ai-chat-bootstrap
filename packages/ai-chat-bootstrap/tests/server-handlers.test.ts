@@ -226,6 +226,73 @@ describe("createCompressionHandler", () => {
     expect(payload.artifacts).toHaveLength(1);
     expect(payload.snapshot.artifactIds).toHaveLength(1);
     expect(payload.snapshot.survivingMessageIds).toContain("m2");
+    expect(payload.snapshot.survivingMessageIds).not.toContain("m1");
+  });
+
+  it("drops summarized messages from survivors when artifacts cover them", async () => {
+    const modelResolver = vi.fn().mockReturnValue("compression-model");
+    (generateObject as unknown as vi.Mock).mockResolvedValue({
+      object: {
+        surviving_message_ids: [],
+        artifacts: [
+          {
+            summary: "All context captured",
+            source_message_ids: ["m1", "m2"],
+          },
+        ],
+      },
+    });
+
+    const handler = createCompressionHandler({
+      model: modelResolver,
+      minRecentMessages: 0,
+    });
+
+    const requestBody = {
+      messages: [
+        {
+          id: "m1",
+          role: "user",
+          parts: [{ type: "text", text: "First" } as any],
+        },
+        {
+          id: "m2",
+          role: "assistant",
+          parts: [{ type: "text", text: "Second" } as any],
+        },
+      ] satisfies UIMessage[],
+      pinnedMessages: [],
+      artifacts: [],
+      snapshot: null,
+      usage: {
+        totalTokens: 80,
+        pinnedTokens: 0,
+        artifactTokens: 0,
+        survivingTokens: 80,
+        updatedAt: 0,
+      },
+      config: {
+        maxTokenBudget: 100,
+        compressionThreshold: 0.8,
+        pinnedMessageLimit: null,
+        model: "compression-model",
+      },
+      reason: "threshold" as const,
+    };
+
+    const response = await handler(
+      new Request("http://test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as CompressionServiceResponse;
+    expect(payload.snapshot.survivingMessageIds).toEqual([]);
+    expect(payload.usage?.survivingTokens).toBe(0);
+    expect(payload.artifacts).toHaveLength(1);
   });
 
   it("returns 400 when messages are missing", async () => {

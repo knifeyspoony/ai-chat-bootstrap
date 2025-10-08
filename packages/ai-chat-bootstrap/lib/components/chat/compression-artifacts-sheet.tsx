@@ -214,13 +214,12 @@ export const CompressionArtifactsSheet: React.FC<
       </SheetTrigger>
       <SheetContent
         side="bottom"
-        className="flex h-[70vh] max-h-[600px] flex-col gap-4 rounded-t-2xl border-t"
+        className="flex h-[70vh] max-h-[600px] flex-col gap-4 rounded-t-2xl border-t px-4 pb-4 pt-6 sm:px-6"
       >
         <SheetHeader>
           <SheetTitle>Compression Artifacts</SheetTitle>
           <SheetDescription>
-            Review, edit, or remove summaries that stand in for older
-            conversation turns.
+            Review, edit, or remove summaries that stand in for older conversation turns.
           </SheetDescription>
         </SheetHeader>
         <ScrollArea className="flex-1 pr-3">
@@ -238,8 +237,7 @@ export const CompressionArtifactsSheet: React.FC<
               <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 p-8 text-center text-sm text-muted-foreground">
                 <PencilLine className="h-8 w-8" />
                 <p>
-                  No compression artifacts yet. Once the context is summarised,
-                  they will appear here.
+                  No compression artifacts yet. Once the context is summarised, they will appear here.
                 </p>
               </div>
             )}

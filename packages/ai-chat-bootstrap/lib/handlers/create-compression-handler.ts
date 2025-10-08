@@ -19,9 +19,10 @@ import { JSON_HEADERS, type GenerateObjectOptions } from "./shared";
 
 const DEFAULT_SYSTEM_PROMPT = `You compress chat transcripts so future LLM calls stay within token limits. Summaries must be precise, retain action items, decisions, and user preferences, and never omit pinned messages. Always preserve the latest important turns so the assistant keeps context.`;
 
-const MIN_RECENT_SURVIVORS_DEFAULT = 6;
+const MAX_RECENT_SURVIVORS_DEFAULT = 4;
 const MAX_ARTIFACTS_DEFAULT = 3;
 const MESSAGE_SNIPPET_LENGTH = 640;
+let snapshotSequence = 0;
 
 const SummarizationSchema = z.object({
   surviving_message_ids: z.array(z.string().min(1)).optional(),
@@ -68,7 +69,11 @@ type ModelResolver =
 export interface CreateCompressionHandlerOptions {
   model?: ModelResolver;
   systemPrompt?: string;
+  /**
+   * @deprecated Use maxRecentMessages instead.
+   */
   minRecentMessages?: number;
+  maxRecentMessages?: number;
   maxArtifacts?: number;
   generateOptions?: GenerateObjectOptions;
   buildGenerateOptions?: (
@@ -78,6 +83,12 @@ export interface CreateCompressionHandlerOptions {
     error: unknown,
     ctx: { req: Request; body?: CompressionServiceRequest }
   ) => void;
+}
+
+function generateSnapshotId(now: number): string {
+  snapshotSequence = (snapshotSequence + 1) % Number.MAX_SAFE_INTEGER;
+  const sequencePart = snapshotSequence.toString(36);
+  return `snapshot-${now}-${sequencePart}`;
 }
 
 function truncateText(value: string, maxLength: number): string {
@@ -133,7 +144,7 @@ function composePrompt(params: {
   reason: string | undefined;
   budget: number | null;
   usageTotalTokens: number;
-  minRecentMessages: number;
+  maxRecentMessages: number;
   pinnedEntries: ConversationEntry[];
   conversationEntries: ConversationEntry[];
   artifacts: ArtifactContextEntry[];
@@ -142,7 +153,7 @@ function composePrompt(params: {
     reason,
     budget,
     usageTotalTokens,
-    minRecentMessages,
+    maxRecentMessages,
     pinnedEntries,
     conversationEntries,
     artifacts,
@@ -160,7 +171,7 @@ function composePrompt(params: {
   }
 
   lines.push(
-    `Always retain pinned messages and ensure the most recent ${minRecentMessages} turns remain unless they are duplicates.`
+    `Pinned messages must remain verbatim. We will preserve up to the most recent ${maxRecentMessages} turns automatically—note in the summary if anything critical should stay verbatim.`
   );
 
   if (pinnedEntries.length) {
@@ -204,7 +215,7 @@ function composePrompt(params: {
   });
 
   lines.push(
-    "Respond with JSON that matches the provided schema. Include surviving_message_ids (string array) and artifacts (array of concise summaries)."
+    "Respond with JSON that matches the provided schema. Focus on emitting concise artifacts that replace older context."
   );
   lines.push("Artifacts should cite source_message_ids for the turns they replace.");
   lines.push("Summaries must remain factual and omit speculation.");
@@ -262,12 +273,22 @@ export function createCompressionHandler(
   const {
     model,
     systemPrompt = DEFAULT_SYSTEM_PROMPT,
-    minRecentMessages = MIN_RECENT_SURVIVORS_DEFAULT,
+    minRecentMessages,
+    maxRecentMessages: maxRecentMessagesOption,
     maxArtifacts = MAX_ARTIFACTS_DEFAULT,
     generateOptions,
     buildGenerateOptions,
     onError,
   } = options;
+
+  const maxRecentMessages = Math.max(
+    0,
+    typeof maxRecentMessagesOption === "number"
+      ? maxRecentMessagesOption
+      : typeof minRecentMessages === "number"
+      ? minRecentMessages
+      : MAX_RECENT_SURVIVORS_DEFAULT
+  );
 
   return async function compressionHandler(req: Request): Promise<Response> {
     let body: CompressionServiceRequest | undefined;
@@ -342,7 +363,7 @@ export function createCompressionHandler(
         reason: body.reason,
         budget: normalizedConfig.maxTokenBudget ?? null,
         usageTotalTokens: baselineResult.usage.totalTokens,
-        minRecentMessages,
+        maxRecentMessages,
         pinnedEntries,
         conversationEntries,
         artifacts: artifactContext,
@@ -366,33 +387,12 @@ export function createCompressionHandler(
       });
 
       const llmPayload = (generationResult.object ?? {}) as SummarizationPayload;
-      const survivingFromModel = ensureUniqueIds(
-        Array.isArray(llmPayload.surviving_message_ids)
-          ? llmPayload.surviving_message_ids
-          : []
-      );
-
-      const recentIds = ensureUniqueIds(
-        body.messages
-          .slice(-Math.max(minRecentMessages, 0))
-          .map((message) => message.id)
-      );
 
       const knownMessageIds = new Set(
         body.messages
           .map((message) => message.id)
           .filter((id): id is string => Boolean(id))
       );
-
-      const survivorIds = ensureUniqueIds([
-        ...survivingFromModel.filter((id) => knownMessageIds.has(id)),
-        ...pinnedIds,
-        ...recentIds,
-      ]);
-
-      const effectiveSurvivorIds = survivorIds.length
-        ? survivorIds
-        : baselineResult.survivingMessageIds;
 
       const messageMap = new Map<string, UIMessage>();
       body.messages.forEach((message) => {
@@ -402,11 +402,18 @@ export function createCompressionHandler(
       });
 
       const now = Date.now();
+      const snapshotId = generateSnapshotId(now);
+      const existingArtifacts = Array.isArray(body.artifacts)
+        ? body.artifacts
+            .filter((artifact): artifact is CompressionArtifact => Boolean(artifact?.id))
+            .map((artifact) => ({ ...artifact }))
+        : [];
+
       const artifactBlueprints = Array.isArray(llmPayload.artifacts)
         ? llmPayload.artifacts.slice(0, Math.max(maxArtifacts, 0))
         : [];
 
-      const artifacts: CompressionArtifact[] = [];
+      const newArtifacts: CompressionArtifact[] = [];
       artifactBlueprints.forEach((artifact, index) => {
         const summary = normalizeWhitespace(artifact.summary ?? "");
         if (!summary) {
@@ -440,7 +447,7 @@ export function createCompressionHandler(
 
         const tokensSaved = Math.max(trimmedTokens - summaryTokens, 0);
 
-        artifacts.push({
+        newArtifacts.push({
           id: `artifact-${now}-${index}`,
           title,
           summary,
@@ -453,11 +460,106 @@ export function createCompressionHandler(
         });
       });
 
+      const artifactMap = new Map<string, CompressionArtifact>();
+      existingArtifacts.forEach((artifact) => {
+        if (!artifact?.id) return;
+        artifactMap.set(artifact.id, artifact);
+      });
+      newArtifacts.forEach((artifact) => {
+        artifactMap.set(artifact.id, artifact);
+      });
+      const combinedArtifacts = Array.from(artifactMap.values());
+
+      const pinnedMessagesForTokens = pinnedMessages.map((pin) => {
+        const candidateId = pin.message?.id ?? pin.id;
+        if (!candidateId) return pin.message;
+        return messageMap.get(candidateId) ?? pin.message;
+      });
+      const pinnedTokenCount = calculateTokensForMessages(
+        pinnedMessagesForTokens.filter(
+          (message): message is UIMessage => Boolean(message)
+        )
+      );
+
+      const budgetForRecent =
+        normalizedConfig.maxTokenBudget !== null &&
+        normalizedConfig.maxTokenBudget > 0
+          ? normalizedConfig.maxTokenBudget
+          : null;
+
+      const recentSurvivorIds: string[] = [];
+      if (maxRecentMessages > 0) {
+        const seenRecent = new Set<string>();
+        let recentTokenAccumulator = 0;
+
+        for (let index = body.messages.length - 1; index >= 0; index -= 1) {
+          const message = body.messages[index];
+          const id = message?.id;
+          if (!id) continue;
+          if (pinnedIds.has(id)) continue;
+          if (seenRecent.has(id)) continue;
+
+          const messageTokens = calculateTokensForMessages([message]);
+
+          if (
+            budgetForRecent !== null &&
+            pinnedTokenCount + recentTokenAccumulator + messageTokens >
+              budgetForRecent
+          ) {
+            continue;
+          }
+
+          recentSurvivorIds.unshift(id);
+          seenRecent.add(id);
+          recentTokenAccumulator += messageTokens;
+
+          if (recentSurvivorIds.length >= maxRecentMessages) {
+            break;
+          }
+        }
+      }
+
+      let survivorSet = new Set<string>([...pinnedIds, ...recentSurvivorIds]);
+
+      if (combinedArtifacts.length > 0) {
+        const artifactSourceIds = new Set<string>();
+        combinedArtifacts.forEach((artifact) => {
+          artifact.sourceMessageIds?.forEach((id) => {
+            if (id) {
+              artifactSourceIds.add(id);
+            }
+          });
+        });
+
+        if (artifactSourceIds.size > 0) {
+          artifactSourceIds.forEach((id) => {
+            if (!pinnedIds.has(id)) {
+              survivorSet.delete(id);
+            }
+          });
+        }
+      }
+
+      const orderedSurvivorIds: string[] = [];
+      body.messages.forEach((message) => {
+        const id = message?.id;
+        if (id && survivorSet.has(id)) {
+          orderedSurvivorIds.push(id);
+        }
+      });
+
+      pinnedMessages.forEach((pin) => {
+        const id = pin.message?.id ?? pin.id;
+        if (id && survivorSet.has(id) && !orderedSurvivorIds.includes(id)) {
+          orderedSurvivorIds.unshift(id);
+        }
+      });
+
       const snapshot: CompressionSnapshot = {
-        id: body.snapshot?.id ?? `snapshot-${now}`,
-        createdAt: body.snapshot?.createdAt ?? now,
-        survivingMessageIds: effectiveSurvivorIds,
-        artifactIds: artifacts.map((artifact) => artifact.id),
+        id: snapshotId,
+        createdAt: now,
+        survivingMessageIds: orderedSurvivorIds,
+        artifactIds: combinedArtifacts.map((artifact) => artifact.id),
         tokensBefore:
           body.usage?.totalTokens ?? baselineResult.usage.totalTokens,
         reason: body.reason,
@@ -466,7 +568,7 @@ export function createCompressionHandler(
       const finalResult = buildCompressionPayload({
         baseMessages: body.messages,
         pinnedMessages,
-        artifacts,
+        artifacts: combinedArtifacts,
         snapshot,
         config: normalizedConfig,
       });
@@ -479,7 +581,7 @@ export function createCompressionHandler(
 
       const responsePayload: CompressionServiceResponse = {
         snapshot: enrichedSnapshot,
-        artifacts,
+        artifacts: combinedArtifacts,
         usage: finalResult.usage,
         pinnedMessages,
       };

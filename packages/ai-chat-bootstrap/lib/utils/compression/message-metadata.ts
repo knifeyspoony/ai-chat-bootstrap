@@ -351,6 +351,15 @@ function applyCompressionMetadata(
       return message;
     }
 
+    const existingState = getCompressionMessageCompressionState(message);
+    if (
+      existingState &&
+      existingState.kind === "event" &&
+      existingState.snapshotId !== snapshot.id
+    ) {
+      return message;
+    }
+
     let targetState: CompressionMessageCompressionState | null = null;
     if (excludedSet.has(messageId)) {
       targetState = {

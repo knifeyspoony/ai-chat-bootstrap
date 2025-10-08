@@ -444,27 +444,22 @@ export function useAIChat({
 
   // Direct reference to the zustand store object (not a hook call) for imperative ops
   const threadStore = useChatThreadsStore; // NOTE: used in effects below (getState())
-  const threadModeRef = useRef<"persistent" | "ephemeral" | null>(null);
 
   // Configure persistence mode based on threads enabled flag.
   useEffect(() => {
     try {
       const store = threadStore.getState();
+
       if (!threadsEnabled) {
-        if (threadModeRef.current !== "ephemeral" || store.mode !== "ephemeral") {
+        if (store.mode !== "ephemeral") {
           store.initializeEphemeral?.();
-          threadModeRef.current = "ephemeral";
+        } else if (store.persistence) {
+          store.setPersistence?.(undefined);
         }
         return;
       }
 
-      if (threadModeRef.current !== "persistent" || store.mode !== "persistent") {
-        store.initializePersistent?.();
-        threadModeRef.current = "persistent";
-        return;
-      }
-
-      if (!store.persistence) {
+      if (store.mode !== "persistent") {
         store.initializePersistent?.();
       }
     } catch (error) {

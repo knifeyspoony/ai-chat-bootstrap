@@ -3,7 +3,7 @@ import { useChatThreadsStore } from '../lib/stores/chat-threads';
 import type { ChatThread, ChatThreadPersistence } from '../lib/types/threads';
 
 function resetStore() {
-  useChatThreadsStore.getState().initializeEphemeral();
+  useChatThreadsStore.getState().initializePersistent();
 }
 
 describe('useChatThreadsStore', () => {
@@ -97,7 +97,7 @@ describe('useChatThreadsStore', () => {
     };
     const store = useChatThreadsStore.getState();
     store.setPersistence(mockPersistence);
-    expect(store.mode).toBe('persistent');
+    expect(useChatThreadsStore.getState().mode).toBe('persistent');
 
     store.initializeEphemeral();
     expect(useChatThreadsStore.getState().mode).toBe('ephemeral');

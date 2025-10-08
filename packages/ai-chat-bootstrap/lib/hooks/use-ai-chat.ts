@@ -184,6 +184,7 @@ export function useAIChat({
   const threadTitleSampleCount = threadTitleOptions?.sampleCount ?? 8;
   const autoCreateThread = threadsGroup.autoCreate ?? true;
   const warnOnMissingThread = threadsGroup.warnOnMissing ?? false;
+  const threadsEnabled = threadsGroup.enabled ?? false;
   const incomingModels = modelsGroup?.available ?? EMPTY_MODEL_OPTIONS;
   const providedModel = modelsGroup?.initial;
   const mcpEnabled = mcp?.enabled ?? false;
@@ -443,6 +444,36 @@ export function useAIChat({
 
   // Direct reference to the zustand store object (not a hook call) for imperative ops
   const threadStore = useChatThreadsStore; // NOTE: used in effects below (getState())
+  const threadModeRef = useRef<"persistent" | "ephemeral" | null>(null);
+
+  // Configure persistence mode based on threads enabled flag.
+  useEffect(() => {
+    try {
+      const store = threadStore.getState();
+      if (!threadsEnabled) {
+        if (threadModeRef.current !== "ephemeral" || store.mode !== "ephemeral") {
+          store.initializeEphemeral?.();
+          threadModeRef.current = "ephemeral";
+        }
+        return;
+      }
+
+      if (threadModeRef.current !== "persistent" || store.mode !== "persistent") {
+        store.initializePersistent?.();
+        threadModeRef.current = "persistent";
+        return;
+      }
+
+      if (!store.persistence) {
+        store.initializePersistent?.();
+      }
+    } catch (error) {
+      logDevError(
+        "[acb][useAIChat] failed to configure chat thread persistence mode",
+        error
+      );
+    }
+  }, [threadStore, threadsEnabled]);
 
   // Apply scopeKey (if provided) and load threads for that scope the first time or when scope changes.
   useEffect(() => {

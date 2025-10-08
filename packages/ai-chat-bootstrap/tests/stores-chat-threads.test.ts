@@ -1,16 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useChatThreadsStore } from '../lib/stores/chat-threads';
-import type { ChatThread, ChatThreadMeta, ChatThreadPersistence } from '../lib/types/threads';
+import type { ChatThread, ChatThreadPersistence } from '../lib/types/threads';
 
 function resetStore() {
-  useChatThreadsStore.setState({
-    scopeKey: undefined,
-    threads: new Map<string, ChatThread>(),
-    metas: new Map<string, ChatThreadMeta>(),
-    activeThreadId: undefined,
-    isLoaded: false,
-    persistence: undefined,
-  });
+  useChatThreadsStore.getState().initializeEphemeral();
 }
 
 describe('useChatThreadsStore', () => {
@@ -92,5 +85,24 @@ describe('useChatThreadsStore', () => {
     expect(meta.messageCount).toBe(1);
     expect(meta.updatedAt).toBeGreaterThanOrEqual(before);
     expect(saved[saved.length - 1].messages.length).toBe(1);
+  });
+
+  it('initializeEphemeral disables persistence writes', () => {
+    const saved: ChatThread[] = [];
+    const mockPersistence: ChatThreadPersistence = {
+      async loadAll() { return []; },
+      async save(t) { saved.push(t); },
+      async delete() {},
+      async load() { return null; },
+    };
+    const store = useChatThreadsStore.getState();
+    store.setPersistence(mockPersistence);
+    expect(store.mode).toBe('persistent');
+
+    store.initializeEphemeral();
+    expect(useChatThreadsStore.getState().mode).toBe('ephemeral');
+    const t = useChatThreadsStore.getState().createThread({ title: 'E' });
+    useChatThreadsStore.getState().updateThreadMessages(t.id, []);
+    expect(saved.length).toBe(0);
   });
 });

@@ -22,8 +22,82 @@ import { cn } from "../../utils";
 import { AssistantMessage } from "./assistant-message";
 import { ChatMessagePinToggle } from "./chat-message-pin-toggle";
 import { ChatMessagePart } from "./chat-message-part";
-import { CompressionBanner } from "./compression-banner";
 import { buildCompressionPayload } from "../../utils/compression/build-payload";
+import { getCompressionMessageCompressionState } from "../../utils/compression/message-metadata";
+
+const tokenNumberFormatter = typeof Intl !== "undefined"
+  ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 })
+  : null;
+
+function formatTokenNumber(value: number): string {
+  const safeValue = Math.max(0, Math.round(value));
+  return tokenNumberFormatter ? tokenNumberFormatter.format(safeValue) : `${safeValue}`;
+}
+
+function buildCompressionSummary(systemText?: string | null): string | null {
+  if (!systemText) return null;
+
+  const tokensLine = systemText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.toLowerCase().startsWith("tokens:"));
+
+  if (!tokensLine) return null;
+
+  const beforeMatch = tokensLine.match(/before\s+(\d+(?:\.\d+)?)/i);
+  const afterMatch = tokensLine.match(/after\s+(\d+(?:\.\d+)?)/i);
+  const savedMatch = tokensLine.match(/saved\s+(\d+(?:\.\d+)?)/i);
+
+  const before = beforeMatch ? Number(beforeMatch[1]) : undefined;
+  const after = afterMatch ? Number(afterMatch[1]) : undefined;
+  const saved = savedMatch ? Number(savedMatch[1]) : undefined;
+
+  if (
+    (before === undefined || Number.isNaN(before)) &&
+    (after === undefined || Number.isNaN(after)) &&
+    (saved === undefined || Number.isNaN(saved))
+  ) {
+    return null;
+  }
+
+  const hasBefore = typeof before === "number" && Number.isFinite(before);
+  const hasAfter = typeof after === "number" && Number.isFinite(after);
+  const hasSaved = typeof saved === "number" && Number.isFinite(saved);
+
+  if (hasBefore && hasAfter) {
+    const parts: string[] = [
+      `from ${formatTokenNumber(before)} tokens to ${formatTokenNumber(after)} tokens`,
+    ];
+
+    if (before > 0) {
+      const reduction = Math.max(0, Math.min(1, (before - after) / before));
+      if (Number.isFinite(reduction) && reduction > 0) {
+        const percentage = reduction * 100;
+        const rounded =
+          percentage >= 10
+            ? Math.round(percentage)
+            : Math.round(percentage * 10) / 10;
+        parts.push(`(${rounded}% reduction)`);
+      }
+    }
+
+    return parts.join(" ");
+  }
+
+  if (hasSaved) {
+    if (hasBefore && before > 0) {
+      const afterComputed = Math.max(before - (saved ?? 0), 0);
+      return `saved ${formatTokenNumber(saved!)} tokens (now ${formatTokenNumber(afterComputed)} tokens)`;
+    }
+    return `saved ${formatTokenNumber(saved!)} tokens`;
+  }
+
+  if (hasAfter) {
+    return `now ${formatTokenNumber(after!)} tokens`;
+  }
+
+  return null;
+}
 
 export interface ChatMessagesProps {
   messages: UIMessage[];
@@ -86,6 +160,8 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
     },
     ref
   ) => {
+    const usageSignatureRef = React.useRef<string | null>(null);
+
     const defaultEmptyState = (
       <div className="flex items-center justify-center h-full text-center p-8 animate-in fade-in duration-500">
         <div className="text-muted-foreground space-y-4">
@@ -166,7 +242,29 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
         compression.shouldCompress !== payload.shouldCompress ||
         compression.overBudget !== payload.overBudget;
 
+      const usageSignature =
+        payload.usage == null
+          ? "null"
+          : [
+              payload.usage.totalTokens,
+              payload.usage.pinnedTokens,
+              payload.usage.artifactTokens,
+              payload.usage.survivingTokens,
+              payload.usage.remainingTokens ?? "x",
+              payload.usage.budget ?? "x",
+              payload.usage.estimatedResponseTokens ?? "x",
+            ].join("|");
+
       if (usageMatches && !shouldUpdateFlags) {
+        usageSignatureRef.current = usageSignature;
+        return;
+      }
+
+      if (
+        usageSignatureRef.current === usageSignature &&
+        !shouldUpdateFlags
+      ) {
+        usageSignatureRef.current = usageSignature;
         return;
       }
 
@@ -176,6 +274,7 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
         shouldCompress: payload.shouldCompress,
         overBudget: payload.overBudget,
       });
+      usageSignatureRef.current = usageSignature;
     }, [
       compression,
       compression?.pinnedMessages,
@@ -274,12 +373,6 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                   />
                 );
               })}
-          {compression?.snapshot && (
-            <CompressionBanner
-              snapshot={compression.snapshot}
-              usage={compression.usage}
-            />
-          )}
           {isLoading && !lastMessage && (
             <Message
               from="assistant"
@@ -360,6 +453,32 @@ const ChatMessageItem = React.memo(
       const firstPart = message.parts?.[0];
       const systemText =
         firstPart && "text" in firstPart ? firstPart.text : "System message";
+      const compressionState =
+        getCompressionMessageCompressionState(message);
+      const isCompressionEvent =
+        compressionState?.kind === "event" &&
+        compressionState.reason === "compression-event";
+
+      if (isCompressionEvent) {
+        const summary = buildCompressionSummary(systemText);
+        const label = summary
+          ? `Conversation was compressed — ${summary}`
+          : "Conversation was compressed";
+        return (
+          <div
+            className={cn(
+              "flex w-full justify-center px-6 py-4 text-center",
+              messageClassName
+            )}
+            title={systemText || undefined}
+          >
+            <span className="rounded-full bg-[var(--acb-chat-message-system-bg)]/70 px-3 py-1 text-xs text-muted-foreground">
+              {label}
+            </span>
+          </div>
+        );
+      }
+
       return (
         <div
           className={cn(

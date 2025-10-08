@@ -2,6 +2,7 @@ import type { UIMessage } from "ai";
 import isEqual from "fast-deep-equal";
 import React, { useCallback, useEffect, useMemo } from "react";
 import {
+  Message,
   MessageAvatar,
   MessageContent,
 } from "../../components/ai-elements/message";
@@ -110,66 +111,55 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
       const showPinToggle = Boolean(pinState);
 
       return (
-        <div className="flex items-start gap-2">
-          <MessageAvatar
-            data-acb-part="message-avatar"
-            name="Assistant"
-            src={assistantAvatar}
-            className="shrink-0"
-          />
-          <div className="flex flex-col gap-3">
-            {hasChainOfThought && (
-              <div className="overflow-x-auto">
-                <ChatChainOfThought
-                  message={{ ...baseMessage, parts: chainOfThoughtParts }}
-                  isStreaming={options.streaming}
-                  isLastMessage={options.isLast}
-                  className="w-full max-w-full"
-                />
-              </div>
-            )}
+        <div className="flex min-w-0 flex-col gap-3">
+          {hasChainOfThought && (
+            <div className="w-full max-w-full overflow-x-auto">
+              <ChatChainOfThought
+                message={{ ...baseMessage, parts: chainOfThoughtParts }}
+                isStreaming={options.streaming}
+                isLastMessage={options.isLast}
+                className="w-full max-w-full"
+              />
+            </div>
+          )}
 
-            {hasRegularContent && (
-              <div className="flex items-stretch gap-2">
-                <MessageContent
-                  data-acb-part="message-content"
-                  data-role="assistant"
-                  data-acb-pinned={pinState?.pinned ? "" : undefined}
+          {hasRegularContent && (
+            <div className="flex min-w-0 items-stretch gap-2">
+              <MessageContent
+                data-acb-part="message-content"
+                data-role="assistant"
+                data-acb-pinned={pinState?.pinned ? "" : undefined}
+                className="min-w-0 rounded-[var(--acb-chat-message-radius)] bg-[var(--acb-chat-message-assistant-bg)] text-[var(--acb-chat-message-assistant-fg)]"
+              >
+                {visibleRegularParts.map((part, partIndex) => (
+                  <ChatMessagePart
+                    key={partIndex}
+                    part={part}
+                    streaming={options.streaming}
+                  />
+                ))}
+              </MessageContent>
+              {showPinToggle && (
+                <div
                   className={cn(
-                    "min-w-0 rounded-[var(--acb-chat-message-radius)] bg-[var(--acb-chat-message-assistant-bg)] text-[var(--acb-chat-message-assistant-fg)]",
-                    messageClassName
+                    "flex shrink-0 items-center self-stretch transition-opacity duration-150",
+                    pinState?.pinned
+                      ? "opacity-100 pointer-events-auto"
+                      : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100 group-hover:pointer-events-auto group-focus-within:pointer-events-auto"
                   )}
                 >
-                  {visibleRegularParts.map((part, partIndex) => (
-                    <ChatMessagePart
-                      key={partIndex}
-                      part={part}
-                      streaming={options.streaming}
-                    />
-                  ))}
-                </MessageContent>
-                {showPinToggle && (
-                  <div
-                    className={cn(
-                      "flex shrink-0 items-center self-stretch transition-opacity duration-150",
-                      pinState?.pinned
-                        ? "opacity-100 pointer-events-auto"
-                        : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100 group-hover:pointer-events-auto group-focus-within:pointer-events-auto"
-                    )}
-                  >
-                    <ChatMessagePinToggle
-                      pinned={Boolean(pinState?.pinned)}
-                      onPressedChange={handlePinPressedChange}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                  <ChatMessagePinToggle
+                    pinned={Boolean(pinState?.pinned)}
+                    onPressedChange={handlePinPressedChange}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       );
     },
-    [assistantAvatar, handlePinPressedChange, messageClassName, pinState]
+    [handlePinPressedChange, pinState]
   );
 
   const rawBranchEntries = useMemo(
@@ -191,12 +181,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
         branchingEnabled,
         selectedBranchIndex,
       }),
-    [
-      branchingEnabled,
-      message.id,
-      rawBranchEntries,
-      selectedBranchIndex,
-    ]
+    [branchingEnabled, message.id, rawBranchEntries, selectedBranchIndex]
   );
 
   const branchCount = branchEntries.length;
@@ -205,10 +190,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
     branchCount > 0 &&
     typeof selectedBranchIndex === "number" &&
     Number.isFinite(selectedBranchIndex)
-      ? Math.max(
-          0,
-          Math.min(branchCount - 1, Math.trunc(selectedBranchIndex))
-        )
+      ? Math.max(0, Math.min(branchCount - 1, Math.trunc(selectedBranchIndex)))
       : undefined;
 
   const resolvedBranchId = branchingEnabled
@@ -248,12 +230,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
       Math.min(branchEntries.length - 1, fallbackBranchIndex)
     );
     return branchEntries[safeIndex];
-  }, [
-    branchEntries,
-    branchingEnabled,
-    fallbackBranchIndex,
-    resolvedBranchId,
-  ]);
+  }, [branchEntries, branchingEnabled, fallbackBranchIndex, resolvedBranchId]);
 
   const effectiveMessage = effectiveBranchEntry?.message ?? message;
   const showBranchSelector = branchingEnabled && branchCount > 1;
@@ -306,12 +283,12 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
     })();
 
     return (
-      <div className="flex items-start gap-2 pb-4">
+      <div className="flex items-start gap-2 -mt-3 pb-0">
         {/* Avatar gutter spacer - matches the avatar width + gap */}
         <div aria-hidden="true" className="size-8 shrink-0" />
         <div
           className={cn(
-            "flex flex-wrap items-start gap-3 pt-1 min-w-0",
+            "flex min-w-0 flex-wrap items-start gap-3 pt-1",
             controlsJustifyClass
           )}
         >
@@ -333,12 +310,6 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
       </div>
     );
   };
-
-  const containerClass = cn(
-    "group flex flex-col gap-0 max-w-[80%]",
-    !showAnyActions && !showBranchSelector && "pt-4",
-    (showAnyActions || showBranchSelector) && "[&>div]:pb-0"
-  );
 
   const handleBranchChange = useCallback(
     (nextIndex: number) => {
@@ -385,28 +356,76 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
     return null;
   }
 
-  const messageContent = showBranchSelector ? (
-    <Branch
-      key={branchKey}
-      defaultBranch={defaultBranchIndex}
-      onBranchChange={handleBranchChange}
-      className="flex flex-col gap-0"
-    >
+  const messageBody = showBranchSelector ? (
+    <div className="flex min-w-0 flex-col gap-0">
       <BranchMessages>
         {branchEntries.map((entry) => (
           <React.Fragment key={entry.key}>{entry.content}</React.Fragment>
         ))}
       </BranchMessages>
-      {renderControlsRow(true)}
-    </Branch>
+    </div>
   ) : (
-    <>
-      {canonicalContent}
-      {renderControlsRow(false)}
-    </>
+    <div className="flex min-w-0 flex-col gap-0">{canonicalContent}</div>
   );
 
-  return <div className={containerClass}>{messageContent}</div>;
+  if (showBranchSelector) {
+    return (
+      <Branch
+        key={branchKey}
+        defaultBranch={defaultBranchIndex}
+        onBranchChange={handleBranchChange}
+        className="group flex w-full flex-col gap-0"
+      >
+        <Message
+          from="assistant"
+          data-acb-part="message"
+          data-role="assistant"
+          data-acb-pinned={pinState?.pinned ? "" : undefined}
+          className={cn(
+            "!pb-0",
+            "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-assistant-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-assistant-fg)]",
+            messageClassName
+          )}
+        >
+          <div className={cn("flex min-w-0 flex-col gap-0", "pt-4")}>
+            {messageBody}
+          </div>
+          <MessageAvatar
+            data-acb-part="message-avatar"
+            name="Assistant"
+            src={assistantAvatar}
+            className="shrink-0 self-end"
+          />
+        </Message>
+        {renderControlsRow(true)}
+      </Branch>
+    );
+  }
+
+  return (
+    <div className="group flex w-full flex-col gap-0">
+      <Message
+        from="assistant"
+        data-acb-part="message"
+        data-role="assistant"
+        data-acb-pinned={pinState?.pinned ? "" : undefined}
+        className={cn(
+          "pb-0",
+          "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-assistant-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-assistant-fg)]",
+          messageClassName
+        )}
+      >
+        <div className="flex min-w-0 flex-col gap-0 pt-4">{messageBody}</div>
+        <MessageAvatar
+          data-acb-part="message-avatar"
+          name="Assistant"
+          src={assistantAvatar}
+          className="shrink-0 self-end"
+        />
+      </Message>
+      {showAnyActions ? renderControlsRow(false) : null}
+    </div>
+  );
 };
 
 export const AssistantMessage = React.memo(

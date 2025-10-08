@@ -2,6 +2,22 @@
 // Consumers: import preset from 'ai-chat-bootstrap/tailwind.preset'
 // and include in `presets: [preset]`.
 
+const withOpacity = (variable) => {
+  return ({ opacityValue }) => {
+    if (opacityValue === undefined) {
+      return `var(${variable})`;
+    }
+
+    const parsed = Number.parseFloat(opacityValue);
+    if (Number.isNaN(parsed)) {
+      return `var(${variable})`;
+    }
+
+    const percentage = Math.max(0, Math.min(100, Math.round(parsed * 100)));
+    return `color-mix(in oklab, var(${variable}) ${percentage}%, transparent)`;
+  };
+};
+
 /** @type {import('tailwindcss').Config} */
 const preset = {
   theme: {
@@ -36,52 +52,55 @@ const preset = {
         ],
       },
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-        card: { DEFAULT: "var(--card)", foreground: "var(--card-foreground)" },
+        background: withOpacity("--background"),
+        foreground: withOpacity("--foreground"),
+        card: {
+          DEFAULT: withOpacity("--card"),
+          foreground: "var(--card-foreground)",
+        },
         popover: {
-          DEFAULT: "var(--popover)",
+          DEFAULT: withOpacity("--popover"),
           foreground: "var(--popover-foreground)",
         },
         primary: {
-          DEFAULT: "var(--primary)",
+          DEFAULT: withOpacity("--primary"),
           foreground: "var(--primary-foreground)",
         },
         secondary: {
-          DEFAULT: "var(--secondary)",
+          DEFAULT: withOpacity("--secondary"),
           foreground: "var(--secondary-foreground)",
         },
         muted: {
-          DEFAULT: "var(--muted)",
+          DEFAULT: withOpacity("--muted"),
           foreground: "var(--muted-foreground)",
         },
         accent: {
-          DEFAULT: "var(--accent)",
+          DEFAULT: withOpacity("--accent"),
           foreground: "var(--accent-foreground)",
         },
         destructive: {
-          DEFAULT: "var(--destructive)",
+          DEFAULT: withOpacity("--destructive"),
           foreground: "var(--destructive-foreground)",
         },
-        border: "var(--border)",
-        input: "var(--input)",
-        ring: "var(--ring)",
+        border: withOpacity("--border"),
+        input: withOpacity("--input"),
+        ring: withOpacity("--ring"),
         chart: {
-          1: "var(--chart-1)",
-          2: "var(--chart-2)",
-          3: "var(--chart-3)",
-          4: "var(--chart-4)",
-          5: "var(--chart-5)",
+          1: withOpacity("--chart-1"),
+          2: withOpacity("--chart-2"),
+          3: withOpacity("--chart-3"),
+          4: withOpacity("--chart-4"),
+          5: withOpacity("--chart-5"),
         },
         sidebar: {
-          DEFAULT: "var(--sidebar)",
-          foreground: "var(--sidebar-foreground)",
-          primary: "var(--sidebar-primary)",
+          DEFAULT: withOpacity("--sidebar"),
+          foreground: withOpacity("--sidebar-foreground"),
+          primary: withOpacity("--sidebar-primary"),
           "primary-foreground": "var(--sidebar-primary-foreground)",
-          accent: "var(--sidebar-accent)",
+          accent: withOpacity("--sidebar-accent"),
           "accent-foreground": "var(--sidebar-accent-foreground)",
-          border: "var(--sidebar-border)",
-          ring: "var(--sidebar-ring)",
+          border: withOpacity("--sidebar-border"),
+          ring: withOpacity("--sidebar-ring"),
         },
       },
       borderRadius: {

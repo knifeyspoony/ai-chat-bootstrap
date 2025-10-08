@@ -9,6 +9,8 @@ import type {
 } from "../types/threads";
 import { getDefaultChatThreadPersistence } from "../persistence/chat-threads-indexeddb";
 
+type ChatThreadsMode = "persistent" | "ephemeral";
+
 interface ChatThreadsState {
   // Current scope partition key (optional)
   scopeKey?: string;
@@ -28,7 +30,12 @@ interface ChatThreadsState {
   // Persistence backend (default: IndexedDB if available)
   persistence?: ChatThreadPersistence;
 
+  // Current persistence mode
+  mode: ChatThreadsMode;
+
   // Actions
+  initializePersistent: (persistence?: ChatThreadPersistence) => void;
+  initializeEphemeral: () => void;
   setScopeKey: (scopeKey?: string) => void;
   setPersistence: (persistence?: ChatThreadPersistence) => void;
   setActiveThread: (id?: string) => void;
@@ -65,6 +72,32 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
   activeThreadId: undefined,
   isLoaded: false,
   persistence: getDefaultChatThreadPersistence(),
+  mode: "persistent",
+
+  initializePersistent: (persistence?: ChatThreadPersistence) => {
+    const nextPersistence = persistence ?? getDefaultChatThreadPersistence();
+    set({
+      scopeKey: undefined,
+      threads: new Map<string, ChatThread>(),
+      metas: new Map<string, ChatThreadMeta>(),
+      activeThreadId: undefined,
+      isLoaded: false,
+      persistence: nextPersistence,
+      mode: "persistent",
+    });
+  },
+
+  initializeEphemeral: () => {
+    set({
+      scopeKey: undefined,
+      threads: new Map<string, ChatThread>(),
+      metas: new Map<string, ChatThreadMeta>(),
+      activeThreadId: undefined,
+      isLoaded: false,
+      persistence: undefined,
+      mode: "ephemeral",
+    });
+  },
 
   setScopeKey: (scopeKey?: string) => {
     const prev = get().scopeKey;
@@ -72,7 +105,11 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
     set({ scopeKey, isLoaded: false });
   },
 
-  setPersistence: (persistence?: ChatThreadPersistence) => set({ persistence }),
+  setPersistence: (persistence?: ChatThreadPersistence) =>
+    set({
+      persistence,
+      mode: persistence ? "persistent" : "ephemeral",
+    }),
 
   setActiveThread: (id?: string) => set({ activeThreadId: id }),
 

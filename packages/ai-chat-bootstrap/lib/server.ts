@@ -2,6 +2,13 @@
 // Exposes utilities & types safe for Next.js Route Handlers / Edge without pulling in React components.
 // NOTE: Do NOT export React components or hooks from this file.
 
+export {
+  createAIChatHandler,
+  createCompressionHandler,
+  createMcpToolsHandler,
+  createSuggestionsHandler,
+  createThreadTitleHandler,
+} from "./handlers";
 export { cn } from "./utils";
 export {
   deserializeFrontendTools,
@@ -9,15 +16,13 @@ export {
 } from "./utils/backend-tool-utils";
 export { buildEnrichedSystemPrompt } from "./utils/prompt-utils";
 export * from "./utils/token-utils";
-export {
-  createAIChatHandler,
-  createCompressionHandler,
-  createSuggestionsHandler,
-  createThreadTitleHandler,
-  createMcpToolsHandler,
-} from "./handlers";
 
 // Re-export types & schemas (pure TypeScript / zod, no React)
+export type {
+  MCPServerToolsRequest,
+  MCPServerToolsResponse,
+  SerializedMCPServer,
+} from "./stores/mcp";
 export { SuggestionsSchema } from "./types/chat";
 export type {
   ChatRequest,
@@ -27,8 +32,4 @@ export type {
   SuggestionsResponse,
   SuggestionsSchemaType,
 } from "./types/chat";
-export type { SerializedMCPServer } from "./stores/mcp";
-export type {
-  MCPServerToolsRequest,
-  MCPServerToolsResponse,
-} from "./stores/mcp";
+export { type CompressionServiceRequest } from "./types/compression";

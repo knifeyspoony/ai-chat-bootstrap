@@ -16,17 +16,7 @@ export function useEphemeralChatThreads() {
     const store = useChatThreadsStore.getState();
 
     // Disable persistence to keep demo runs stateless.
-    store.setPersistence?.(undefined);
-
-    // Reset in-memory thread data so the next render begins from scratch.
-    useChatThreadsStore.setState((state) => ({
-      ...state,
-      scopeKey: undefined,
-      threads: new Map(),
-      metas: new Map(),
-      activeThreadId: undefined,
-      isLoaded: false,
-    }));
+    store.initializeEphemeral?.();
 
     return true;
   });

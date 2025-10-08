@@ -87,7 +87,7 @@ export function App() {
 
 ## Server Templates
 
-New helper functions make deploying API endpoints easier:
+Helper functions make deploying API endpoints easier:
 
 ```ts
 // app/api/chat/route.ts
@@ -107,8 +107,8 @@ Also available: `createSuggestionsHandler`, `createThreadTitleHandler`, `createM
 ## Features
 
 - Chat container + message rendering primitives
-- **Model selection** dropdown with store management
-- **Chain of thought** reasoning display mode
+- Model selection dropdown with store management
+- Chain of thought reasoning display mode
 - Slash command system (zod parameter schemas)
 - Frontend tool registration (execute functions client-side)
 - Automatic context sharing hooks

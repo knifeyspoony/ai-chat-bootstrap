@@ -45,6 +45,8 @@ interface UseAIChatOptions {
   features?: {
     /** Enable reasoning capture and rendering blocks. */
     chainOfThought?: boolean;
+    /** Enable branching previews + regenerate control surfaces. */
+    branching?: boolean;
   };
   mcp?: {
     /** Toggle MCP support. */
@@ -60,6 +62,7 @@ interface UseAIChatOptions {
     /** Preferred model id to select on mount. */
     initial?: string;
   };
+  compression?: CompressionConfig;
 }
 
 function useAIChat(options?: UseAIChatOptions): UseAIChatReturn
@@ -92,11 +95,13 @@ Per-call override: you can still control the final string by providing `body.enr
 | `threads.title.api` | `string` | `""` | Endpoint used to upgrade thread titles |
 | `threads.title.sampleCount` | `number` | `8` | Number of messages sent to the title endpoint |
 | `features.chainOfThought` | `boolean` | `false` | Enables reasoning capture/tooling |
+| `features.branching` | `boolean` | `false` | Enables WIP branching helpers (manual regenerate history) |
 | `mcp.enabled` | `boolean` | `false` | Turns MCP support on/off |
 | `mcp.api` | `string` | `undefined` | Default MCP server API endpoint |
 | `mcp.servers` | `SerializedMCPServer[]` | `[]` | Pre-registered MCP servers |
 | `models.available` | `ChatModelOption[]` | `[]` | Models displayed in the selector |
 | `models.initial` | `string` | `undefined` | Preferred model id selected on mount |
+| `compression` | `CompressionConfig` | `{ enabled: false }` | Enables compression, artifact UI, and usage tracking |
 
 ## Return Value
 
@@ -144,6 +149,13 @@ interface UseAIChatReturn extends ChatHelpers {
   scopeKey?: string;
   chainOfThoughtEnabled: boolean;
   mcpEnabled: boolean;
+  compression: CompressionController;
+  branching:
+    | { enabled: false }
+    | {
+        enabled: true;
+        selectBranch: (messageId: string, branchId: string) => void;
+      };
 }
 ```
 
@@ -228,6 +240,20 @@ const chat = useAIChat({
 // Assistant reasoning blocks render when the model returns them.
 ```
 
+### Branching Controls
+
+```tsx
+const chat = useAIChat({
+  features: { branching: true },
+});
+
+if (chat.branching.enabled) {
+  chat.branching.selectBranch(messageId, branchId);
+}
+```
+
+Branching keeps alternative assistant responses available while letting you trigger regenerations without losing the original turn.
+
 ### Thread Scoping & Persistence
 
 ```tsx
@@ -255,6 +281,8 @@ const chat = useAIChat({
 });
 ```
 
+> Pair with [`useMCPServer`](/api/hooks/use-mcp-server) when you want users to register additional MCP servers at runtime.
+
 ### Sending Targeted AI Commands
 
 ```tsx
@@ -268,6 +296,26 @@ function handleSummarise() {
   );
 }
 ```
+
+### Compression & Artifacts
+
+```tsx
+const chat = useAIChat({
+  transport: { api: "/api/chat" },
+  compression: {
+    enabled: true,
+    api: "/api/compression",
+    maxTokenBudget: 16000,
+    pinnedMessageLimit: 5,
+  },
+});
+
+// Inspect usage or pinned messages
+const usage = chat.compression.usage;
+const pinned = chat.compression.pinnedMessages;
+```
+
+When compression is enabled the prompt toolbar shows token usage, compression artifacts, and a manual "Review" sheet. Pair it with [`useAIChatCompression`](/api/hooks/use-ai-chat-compression) for lower-level control or to trigger manual compression runs.
 
 ## Related
 

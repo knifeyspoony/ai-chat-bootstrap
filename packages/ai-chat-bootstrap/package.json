@@ -1,6 +1,6 @@
 {
   "name": "ai-chat-bootstrap",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "React UI + hooks for building modern AI chat interfaces fast. Based on AISDK and AISDK Elements",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -17,8 +17,6 @@
       "import": "./dist/server.mjs"
     },
     "./tokens.css": "./dist/tokens.css",
-    "./tokens.primitives.css": "./dist/tokens.primitives.css",
-    "./tokens.dark.css": "./dist/tokens.dark.css",
     "./tailwind.preset": "./dist/tailwind.preset.mjs",
     "./tailwind.plugin": "./dist/tailwind.plugin.mjs",
     "./ai-chat.css": "./dist/ai-chat.css",

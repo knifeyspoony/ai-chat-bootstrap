@@ -4,8 +4,9 @@ Scaffolded with `ai-chat-bootstrap` CLI.
 
 ### Includes
 
-- API routes: `/api/chat`, `/api/suggestions`, `/api/thread-title`, `/api/mcp`
+- API routes: `/api/chat`, `/api/suggestions`, `/api/thread-title`, `/api/mcp`, `/api/compression`
 - Floating chat popout on the home page with threads & auto titles enabled
+- Compression pipeline wired to `/api/compression` with model metadata ready for budget tracking
 - Suggestions, slash commands, and MCP tooling ready (configure via `ChatContainer` props)
 - Hooks for context (`useAIContext`), tools (`useAIFrontendTool`), commands (`useAIChatCommand`)
 
@@ -31,17 +32,11 @@ useAIFrontendTool({
 });
 ```
 
-### Theme Toggle
+### Theme Tokens
 
-Dark mode tokens are already defined. A small client-side toggle writes `data-theme="dark"` to `<html>` and persists preference in `localStorage`.
+The scaffold injected a shadcn-compatible palette into `app/globals.css`. Keep that block (it must live outside `@layer base`) and tweak the variable values to match your brand. The chat components read those tokens directly—if you delete them, the UI loses its color system.
 
-To customize, override variables after importing `tokens.css`, e.g.:
-
-```css
-:root[data-theme="dark"] {
-  --primary: oklch(0.85 0 0);
-}
-```
+Tip: once your Tailwind build emits the chat utilities, you can remove the `@import "ai-chat-bootstrap/ai-chat.css";` line from `globals.css` to avoid duplicate CSS.
 
 ### Next Ideas
 

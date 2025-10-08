@@ -11,24 +11,29 @@ Complete API documentation for all hooks, components, and TypeScript interfaces 
 
 ### Chat Management
 
-- **[useAIChat](/api/hooks/use-ai-chat)** - Advanced hook for custom chat state management (most users should use ChatContainer/ChatPopout components directly)
+- **[useAIChat](/api/hooks/use-ai-chat)** – Advanced hook for full chat state + transport orchestration (used internally by `ChatContainer`)
+- **[useAIChatCompression](/api/hooks/use-ai-chat-compression)** – Access the compression controller, pinned messages, artifacts, and `runCompression`
+- **[useMCPServer](/api/hooks/use-mcp-server)** – Discover and sync Model Context Protocol (MCP) servers from the client
+- **[useAIChatCommand](/api/hooks/use-ai-chat-command)** – Register slash commands that call frontend tools or remote actions
+- **[useUIChatCommand](/api/hooks/use-ui-chat-command)** – Present command palettes bound to `useAIChatCommand`
 
 ### Context & Focus
 
-- **[useAIContext](/api/hooks/use-ai-context)** - Share React component state with the AI without causing re-renders
-- **[useAIFocus](/api/hooks/use-ai-focus)** - Enable users to explicitly mark which items should be prioritized in AI conversations
+- **[useAIContext](/api/hooks/use-ai-context)** – Share React component state with the AI without causing re-renders
+- **[useAIFocus](/api/hooks/use-ai-focus)** – Enable users to explicitly mark which items should be prioritized in AI conversations
 
 ### Tools
 
-- **[useAIFrontendTool](/api/hooks/use-ai-frontend-tool)** - Register tools that the AI can execute in your React components for direct UI interaction
+- **[useAIFrontendTool](/api/hooks/use-ai-frontend-tool)** – Register tools that the AI can execute in your React components for direct UI interaction
 
 ## Components
 
 ### Chat Interface Components
 
-- **[ChatContainer](/api/components/chat-container)** - Main chat interface component with message display and input
-- **[ChatMessage](/api/components/chat-message)** - Individual message component with support for different message types  
-- **[ChatInput](/api/components/chat-input)** - Standalone input component for chat interfaces
+- **[ChatContainer](/api/components/chat-container)** – Main chat interface component with header, threads, compression, and actions toolbar
+- **[ChatPopout](/api/components/chat-popout)** – Overlay/inline popout shell that composes `ChatContainer`
+- **[ChatMessage](/api/components/chat-message)** – Individual message component with support for different message types
+- **[ChatInput](/api/components/chat-input)** – Standalone input component with model selector, suggestions, compression indicators, and toolbar variants
 
 ## Core Concepts
 
@@ -116,10 +121,13 @@ function ChatWithFeatures() {
   return (
     <ChatContainer
       transport={{ api: "/api/chat" }}
-      models={[
-        { id: 'gpt-4', label: 'GPT-4' },
-        { id: 'gpt-4o-mini', label: 'GPT-4o mini' }
-      ]}
+      models={{
+        available: [
+          { id: "gpt-4", label: "GPT-4" },
+          { id: "gpt-4o-mini", label: "GPT-4o mini" },
+        ],
+        initial: "gpt-4o-mini",
+      }}
       features={{ chainOfThought: true }}
     />
   );
@@ -176,11 +184,33 @@ function ChatWithTools() {
 }
 ```
 
+### Enabling Compression
+
+```tsx
+import { ChatContainer } from "ai-chat-bootstrap";
+
+function ChatWithCompression() {
+  return (
+    <ChatContainer
+      transport={{ api: "/api/chat" }}
+      compression={{
+        enabled: true,
+        api: "/api/compression",
+        maxTokenBudget: 16000,
+        pinnedMessageLimit: 4,
+      }}
+    />
+  );
+}
+```
+
+When compression is configured, the prompt actions toolbar surfaces token usage, compression artifacts, and manual controls. Pair it with [`createCompressionHandler`](/api/server-templates/create-compression-handler) on the backend.
+
 ## Component Reference
 
 ### ChatContainer
 
-Main chat interface component with built-in `useAIChat` state. It accepts all `UseAIChatOptions` (via `transport`, `messages`, `threads`, `features`, `models`, `mcp`) plus UI configuration groups such as `header`, `ui`, `suggestions`, `commands`, `threads`, and `assistantActions`. Always prefer the structured configuration groups when wiring new code.
+Main chat interface component with built-in `useAIChat` state. It accepts all `UseAIChatOptions` (via `transport`, `messages`, `threads`, `features`, `models`, `mcp`, `compression`) plus UI configuration groups such as `header`, `ui`, `suggestions`, `commands`, `threads`, and `assistantActions`. Always prefer the structured configuration groups when wiring new code.
 
 See the dedicated [ChatContainer API](/api/components/chat-container) for the complete prop interface and examples.
 
@@ -197,18 +227,7 @@ interface ChatMessageProps {
 
 ### ChatInput
 
-Standalone input component for chat interfaces.
-
-```tsx
-interface ChatInputProps {
-  input: string;
-  onInputChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-  onSubmit: (e?: FormEvent) => void;
-  isLoading?: boolean;
-  placeholder?: string;
-  className?: string;
-}
-```
+Standalone input component for chat interfaces. Provides the prompt toolbar, model selector, suggestions trigger, compression indicators, and focus chips. See the [ChatInput API](/api/components/chat-input) for the full prop interface and examples.
 
 ## TypeScript Interfaces
 
@@ -300,6 +319,7 @@ export { handler as POST };
 ```ts
 import {
   createAIChatHandler,
+  createCompressionHandler,
   createSuggestionsHandler,
   createThreadTitleHandler,
   createMcpToolsHandler,
@@ -313,6 +333,9 @@ export const POST = createSuggestionsHandler({ model });
 
 // Auto thread titles
 export const POST = createThreadTitleHandler({ model });
+
+// Compression summaries
+export const POST = createCompressionHandler({ model });
 
 // MCP server tools
 export const POST = createMcpToolsHandler();
@@ -330,6 +353,7 @@ The AI Chat Bootstrap library is designed to work seamlessly with the Vercel AI 
 - [Chat with Tools](/chat/chat-with-tools) - Adding frontend tools  
 - [Sharing Context](/features/ai-context) - Using ambient context
 - [Focus Items](/features/focus-items) - User-controlled focus
+- [Compression](/features/compression) - Keeping transcripts within token budgets
 
 ## Support
 

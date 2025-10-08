@@ -84,9 +84,10 @@ export { handler as POST };
 ## Next steps
 
 - **Add tools**: Register frontend tools (or MCP servers) and they are automatically merged into the handler request
+- **Compress history**: Provide a compression endpoint and enable `compression.enabled` to keep threads under budget
 - **Add context**: Use <API name="useAIContext">useAIContext</API> to share app state with the AI
-- **Add suggestions**: Enable contextual suggestions with `enableSuggestions={true}`
-- **Style**: Customize appearance via Tailwind classes or component props
+- **Add suggestions**: Enable contextual suggestions with `enableSuggestions={true}` — the actions toolbar will surface them automatically
+- **Style & toolbar**: Customize the prompt toolbar (floating, inline, hidden) or restyle the chat via Tailwind classes or component props
 
 ## API Reference
 

@@ -14,6 +14,8 @@ description: Main chat interface component with message display and input.
 interface ChatContainerProps extends UseAIChatOptions {
   /** Opt-in to the unstyled variant (removes default borders/background). */
   "data-acb-unstyled"?: "" | boolean;
+  /** Convenience toggle for assistant branching (aliases `features.branching`). */
+  enableBranching?: boolean;
 
   header?: {
     title?: string;
@@ -33,6 +35,7 @@ interface ChatContainerProps extends UseAIChatOptions {
       message?: string;
       input?: string;
       assistantActions?: string;
+      toolbar?: string;
     };
     emptyState?: React.ReactNode;
   };
@@ -64,7 +67,7 @@ interface ChatContainerProps extends UseAIChatOptions {
 }
 ```
 
-> All AI configuration (API endpoint, system prompt, models, MCP, threading, etc.) is supplied via the `UseAIChatOptions` keys: `transport`, `messages`, `threads`, `features`, `mcp`, and `models`.
+> All AI configuration (API endpoint, system prompt, models, MCP, threading, compression, etc.) is supplied via the `UseAIChatOptions` keys: `transport`, `messages`, `threads`, `features`, `mcp`, `models`, and `compression`.
 
 ## Usage
 
@@ -95,8 +98,10 @@ export function MyChat() {
 
 ## Features
 
+- **Prompt Actions Toolbar**: Model selector, attachment button, compression usage, and suggestions share a single toolbar (customize placement via variants or `ui.classes.toolbar`).
 - **Model Selection**: Dropdown automatically appears when multiple models are configured via `models.available`.
 - **Chain of Thought**: Reasoning blocks render when `features.chainOfThought` is enabled and the assistant returns reasoning parts.
+- **Compression**: Token usage indicator, pinned message UI, and artifact review sheet when `compression.enabled` is true.
 - **Assistant Actions**: Built-in copy/regenerate/debug/feedback actions with support for custom buttons.
 - **Suggestions**: Optional AI-generated follow-up suggestions displayed above the input.
 - **Commands**: Slash-command palette that integrates with `useAIChatCommand` and frontend tools.
@@ -144,6 +149,22 @@ import { Share2Icon } from "lucide-react";
 ```
 
 > Built-in actions automatically hide on older messages when `onlyOnMostRecent` is set (e.g. regenerate). Custom actions can use `onlyOnMostRecent`, `visible`, or `disabled` predicates for granular control.
+
+## Compression
+
+```tsx
+<ChatContainer
+  transport={{ api: "/api/chat" }}
+  compression={{
+    enabled: true,
+    api: "/api/compression",
+    maxTokenBudget: 16000,
+    pinnedMessageLimit: 4,
+  }}
+/>
+```
+
+When compression is enabled the prompt toolbar surfaces current usage, exposes a "Review compression" sheet (artifacts, snapshots, survivors), and respects pinned messages per thread. Pair it with [`createCompressionHandler`](/api/server-templates/create-compression-handler) so the backend can summarize transcripts and return updated artifacts.
 
 ## See Also
 

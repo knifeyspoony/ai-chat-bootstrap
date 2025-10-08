@@ -1,0 +1,82 @@
+---
+title: useAIChatCompression
+description: Access the compression controller, pinned messages, artifacts, and helpers used by ChatContainer to keep transcripts within budget.
+---
+
+# useAIChatCompression
+
+`useAIChatCompression` exposes the **compression controller** that powers message pinning, artifact review, and auto-compression inside `ChatContainer`. It normalizes your `CompressionConfig`, syncs the global compression store, and returns helpers for manually triggering compression runs when you need direct control.
+
+Most apps interact with compression through `ChatContainer` or `useAIChat`. Reach for this hook when you are composing your own UI, rendering custom pinned message indicators, or wiring a manual "Compress now" button.
+
+## Signature
+
+```ts
+import { useAIChatCompression } from "ai-chat-bootstrap";
+
+interface UseAIChatCompressionOptions {
+  compression?: CompressionConfig;
+}
+
+function useAIChatCompression(
+  options?: UseAIChatCompressionOptions
+): {
+  config: NormalizedCompressionConfig;
+  controller: CompressionController;
+  buildPayload: (
+    messages: UIMessage[],
+    options?: CompressionRunOptions
+  ) => Promise<BuildCompressionPayloadResult>;
+}
+```
+
+The optional `compression` object matches the configuration you pass to `ChatContainer` / `useAIChat` (`enabled`, `api`, `maxTokenBudget`, `pinnedMessageLimit`, etc.).
+
+## Return value
+
+- `config` – The normalized compression configuration (defaults applied, strings coerced).
+- `controller` – Live compression state (`pinnedMessages`, `artifacts`, `snapshot`, `usage`, `shouldCompress`, `overBudget`) plus mutating `actions` such as `pinMessage`, `clearArtifacts`, and `setUsage`.
+- `buildPayload(messages, options?)` – Builds the payload sent to your compression endpoint. It merges pinned messages and previous artifacts, records usage, and (when compression is enabled) POSTs to the configured service. Returns the updated compression metadata, surviving message ids, and pinned/artifact references.
+
+> Tip: `controller.runCompression` already wraps `buildPayload` with the currently tracked message set—use that when possible instead of invoking `buildPayload` manually.
+
+## Example – Manual compression button
+
+```tsx
+import { useAIChat, useAIChatCompression } from "ai-chat-bootstrap";
+
+function ManualCompressionControl() {
+  const chat = useAIChat({
+    compression: { enabled: true, maxTokenBudget: 16_000 },
+  });
+  const { controller } = useAIChatCompression();
+
+  return (
+    <button
+      type="button"
+      onClick={() => controller.runCompression?.({ force: true })}
+      disabled={!controller.config.enabled || chat.messages.length === 0}
+    >
+      Compress history
+    </button>
+  );
+}
+```
+
+## CompressionConfig overview
+
+`CompressionConfig` is shared across the hook, `useAIChat`, and `ChatContainer`:
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `enabled` | `boolean` | `false` | Master switch for compression features |
+| `api` | `string` | `"/api/compression"` | Endpoint used by `createCompressionHandler` (or your own handler) |
+| `maxTokenBudget` | `number \| null` | `null` | Target token ceiling for the transcript (used to compute `overBudget`) |
+| `compressionThreshold` | `number` | `0.85` | Ratio of usage to budget that triggers automatic compressions |
+| `pinnedMessageLimit` | `number \| null` | `null` | Maximum number of messages users can pin |
+| `model` | `string \| null` | `null` | Preferred compression model id (mirrors server template option) |
+| `onCompression` | `(result) => void` | `undefined` | Callback invoked after a successful compression run |
+| `onError` | `(error) => void` | `undefined` | Callback invoked when the compression service fails |
+| `fetcher` | `CompressionServiceFetcher` | `undefined` | Replace the default `fetch` implementation |
+
+Combine this hook with [`createCompressionHandler`](/api/server-templates/create-compression-handler) to keep transcripts within the context window while providing users with artifact review and pinning controls.

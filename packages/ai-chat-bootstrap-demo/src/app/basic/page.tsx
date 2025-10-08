@@ -13,7 +13,7 @@ export default function BasicChatPage() {
   useEphemeralChatThreads();
 
   // Optional: keep a scope key to partition threads in this demo route
-  const scopeKey = "basic-demo";
+  const scopeKey = "ai-chat-bootstrap-basic-demo";
 
   return (
     <div className="h-screen flex flex-col p-8">

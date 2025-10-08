@@ -1,38 +1,104 @@
 ---
 title: Theme System
-description: Understand how AI Chat Bootstrap inherits shadcn/Tailwind design tokens, ships a default palette, and how to override them.
+description: Configure shadcn-compatible tokens so AI Chat Bootstrap derives its palette from your Tailwind theme.
 ---
 
 import { ThemePlayground } from "../../components/ThemePlayground";
 
 # Theme System
 
-AI Chat Bootstrap leans on the same CSS custom properties used by **shadcn/ui** (for example `--background`, `--foreground`, `--card`, `--border`). When those variables exist—because you are using Tailwind with the shadcn preset—the chat components inherit the palette automatically. If they are missing, the library falls back to bundled defaults so you still get a polished experience without Tailwind.
+AI Chat Bootstrap reads the same CSS custom properties used by **shadcn/ui** (`--background`, `--foreground`, `--card`, `--border`, etc.). Unlike earlier releases, we no longer ship fallback values—if those tokens are missing, every chat surface appears unstyled. The fix is to define the light/dark palette once in your `globals.css` (or wherever you manage Tailwind base styles).
 
-## Default Tokens & Fallbacks
+## Required Token Setup
 
-- `tokens.primitives.css` defines the base palette (`--acb-default-*` variables) covering light and dark modes.
-- `tokens.css` layers the shadcn-compatible semantic tokens over the primitives and exports component-level variables used by the chat UI.
-- `ai-chat.css` contains the precompiled component styles that consume the tokens.
-
-If you only import `tokens.css` + `ai-chat.css`, the primitives supply a **neutral light/dark theme**. Any shadcn/Tailwind variables that do exist are preferred, so you can gradually override them without touching generated CSS.
+Import the library tokens, then declare the shadcn-compatible palette. Keep the variable block outside of `@layer base` so it is not hoisted ahead of our imports.
 
 ```css
-/* globals.css */
+/* src/app/globals.css */
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
 @import "ai-chat-bootstrap/tokens.css";
 @import "ai-chat-bootstrap/ai-chat.css";
 
 :root {
-  --radius: 0.875rem;
-  --primary: oklch(0.6 0.2 265);
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
 }
 ```
 
-The example above keeps everything zero-config while nudging the brand radius and primary color.
+Customize the palette for your brand, but keep every variable defined—our component-level tokens reference each one directly.
 
-## Tailwind Integration
+If you compile the Tailwind utilities yourself, feel free to remove the `@import "ai-chat-bootstrap/ai-chat.css";` line once you confirm your build emits the chat classes.
 
-When you are already using Tailwind (or shadcn/ui), add the published preset to surface the tokens as Tailwind theme values:
+## Tailwind Preset
+
+Hook the preset so Tailwind makes the same variables available to your utility classes and components. Remember to let Tailwind scan the package so the generated CSS includes chat utilities.
 
 ```ts
 // tailwind.config.ts
@@ -40,13 +106,12 @@ import preset from "ai-chat-bootstrap/tailwind.preset";
 
 export default {
   presets: [preset],
-  content: ["./src/**/*.{ts,tsx,mdx}"],
+  content: [
+    "./src/**/*.{ts,tsx,js,jsx,mdx}",
+    "./node_modules/ai-chat-bootstrap/dist/**/*.{js,mjs}",
+  ],
 };
 ```
-
-The preset wires common keys (`background`, `foreground`, `border`, etc.) and exposes helper utilities so you can stay in Tailwind land. This mode also plays nicely with shadcn components because everything references the same CSS variables.
-
-> Avoid mixing preset + zero-config imports in the same build. Choose either Tailwind-native **or** the bundled CSS pipeline.
 
 ## Theme Playground
 
@@ -56,8 +121,8 @@ Use the header theme selector to toggle palettes and watch the chat below restyl
 
 ## Shipping Your Own Palette
 
-- Override the semantic tokens (`--background`, `--foreground`, `--primary`, etc.) on `:root`, `[data-theme="dark"]`, or any scoped element.
+- Override the shadcn tokens (`--background`, `--foreground`, `--primary`, etc.) on `:root`, `[data-theme="dark"]`, or any scoped element.
 - For multi-theme apps, toggle a class or `data-theme` attribute on `html`/`body` and let the tokens cascade—no need to touch component code.
-- Extend tokens for custom surfaces via `--acb-chat-*` variables whenever you need granular control (see `tokens.css` for the full list).
+- Extend tokens for custom surfaces via `--acb-chat-*` variables whenever you need granular control (see `ai-chat-bootstrap/tokens.css` for the full list).
 
-Because the components resolve every color through CSS variables, you can safely layer design systems on top of AI Chat Bootstrap without forking styles.
+Because every component reads colors through CSS variables, you can safely layer your own design system on top of AI Chat Bootstrap without modifying our source.

@@ -2,6 +2,21 @@
 import { ChatPopout } from "ai-chat-bootstrap";
 import Image from "next/image";
 
+const DEFAULT_MODEL_ID = "gpt-4o-mini";
+const MODEL_OPTIONS = [
+  {
+    id: DEFAULT_MODEL_ID,
+    label: "GPT-4o mini",
+    contextWindowTokens: 128_000,
+    contextCompressionThreshold: 0.85,
+  },
+];
+const COMPRESSION_CONFIG = {
+  enabled: true,
+  api: "/api/compression",
+  model: DEFAULT_MODEL_ID,
+};
+
 export default function Page() {
   return (
     <main
@@ -56,8 +71,8 @@ export default function Page() {
       >
         This starter was scaffolded with <code>ai-chat-bootstrap</code>. Use the
         floating chat popout or customize this page further. The UI library
-        provides hooks for context sharing, tools, slash commands, suggestions
-        and more.
+        provides hooks for context sharing, tools, slash commands, suggestions,
+        compression, and more.
       </p>
       {/* Drop-in chat assistant with built-in toggle button & overlay panel */}
       <ChatPopout
@@ -73,6 +88,8 @@ export default function Page() {
             sampleCount: 6,
           },
         }}
+        models={{ available: MODEL_OPTIONS, initial: DEFAULT_MODEL_ID }}
+        compression={COMPRESSION_CONFIG}
         mcp={{ enabled: true, api: "/api/mcp" }}
         suggestions={{ enabled: true, count: 3 }}
         commands={{ enabled: true }}

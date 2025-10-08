@@ -94,7 +94,7 @@ const preset = {
         },
         sidebar: {
           DEFAULT: withOpacity("--sidebar"),
-          foreground: withOpacity("--sidebar-foreground"),
+          foreground: "var(--sidebar-foreground)",
           primary: withOpacity("--sidebar-primary"),
           "primary-foreground": "var(--sidebar-primary-foreground)",
           accent: withOpacity("--sidebar-accent"),

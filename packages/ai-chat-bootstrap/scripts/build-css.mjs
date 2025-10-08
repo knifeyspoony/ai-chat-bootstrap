@@ -16,8 +16,8 @@ if (!existsSync(distDir)) {
   mkdirSync(distDir, { recursive: true });
 }
 
-// Copy token layers
-const tokenFiles = ["tokens.css", "tokens.primitives.css", "tokens.dark.css"];
+// Copy token assets
+const tokenFiles = ["tokens.css"];
 
 function copyTokenFile(file) {
   const input = join(packageRoot, "lib", file);
@@ -31,7 +31,7 @@ function copyTokenFile(file) {
   }
 }
 
-console.log("Publishing token layers for ai-chat-bootstrap...");
+console.log("Publishing tokens for ai-chat-bootstrap...");
 tokenFiles.forEach(copyTokenFile);
 
 // Also copy tailwind preset & plugin
@@ -61,7 +61,7 @@ copyPreset();
 copyPlugin();
 
 // Build a minimal compiled CSS (no preflight) using Tailwind against our source.
-// This yields ai-chat.css that consumers can import directly for zero-config.
+// This yields ai-chat.css for projects that prefer importing the prebuilt utilities.
 console.log("Building ai-chat.css (Tailwind minimal layer)...");
 // We run tailwind using npx (local dependency) with an inline config pointing at dist preset.
 const buildInput = join(packageRoot, "scripts", "build-input.css");

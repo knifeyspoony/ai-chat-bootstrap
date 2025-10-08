@@ -5,5 +5,7 @@ const meta = {
   "use-ai-frontend-tool": "useAIFrontendTool",
   "use-ai-chat-command": "useAIChatCommand",
   "use-ui-chat-command": "useUIChatCommand",
+  "use-ai-chat-compression": "useAIChatCompression",
+  "use-mcp-server": "useMCPServer",
 };
 export default meta;

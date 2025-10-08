@@ -1,4 +1,4 @@
-/* ai-chat-bootstrap zero-config: tokens first, then your layers, then precompiled slice */
+/* ai-chat-bootstrap required imports: tokens first, then your layers, optional prebuilt slice */
 @import "ai-chat-bootstrap/tokens.css"; /* design tokens & minimal globals */
 @import "tailwindcss"; /* your tailwind (optional) */
 @import "ai-chat-bootstrap/ai-chat.css"; /* library utility slice */

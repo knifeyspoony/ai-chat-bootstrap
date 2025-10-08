@@ -1,5 +1,6 @@
 import { MockChatContainer, type UIMessage } from "ai-chat-bootstrap";
 import {
+  useMemo,
   useState,
   type ComponentProps,
   type Dispatch,
@@ -107,6 +108,52 @@ export function useMockAIChat(options: MockChatOptions = {}): MockChat {
     return Promise.resolve();
   };
 
+  const compression = useMemo<MockChat["compression"]>(
+    () => ({
+      config: { enabled: false },
+      pinnedMessages: [],
+      artifacts: [],
+      events: [],
+      usage: null,
+      metadata: null,
+      snapshot: null,
+      shouldCompress: false,
+      overBudget: false,
+      actions: {
+        pinMessage: () => {},
+        setPinnedMessages: () => {},
+        unpinMessage: () => {},
+        clearPinnedMessages: () => {},
+        addArtifact: () => {},
+        updateArtifact: () => {},
+        removeArtifact: () => {},
+        setArtifacts: () => {},
+        clearArtifacts: () => {},
+        recordEvent: () => {},
+        setModelMetadata: () => {},
+        setUsage: () => {},
+        setSnapshot: () => {},
+      },
+      runCompression: async () =>
+        Promise.resolve({
+          messages: [],
+          pinnedMessageIds: [],
+          artifactIds: [],
+          survivingMessageIds: [],
+          usage: {
+            totalTokens: 0,
+            pinnedTokens: 0,
+            artifactTokens: 0,
+            survivingTokens: 0,
+            updatedAt: Date.now(),
+          },
+          shouldCompress: false,
+          overBudget: false,
+        }),
+    }),
+    []
+  );
+
   return {
     // From useChat (AI SDK)
     id: "mock-chat-id",
@@ -147,7 +194,7 @@ export function useMockAIChat(options: MockChatOptions = {}): MockChat {
     mcpEnabled: false,
     threadId: undefined,
     scopeKey: undefined,
-    compression: undefined,
+    compression,
     branching: { enabled: false as const },
 
     // Utility functions for tests

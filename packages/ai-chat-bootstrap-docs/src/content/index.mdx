@@ -7,7 +7,7 @@ import Link from "next/link";
 
 # AI Chat Bootstrap
 
-AI Chat Bootstrap provides **React components**, **hooks**, and **design tokens** to build AI chat UIs quickly. It layers cleanly on top of the Vercel AI SDK and AI SDK Elements, adding opinionated primitives for messages, commands, contextual tools, suggestions, and theming.
+AI Chat Bootstrap provides **React components**, **hooks**, and **design tokens** to build AI chat UIs quickly. It layers cleanly on top of the Vercel AI SDK and AI SDK Elements, adding opinionated primitives for messages, commands, contextual tools, compression, actions toolbar controls, and theming.
 
 > If you just want to see code first, jump to the <Link href="/chat/basic-chat">Basic Chat example</Link>.
 
@@ -95,20 +95,18 @@ const handler = createAIChatHandler({
 export { handler as POST };
 ```
 
-Also available: `createSuggestionsHandler`, `createThreadTitleHandler`, `createMcpToolsHandler`.
+Also available: `createCompressionHandler`, `createSuggestionsHandler`, `createThreadTitleHandler`, `createMcpToolsHandler`.
 
 ## Features
 
-- Chat container + composable message primitives
-- **Model selection** dropdown with store management
-- **Chain of thought** reasoning display mode
-- Slash command system with parameter schemas (`zod`)
-- Frontend tool registration (client‑side function invocation)
-- Context sharing hooks (inject dynamic UI/app state into model context)
-- Focus / selection tracking for contextual relevance
-- AI suggestion queue + UI components
-- Structured message parts: reasoning, tool calls, sources, code blocks
-- Tailwind + shadcn/ui compatible base components
+- Chat container + composable message primitives with popout support
+- **Prompt actions toolbar** (models, suggestions, attachments, compression status)
+- **Automatic compression** pipelines with pinned messages and artifact review UI
+- Slash command system with parameter schemas (`zod`) and tool execution
+- Context sharing + focus tracking hooks for dynamic prompt enrichment
+- MCP and frontend tool integration (merged in enriched system prompt)
+- Threading, auto titling, and AI suggestion queue components
+- Tailwind + shadcn/ui compatible base components and design tokens
 
 ## CSS & Theming
 

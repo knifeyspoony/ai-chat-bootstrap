@@ -4,6 +4,7 @@ const meta = {
   "focus-items": "Focus Items",
   "tool-result-rendering": "Tool Result Rendering",
   "ai-context": "Sharing Context",
+  compression: "Compression",
 };
 
 export default meta;

@@ -12,6 +12,7 @@ Server templates provide pre-built handlers that simplify creating backend API r
 | Template | Purpose | Import |
 |----------|---------|---------|
 | [createAIChatHandler](/api/server-templates/create-ai-chat-handler) | Main chat API route | `ai-chat-bootstrap/server` |
+| [createCompressionHandler](/api/server-templates/create-compression-handler) | Summarise transcripts and return compression artifacts | `ai-chat-bootstrap/server` |
 | [createSuggestionsHandler](/api/server-templates/create-suggestions-handler) | Generate contextual suggestions | `ai-chat-bootstrap/server` |
 | [createThreadTitleHandler](/api/server-templates/create-thread-title-handler) | Auto-generate thread titles | `ai-chat-bootstrap/server` |
 | [createMcpToolsHandler](/api/server-templates/create-mcp-tools-handler) | MCP server tool integration | `ai-chat-bootstrap/server` |
@@ -74,6 +75,7 @@ Server templates automatically handle:
 - **Chain of Thought**: Handle reasoning blocks
 - **File Attachments**: Process file uploads
 - **Thread Management**: Handle thread persistence
+- **Compression Summaries**: `createCompressionHandler` generates artifacts, snapshot metadata, and usage stats for long transcripts
 
 ## System Prompt Enrichment
 

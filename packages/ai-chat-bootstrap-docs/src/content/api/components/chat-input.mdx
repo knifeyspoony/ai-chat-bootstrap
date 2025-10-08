@@ -1,11 +1,11 @@
 ---
 title: ChatInput
-description: Standalone input component for chat interfaces with model selection support.
+description: Standalone input surface with prompt toolbar, model selector, suggestions, compression indicators, and focus chips.
 ---
 
 # ChatInput
 
-Standalone input component for chat interfaces. Includes automatic model selection dropdown when multiple models are provided.
+`ChatInput` is the headless input surface used inside `ChatContainer`. Use it directly when you are composing your own layout but still want the smart prompt toolbar, model selector, and compression UI.
 
 ## Props
 
@@ -13,10 +13,16 @@ Standalone input component for chat interfaces. Includes automatic model selecti
 interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
-  onSubmit: (e?: FormEvent) => void;
+  onSubmit: (event: FormEvent) => void;
+  onAttach?: () => void;
+  onRetry?: () => void;
   disabled?: boolean;
+  submitDisabled?: boolean;
+  status?: ChatStatus;
+  maxRows?: number;
   placeholder?: string;
   className?: string;
+  onKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
 
   // Model selection
   models?: ChatModelOption[];
@@ -26,14 +32,23 @@ interface ChatInputProps {
   // Suggestions
   enableSuggestions?: boolean;
   suggestions?: Suggestion[];
+  suggestionsCount?: number;
   onSuggestionClick?: (suggestion: Suggestion) => void;
 
-  // Commands
-  enableCommands?: boolean;
-  onCommandExecute?: (commandName: string, args?: string) => void;
-  onAICommandExecute?: (message: string, toolName: string, systemPrompt?: string) => void;
+  // Focus chips
+  allFocusItems?: FocusItem[];
+  clearFocus?: (id: string) => void;
+
+  // Error banner
+  error?: string | null;
+  setError?: (value: string | null) => void;
+
+  // Compression controller (from useAIChat / useAIChatCompression)
+  compression?: CompressionController;
 }
 ```
+
+> Types such as `FormEvent`, `KeyboardEvent`, `ChatStatus`, and `CompressionController` refer to the React and AI Chat Bootstrap exports.
 
 ## Usage
 
@@ -45,23 +60,30 @@ export function MyInput() {
   const [selectedModel, setSelectedModel] = useState("gpt-4");
 
   const models = [
-    { id: "gpt-4", name: "GPT-4" },
-    { id: "gpt-3.5-turbo", name: "GPT-3.5" }
+    { id: "gpt-4", label: "GPT-4" },
+    { id: "gpt-4o-mini", label: "GPT-4o mini" },
   ];
 
   return (
     <ChatInput
       value={input}
       onChange={setInput}
-      onSubmit={(e) => {
-        e?.preventDefault();
+      onSubmit={(event) => {
+        event?.preventDefault();
         console.log("Submitted:", input);
         setInput("");
       }}
       models={models}
       selectedModelId={selectedModel}
       onModelChange={setSelectedModel}
-      placeholder="Type your message..."
+      placeholder="Ask me anything…"
+      enableSuggestions
+      suggestions={[
+        {
+          shortSuggestion: "Summarise the last conversation",
+          longSuggestion: "Summarise the previous conversation in bullet points.",
+        },
+      ]}
     />
   );
 }
@@ -69,8 +91,9 @@ export function MyInput() {
 
 ## Features
 
-- **Model Selection**: Dropdown automatically appears when multiple models are provided
-- **Suggestions**: AI-generated follow-up suggestions when enabled
-- **Commands**: Slash command support when enabled
-- **Auto-resize**: Textarea grows with content
-- **Keyboard Shortcuts**: Enter to submit, Shift+Enter for new line
+- **Prompt Toolbar** – Consolidated model selector, attachment button, compression usage meter, suggestions trigger, and submit button. Use the exported `promptVariants` helper (`ai-chat-bootstrap/variants`) to float or hide it.
+- **Model Selection** – Dropdown appears automatically when you provide multiple models.
+- **Suggestions & Slash Commands** – Works with the suggestions store and shows the command palette when `useAIChatCommand` is configured.
+- **Compression Awareness** – Pass a compression controller to surface token usage, pinned message badges, and the artifact review sheet button.
+- **Focus Chips** – Focus items render above the textarea with one-click removal.
+- **Auto-resize & Keyboard Shortcuts** – Textarea grows as you type, `Enter` submits, `Shift+Enter` inserts a newline (while preventing accidental sends mid-stream).

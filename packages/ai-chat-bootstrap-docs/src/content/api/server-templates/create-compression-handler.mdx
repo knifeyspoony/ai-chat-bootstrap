@@ -1,0 +1,157 @@
+---
+title: createCompressionHandler
+description: Summarise chat transcripts, return artifacts, and keep conversations within model token budgets.
+---
+
+# createCompressionHandler
+
+`createCompressionHandler` implements the `/api/compression` endpoint expected by the compression controller. It receives the current transcript (plus pinned messages, artifacts, usage metrics) and responds with a snapshot + artifact list that the UI merges back into the store.
+
+Use it alongside the client-side `compression` config to keep long-running chats inside the model's context window while giving users transparency over what was summarised.
+
+## Import
+
+```ts
+import { createCompressionHandler } from "ai-chat-bootstrap/server";
+```
+
+## Signature
+
+```ts
+function createCompressionHandler(
+  options: CreateCompressionHandlerOptions
+): RequestHandler;
+```
+
+### Options
+
+```ts
+interface CreateCompressionHandlerOptions {
+  /** Language model (or resolver) used to generate summaries. */
+  model?: LanguageModel | ((ctx: ModelResolverContext) => LanguageModel | Promise<LanguageModel | null | undefined> | null | undefined);
+  /** Custom system prompt (defaults to a built-in compression prompt). */
+  systemPrompt?: string;
+  /** Legacy alias (deprecated) for `maxRecentMessages`. */
+  minRecentMessages?: number;
+  /** How many of the most recent turns should always survive. Defaults to 4. */
+  maxRecentMessages?: number;
+  /** Maximum number of artifacts to return per run. Defaults to 3. */
+  maxArtifacts?: number;
+  /** Static options passed into `generateObject`. */
+  generateOptions?: GenerateObjectOptions;
+  /** Build `generateObject` options dynamically per request. */
+  buildGenerateOptions?: (ctx: {
+    req: Request;
+    body: CompressionServiceRequest;
+  }) => Promise<GenerateObjectOptions> | GenerateObjectOptions;
+  /** Optional logger invoked on handler errors. */
+  onError?: (
+    error: unknown,
+    ctx: { req: Request; body?: CompressionServiceRequest }
+  ) => void;
+}
+```
+
+If you pass a function to `model` it receives `{ req, body, requestedModel }` and should return a `LanguageModel` instance (or `null` to fall back to the default).
+
+## Basic Usage
+
+```ts
+// app/api/compression/route.ts
+import { createCompressionHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+export const POST = createCompressionHandler({
+  model: openai("gpt-4o-mini"),
+  maxRecentMessages: 6,
+  maxArtifacts: 4,
+});
+```
+
+### Dynamic model selection
+
+```ts
+const handler = createCompressionHandler({
+  async model({ body }) {
+    // Prefer the model requested by the client, otherwise default.
+    if (body.config?.model) {
+      return openai(body.config.model);
+    }
+    return openai("gpt-4o-mini");
+  },
+  buildGenerateOptions: async ({ body }) => ({
+    response_format: {
+      type: "json_schema",
+    },
+    temperature: body.reason === "manual" ? 0.1 : 0.25,
+  }),
+});
+
+export const POST = handler;
+```
+
+## Request Payload
+
+The handler receives the same payload produced by the client-side compression controller:
+
+```ts
+interface CompressionServiceRequest {
+  messages: UIMessage[];
+  pinnedMessages: CompressionPinnedMessage[];
+  artifacts: CompressionArtifact[];
+  snapshot: CompressionSnapshot | null;
+  usage: CompressionUsage;
+  config: {
+    maxTokenBudget: number | null;
+    compressionThreshold: number;
+    pinnedMessageLimit: number | null;
+    model?: string | null;
+  };
+  metadata?: CompressionModelMetadata | null;
+  reason: "manual" | "threshold" | "over-budget";
+}
+```
+
+- `messages` are the surviving transcript turns the client will continue sending to the chat model.
+- `pinnedMessages` must remain verbatim after compression.
+- `artifacts` includes previously generated summaries (can be edited or deleted by the user).
+- `snapshot` is the last successful compression run (if any).
+- `usage` describes current token counts, over-budget status, and timestamps.
+
+## Response Format
+
+Return a JSON object describing the updated compression state:
+
+```ts
+interface CompressionServiceResponse {
+  snapshot: CompressionSnapshot;
+  artifacts: CompressionArtifact[];
+  usage?: CompressionUsage;
+  pinnedMessages?: CompressionPinnedMessage[];
+}
+```
+
+- `snapshot` summarises the run (timestamp, reason, survivor ids, tokens saved, artifact ids).
+- `artifacts` is the list of summaries to merge into the UI.
+- `usage` optionally overrides the computed token usage (if you perform your own counting on the server).
+- `pinnedMessages` lets the server enforce pin changes (for example auto-pinning system messages).
+
+The helper automatically sets `Content-Type: application/json` and returns a 200 response. Throwing an error (or returning a `Response`) short-circuits the default behaviour.
+
+## Error Handling
+
+- Throwing inside the handler returns a `500` with `{ error: string }`. Override with `onError` to emit custom responses.
+- Non-2xx responses from `generateObject` (rate limits, auth) propagate through the promise chain—log them in `onError` for telemetry.
+
+## Frontend Integration
+
+Enable compression on the client and point to the endpoint:
+
+```tsx
+<ChatContainer
+  transport={{ api: "/api/chat" }}
+  compression={{ enabled: true, api: "/api/compression" }}
+/>
+```
+
+The prompt toolbar now displays token usage, a compression review sheet, and pinned message indicators. See the [Compression guide](/features/compression) for end-to-end configuration tips.

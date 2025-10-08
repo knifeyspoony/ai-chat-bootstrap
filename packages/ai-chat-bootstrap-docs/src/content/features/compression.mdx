@@ -1,0 +1,95 @@
+---
+title: Compression
+description: Automatically compress long transcripts with pinning, artifact review, and token usage indicators.
+---
+
+# Conversation Compression
+
+Compression keeps your chat history inside the model's context window without losing important turns. AI Chat Bootstrap ships a **client-side controller** (pinning, artifacts, usage), a **prompt toolbar indicator**, and a **server template** for summarising the transcript.
+
+When enabled, users can pin critical messages, inspect generated summaries, and trigger manual compression runs if needed. The UI always shows the full transcript; only the payload sent to the model is trimmed.
+
+## Enable Compression
+
+```tsx
+import { ChatContainer } from "ai-chat-bootstrap";
+
+export function CompressedChat() {
+  return (
+    <ChatContainer
+      transport={{ api: "/api/chat" }}
+      compression={{
+        enabled: true,
+        api: "/api/compression",
+        maxTokenBudget: 16000,
+        pinnedMessageLimit: 4,
+      }}
+    />
+  );
+}
+```
+
+With compression on:
+
+- The prompt toolbar shows **token usage** and a "Review compression" button.
+- Users can **pin** messages from the transcript to keep them immune from summarisation.
+- Generated **artifacts** (summaries) appear in a sheet where users can edit or delete them.
+- Automatic runs happen when usage crosses the configured threshold; manual runs are available via the toolbar.
+
+## Server Template
+
+Use the [`createCompressionHandler`](/api/server-templates/create-compression-handler) template to implement `/api/compression`:
+
+```ts
+// app/api/compression/route.ts
+import { createCompressionHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+export const POST = createCompressionHandler({
+  model: openai("gpt-4o-mini"),
+  temperature: 0.2,
+  maxOutputTokens: 800,
+});
+```
+
+The handler receives the **pinned messages**, **surviving message ids**, and **existing artifacts**. It returns a new snapshot and artifact list which the client merges into its compression store.
+
+## Configuration
+
+`CompressionConfig` is shared by `ChatContainer`, `useAIChat`, and `useAIChatCompression`:
+
+| Option | Type | Default | Notes |
+| ------ | ---- | ------- | ----- |
+| `enabled` | `boolean` | `false` | Master switch for all compression features |
+| `api` | `string` | `"/api/compression"` | Endpoint invoked with the compression payload |
+| `model` | `string \| null` | `null` | Preferred summarisation model id (sent to the server template) |
+| `maxTokenBudget` | `number \| null` | `null` | Target token ceiling used to detect over-budget threads |
+| `compressionThreshold` | `number` | `0.85` | Percentage of the budget that triggers automatic runs |
+| `pinnedMessageLimit` | `number \| null` | `null` | Optional cap on pinned messages (warns users when exceeded) |
+| `onCompression` | `(result) => void` | `undefined` | Called after each successful run (analytics/persistence) |
+| `onError` | `(error) => void` | `undefined` | Called when the compression endpoint fails |
+| `fetcher` | `CompressionServiceFetcher` | `undefined` | Override the fetch implementation (for retries, auth, etc.) |
+
+## Accessing Compression State
+
+`useAIChat` exposes the compression controller directly:
+
+```tsx
+const chat = useAIChat({ compression: { enabled: true } });
+
+chat.compression.pinnedMessages; // array of pinned message metadata
+chat.compression.artifacts;      // generated summaries
+chat.compression.usage;          // token counts + overBudget flag
+chat.compression.actions.pinMessage(message);
+```
+
+For custom dashboards or manual buttons use [`useAIChatCompression`](/api/hooks/use-ai-chat-compression) which returns the same controller plus a `buildPayload` helper.
+
+## Best Practices
+
+- **Pin critical turns** (system instructions, user objectives) so they are always prepended to the LLM payload.
+- **Persist artifacts** if you need cross-session continuity—`onCompression` receives the snapshot and usage metrics.
+- **Budget per model**: set `maxTokenBudget` close to the provider's real context window. Compression runs earlier if you use a smaller target.
+- **Surface manual control** for power users: expose a "Compress now" button that calls `chat.compression.runCompression?.({ force: true })`.
+
+Compression is opt-in, but once configured it gives users confidence that their long-running conversations will stay responsive without sacrificing the parts that matter.

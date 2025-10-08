@@ -1,0 +1,95 @@
+---
+title: useMCPServer
+description: Register a Model Context Protocol server from the client, sync tool metadata, and surface it to ChatContainer and prompts.
+---
+
+# useMCPServer
+
+`useMCPServer` registers a **Model Context Protocol (MCP)** server, keeps a local cache of its tool summaries, and exposes helpers to refresh or inspect the connection state. MCP servers discovered through this hook are automatically merged with frontend tools, appended to the enriched system prompt, and forwarded to `createAIChatHandler`.
+
+Use it to let users opt into remote MCP servers at runtime (e.g. via a settings dialog) without redeploying your backend.
+
+## Signature
+
+```ts
+import { useMCPServer } from "ai-chat-bootstrap";
+
+interface UseMCPServerOptions {
+  id?: string;
+  url: string;
+  headers?: Record<string, string>;
+  name?: string;
+  autoFetchTools?: boolean;
+  transportType?: "sse" | "ws";
+  api?: string;
+}
+
+interface UseMCPServerReturn {
+  id: string;
+  name?: string;
+  isLoading: boolean;
+  error: string | null;
+  tools: MCPToolSummary[];
+  lastLoadedAt?: number;
+  refresh: () => Promise<void>;
+}
+```
+
+### Options
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `url` | `string` | — | MCP server URL (SSE or WebSocket) – required |
+| `id` | `string` | `url` | Override the identifier used in stores + API payloads |
+| `name` | `string` | `undefined` | Friendly server name shown in the UI |
+| `headers` | `Record<string,string>` | `{}` | Extra headers forwarded to the MCP transport |
+| `transportType` | `"sse" \| "ws"` | `"sse"` | Protocol used when connecting |
+| `api` | `string` | `"/api/mcp"` or `mcp.api` default | Endpoint invoked to fetch tool summaries |
+| `autoFetchTools` | `boolean` | `true` | Automatically call `refresh()` on mount |
+
+The hook registers the server with the internal MCP store on mount and unregisters it on unmount. Tool summaries are fetched by POSTing to the MCP bridge endpoint (use [`createMcpToolsHandler`](/api/server-templates/create-mcp-tools-handler)).
+
+## Return value
+
+- `id`, `name` – identifiers used throughout the UI
+- `isLoading`, `error` – request state while fetching tool summaries
+- `tools` – array of `MCPToolSummary` objects describing each available tool (name, description, input schema metadata)
+- `lastLoadedAt` – timestamp of the most recent successful refresh
+- `refresh()` – manually re-fetch tool metadata (useful for retry buttons)
+
+## Example – MCP server selector
+
+```tsx
+import { ChatContainer, useMCPServer } from "ai-chat-bootstrap";
+
+function MCPDemo() {
+  const localServer = useMCPServer({
+    url: process.env.NEXT_PUBLIC_MCP_SERVER_URL ?? "http://127.0.0.1:3030/mcp",
+    name: "Local Tools",
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">
+          {localServer.isLoading
+            ? "Loading MCP tools…"
+            : `${localServer.tools.length} tools available`}
+        </span>
+        {localServer.error && (
+          <button type="button" onClick={localServer.refresh}>
+            Retry
+          </button>
+        )}
+      </div>
+
+      <ChatContainer
+        transport={{ api: "/api/chat" }}
+        mcp={{ enabled: true, api: "/api/mcp" }}
+      />
+    </div>
+  );
+}
+```
+
+Pair this with [`createAIChatHandler`](/api/server-templates/create-ai-chat-handler) (set `mcpEnabled: true`) and a [`createMcpToolsHandler`](/api/server-templates/create-mcp-tools-handler) bridge to expose remote capability lists in the prompt and actions toolbar.

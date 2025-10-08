@@ -6,7 +6,6 @@ import type {
   CompressionPinnedMessage,
   CompressionSnapshot,
   CompressionUsage,
-  NormalizedCompressionConfig,
 } from "../../types/compression";
 import {
   calculateTokensForArtifacts,

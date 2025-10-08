@@ -43,7 +43,7 @@ export async function fetchCompressionService(
   let data: unknown;
   try {
     data = await response.json();
-  } catch (error) {
+  } catch {
     throw new CompressionServiceError("Failed to parse compression response JSON", {
       status: response.status,
       statusText: response.statusText,

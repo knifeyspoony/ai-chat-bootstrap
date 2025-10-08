@@ -73,8 +73,10 @@ export interface ChatContainerProps extends UseAIChatOptions {
       message?: string;
       input?: string;
       assistantActions?: string;
+      inputWrapper?: string;
     };
     emptyState?: React.ReactNode;
+    style?: React.CSSProperties;
   };
 
   // Suggestions group
@@ -321,11 +323,14 @@ function ChatContainerView(props: ChatContainerViewProps) {
           isUnstyled && "relative flex flex-col h-full overflow-hidden min-w-0",
           ui?.className
         )}
-        style={{
-          borderRadius: isUnstyled
-            ? undefined
-            : "var(--acb-chat-container-radius)",
-        }}
+        style={
+          {
+            ...(isUnstyled
+              ? {}
+              : { borderRadius: "var(--acb-chat-container-radius)" }),
+            ...(ui?.style ?? {}),
+          } as React.CSSProperties
+        }
         data-acb-unstyled={isUnstyled ? "" : undefined}
       >
         <ChatHeader
@@ -357,7 +362,8 @@ function ChatContainerView(props: ChatContainerViewProps) {
           className={cn(
             !isUnstyled &&
               "backdrop-blur-sm p-4 rounded-b-md bg-[var(--acb-chat-input-wrapper-bg)]",
-            isUnstyled && "p-0"
+            isUnstyled && "p-0",
+            ui?.classes?.inputWrapper
           )}
         >
           <ChatInputWithCommands

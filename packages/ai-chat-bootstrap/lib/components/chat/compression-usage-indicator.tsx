@@ -13,6 +13,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../../components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 import type { CompressionController } from "../../types/compression";
 import { cn } from "../../utils";
 import { calculateTokensForMessages } from "../../utils/compression/token-helpers";
@@ -107,11 +113,6 @@ export const CompressionUsageIndicator: React.FC<
     return "--%";
   }, [percentUsed]);
 
-  const fillPercent = useMemo(() => {
-    if (percentUsed === null) return 0;
-    return Math.min(Math.max(percentUsed, 0), 100);
-  }, [percentUsed]);
-
   const computedPinnedTokens = useMemo(() => {
     const pins = compression?.pinnedMessages ?? [];
     if (!pins.length) return undefined;
@@ -191,24 +192,32 @@ export const CompressionUsageIndicator: React.FC<
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "relative inline-flex h-6 min-w-[2.5rem] items-center justify-center overflow-hidden rounded-full border border-border/50 px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all",
-            showAlert && "border-destructive/70 bg-destructive/10",
-            className
-          )}
-          style={{
-            backgroundColor: showAlert ? undefined : gradientColor,
-          }}
-          title={buttonTitle}
-          aria-label={accessibleLabel}
-        >
-          <span className={textClassName}>{displayValue}</span>
-          <span className="sr-only">{accessibleLabel}</span>
-        </button>
-      </PopoverTrigger>
+      <TooltipProvider delayDuration={200} skipDelayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "relative inline-flex h-6 min-w-[2.5rem] items-center justify-center overflow-hidden rounded-full border border-border/50 px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all",
+                  showAlert && "border-destructive/70 bg-destructive/10",
+                  className
+                )}
+                style={{
+                  backgroundColor: showAlert ? undefined : gradientColor,
+                }}
+                aria-label={accessibleLabel}
+              >
+                <span className={textClassName}>{displayValue}</span>
+                <span className="sr-only">{accessibleLabel}</span>
+              </button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-xs text-xs leading-tight">
+            {buttonTitle}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <PopoverContent align="end" className="w-80 text-sm">
         <div className="flex flex-col gap-5">
           {latestError && (

@@ -382,7 +382,6 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
           data-role="assistant"
           data-acb-pinned={pinState?.pinned ? "" : undefined}
           className={cn(
-            "!pb-0",
             "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-assistant-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-assistant-fg)]",
             messageClassName
           )}
@@ -410,7 +409,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
         data-role="assistant"
         data-acb-pinned={pinState?.pinned ? "" : undefined}
         className={cn(
-          "pb-0",
+          "pb-2",
           "[&_[data-acb-part=message-content]]:bg-[var(--acb-chat-message-assistant-bg)] [&_[data-acb-part=message-content]]:text-[var(--acb-chat-message-assistant-fg)]",
           messageClassName
         )}

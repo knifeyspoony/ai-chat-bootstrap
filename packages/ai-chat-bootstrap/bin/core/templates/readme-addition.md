@@ -34,7 +34,7 @@ useAIFrontendTool({
 
 ### Theme Tokens
 
-The scaffold injected a shadcn-compatible palette into `app/globals.css`. Keep that block (it must live outside `@layer base`) and tweak the variable values to match your brand. The chat components read those tokens directly—if you delete them, the UI loses its color system.
+The scaffold injected our claymorphism light/dark palette (still shadcn-compatible) into `app/globals.css`. Keep that block (it must live outside `@layer base`) and tweak the variable values to match your brand. The chat components read those tokens directly—if you delete them, the UI loses its color system.
 
 Tip: once your Tailwind build emits the chat utilities, you can remove the `@import "ai-chat-bootstrap/ai-chat.css";` line from `globals.css` to avoid duplicate CSS.
 

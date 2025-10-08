@@ -626,7 +626,7 @@ export function createCompressionHandler(
         }
       }
 
-      let survivorSet = new Set<string>([...pinnedIds, ...recentSurvivorIds]);
+      const survivorSet = new Set<string>([...pinnedIds, ...recentSurvivorIds]);
 
       if (combinedArtifacts.length > 0) {
         const artifactSourceIds = new Set<string>();

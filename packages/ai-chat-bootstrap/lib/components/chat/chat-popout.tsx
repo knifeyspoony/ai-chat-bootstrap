@@ -70,6 +70,41 @@ export function ChatPopout(props: ChatPopoutProps) {
   const popoutClassName = popout?.className;
   const contentClassName = popout?.contentClassName;
   const isPermanent = popout?.permanent ?? false;
+  const isChatUnstyled = unstyledProp === "" || unstyledProp === true;
+
+  const blendEdgeStyle: React.CSSProperties | undefined = isChatUnstyled
+    ? undefined
+    : position === "right"
+      ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 }
+      : { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 };
+
+  const shellRadiusStyle: React.CSSProperties | undefined = isChatUnstyled
+    ? undefined
+    : position === "right"
+      ? {
+          borderTopRightRadius: 0,
+          borderBottomRightRadius: 0,
+          borderTopLeftRadius: "var(--acb-chat-container-radius)",
+          borderBottomLeftRadius: "var(--acb-chat-container-radius)",
+        }
+      : {
+          borderTopLeftRadius: 0,
+          borderBottomLeftRadius: 0,
+          borderTopRightRadius: "var(--acb-chat-container-radius)",
+          borderBottomRightRadius: "var(--acb-chat-container-radius)",
+        };
+
+  const headerEdgeClass = !isChatUnstyled
+    ? position === "right"
+      ? "rounded-tr-none"
+      : "rounded-tl-none"
+    : undefined;
+
+  const inputWrapperEdgeClass = !isChatUnstyled
+    ? position === "right"
+      ? "rounded-br-none"
+      : "rounded-bl-none"
+    : undefined;
 
   const mergedFeatures = useMemo(() => {
     if (enableBranching === undefined) {
@@ -170,6 +205,7 @@ export function ChatPopout(props: ChatPopoutProps) {
     devtools,
     header: {
       ...header,
+      className: cn(header?.className, headerEdgeClass),
       actions: (
         <>
           {header?.actions}
@@ -187,12 +223,22 @@ export function ChatPopout(props: ChatPopoutProps) {
     ui: {
       placeholder: ui?.placeholder,
       emptyState: ui?.emptyState,
-      classes: ui?.classes,
+      classes: {
+        ...(ui?.classes ?? {}),
+        header: cn(ui?.classes?.header, headerEdgeClass),
+        inputWrapper: cn(
+          ui?.classes?.inputWrapper,
+          inputWrapperEdgeClass
+        ),
+      },
       className: cn(
         "h-full",
         ui?.className,
         includeContentClassInUI ? contentClassName : undefined
       ),
+      style: blendEdgeStyle
+        ? { ...(ui?.style ?? {}), ...blendEdgeStyle }
+        : ui?.style,
     },
     suggestions: {
       enabled: suggestionOptions?.enabled,
@@ -307,18 +353,22 @@ export function ChatPopout(props: ChatPopoutProps) {
         <div
           ref={popoutRef}
           className={cn(
-            "flex h-full bg-background transition-all duration-300 ease-in-out",
+            "flex h-full transition-all duration-300 ease-in-out",
+            isChatUnstyled
+              ? "bg-background"
+              : "bg-[var(--acb-chat-container-bg)]",
             // side borders removed per request
             popoutClassName
           )}
-          style={{
-            width: effectiveIsOpen ? `${width}px` : "0px",
-            minWidth: effectiveIsOpen ? `${minWidth}px` : "0px",
-            maxWidth: effectiveIsOpen ? `${maxWidth}px` : "0px",
-            height: typeof height === "number" ? `${height}px` : height,
-            overflow: effectiveIsOpen ? "visible" : "hidden",
-          }}
-        >
+        style={{
+          width: effectiveIsOpen ? `${width}px` : "0px",
+          minWidth: effectiveIsOpen ? `${minWidth}px` : "0px",
+          maxWidth: effectiveIsOpen ? `${maxWidth}px` : "0px",
+          height: typeof height === "number" ? `${height}px` : height,
+          overflow: effectiveIsOpen ? "visible" : "hidden",
+          ...(shellRadiusStyle ?? {}),
+        }}
+      >
           {/* Resize Handle for inline mode */}
           <div
             className={cn(
@@ -391,7 +441,10 @@ export function ChatPopout(props: ChatPopoutProps) {
         className={cn(
           // Position relative to viewport (fixed) or parent (absolute)
           containerTarget === "viewport" ? "fixed top-0" : "absolute inset-y-0",
-          "z-50 bg-background shadow-2xl transition-transform duration-300 ease-in-out",
+          "z-50 shadow-2xl transition-transform duration-300 ease-in-out",
+          isChatUnstyled
+            ? "bg-background"
+            : "bg-[var(--acb-chat-container-bg)]",
           position === "left" && "shadow-[4px_0_24px_rgba(0,0,0,0.12)]", // removed side border
           position === "right" && "shadow-[-4px_0_24px_rgba(0,0,0,0.12)]", // removed side border
           popoutClassName
@@ -400,6 +453,7 @@ export function ChatPopout(props: ChatPopoutProps) {
           ...positionStyles[position],
           width: `${width}px`,
           height: typeof height === "number" ? `${height}px` : height,
+          ...(shellRadiusStyle ?? {}),
         }}
       >
         {/* Resize Handle */}

@@ -270,12 +270,7 @@ export function useAIChat({
     }
 
     return base;
-  }, [
-    compressionOptions,
-    compressionEnabled,
-    activeModel?.contextWindowTokens,
-    activeModel?.contextCompressionThreshold,
-  ]);
+  }, [compressionOptions, compressionEnabled, activeModel]);
 
   const compressionHelpers = useAIChatCompression({
     compression: resolvedCompressionOptions,
@@ -296,12 +291,7 @@ export function useAIChat({
       modelLabel: activeModel.label,
       contextWindowTokens: activeModel.contextWindowTokens ?? undefined,
     } as const;
-  }, [
-    resolvedCompressionOptions?.enabled,
-    activeModel?.id,
-    activeModel?.label,
-    activeModel?.contextWindowTokens,
-  ]);
+  }, [resolvedCompressionOptions?.enabled, activeModel]);
 
   useEffect(() => {
     const state = useAIModelsStore.getState();
@@ -968,7 +958,11 @@ export function useAIChat({
         }
       }
     },
-    onError: () => {
+    onError: (error) => {
+      logDevError(
+        "[acb][useAIChat] Chat error occurred",
+        error ?? new Error("Unknown chat error")
+      );
       setError("Chat error occurred");
     },
   });
@@ -1462,6 +1456,7 @@ export function useAIChat({
     chatHook,
     chatHook.messages,
     compressionConfig.enabled,
+    compressionController,
     compressionController.artifacts,
     compressionController.metadata,
     compressionController.overBudget,

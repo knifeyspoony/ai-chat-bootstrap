@@ -100,6 +100,7 @@ export function useAIContext(
     dumped,
     description,
     parentId,
+    categories,
     categoriesKey,
     setContextItem,
     removeContextItem,

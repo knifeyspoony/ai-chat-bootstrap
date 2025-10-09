@@ -4,6 +4,12 @@ import { Button } from "../../components/ui/button";
 import { McpServersDialog } from "./mcp-servers-dialog";
 import { useAIMCPServersStore, useStableMCPServers } from "../../stores";
 import { useShallow } from "zustand/react/shallow";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 
 export function McpServersButton() {
   const [isOpen, setIsOpen] = useState(false);
@@ -27,15 +33,22 @@ export function McpServersButton() {
 
   return (
     <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        onClick={() => setIsOpen(true)}
-        aria-label="Configure MCP servers"
-      >
-        <Settings2 className="h-4 w-4" />
-      </Button>
+      <TooltipProvider delayDuration={200} skipDelayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsOpen(true)}
+              aria-label="Configure MCP servers"
+            >
+              <Settings2 className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Configure MCP servers</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <McpServersDialog
         open={isOpen}
         onOpenChange={setIsOpen}

@@ -140,10 +140,10 @@ export function ChatThreadsButton({
           <TooltipTrigger asChild>
             <DropdownMenu.Trigger asChild>
               <Button
-                size="sm"
+                size="icon"
                 variant="ghost"
                 aria-label={label}
-                className={className}
+                className={cn("h-7 w-7", className)}
               >
                 <Spool size={18} />
               </Button>

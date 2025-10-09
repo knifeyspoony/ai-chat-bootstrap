@@ -23,6 +23,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "../../components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 import type { ChatModelOption, FocusItem, Suggestion } from "../../types/chat";
 import type { CompressionController } from "../../types/compression";
 import { cn } from "../../utils";
@@ -42,51 +48,59 @@ const PureSuggestionsButton = ({
   onSuggestionClick,
 }: PureSuggestionsButtonProps) => {
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <PromptInputButton
-          type="button"
-          disabled={!suggestions || suggestions.length === 0}
-          className={cn(
-            suggestions &&
-              suggestions.length > 0 &&
-              "text-primary hover:text-primary"
-          )}
-        >
-          <SparklesIcon className="h-4 w-4" />
-        </PromptInputButton>
-      </DropdownMenuTrigger>
-      {suggestions && suggestions.length > 0 && (
-        <DropdownMenuContent
-          align="end"
-          side="top"
-          className="w-80"
-          sideOffset={8}
-        >
-          <DropdownMenuLabel>AI Suggestions</DropdownMenuLabel>
-          {suggestions
-            .slice(0, Math.min(Math.max(suggestionsCount, 1), 10))
-            .map((suggestion, index) => (
-              <DropdownMenuItem
-                key={index}
-                onClick={() => onSuggestionClick?.(suggestion)}
-                className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
+    <TooltipProvider delayDuration={200} skipDelayDuration={300}>
+      <DropdownMenu modal={false}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <PromptInputButton
+                type="button"
+                disabled={!suggestions || suggestions.length === 0}
+                className={cn(
+                  suggestions &&
+                    suggestions.length > 0 &&
+                    "text-primary hover:text-primary"
+                )}
+                aria-label="Open AI suggestions"
               >
-                <div className="flex flex-col gap-1 py-1">
-                  <span className="font-medium leading-tight">
-                    {suggestion.shortSuggestion}
-                  </span>
-                  {suggestion.shortSuggestion !== suggestion.longSuggestion && (
-                    <span className="text-xs text-muted-foreground leading-tight">
-                      {suggestion.longSuggestion}
+                <SparklesIcon className="h-4 w-4" />
+              </PromptInputButton>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="top">AI Suggestions</TooltipContent>
+        </Tooltip>
+        {suggestions && suggestions.length > 0 && (
+          <DropdownMenuContent
+            align="end"
+            side="top"
+            className="w-80"
+            sideOffset={8}
+          >
+            <DropdownMenuLabel>AI Suggestions</DropdownMenuLabel>
+            {suggestions
+              .slice(0, Math.min(Math.max(suggestionsCount, 1), 10))
+              .map((suggestion, index) => (
+                <DropdownMenuItem
+                  key={index}
+                  onClick={() => onSuggestionClick?.(suggestion)}
+                  className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
+                >
+                  <div className="flex flex-col gap-1 py-1">
+                    <span className="font-medium leading-tight">
+                      {suggestion.shortSuggestion}
                     </span>
-                  )}
-                </div>
-              </DropdownMenuItem>
-            ))}
-        </DropdownMenuContent>
-      )}
-    </DropdownMenu>
+                    {suggestion.shortSuggestion !== suggestion.longSuggestion && (
+                      <span className="text-xs text-muted-foreground leading-tight">
+                        {suggestion.longSuggestion}
+                      </span>
+                    )}
+                  </div>
+                </DropdownMenuItem>
+              ))}
+          </DropdownMenuContent>
+        )}
+      </DropdownMenu>
+    </TooltipProvider>
   );
 };
 

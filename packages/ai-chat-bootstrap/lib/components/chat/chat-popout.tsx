@@ -5,6 +5,12 @@ import {
   type ChatContainerProps,
 } from "../../components/chat/chat-container";
 import { Button } from "../../components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 import { cn } from "../../utils";
 
 export interface ChatPopoutProps extends ChatContainerProps {
@@ -203,23 +209,31 @@ export function ChatPopout(props: ChatPopoutProps) {
     compression: compressionOptions,
     "data-acb-unstyled": unstyledProp,
     devtools,
-    header: {
-      ...header,
-      className: cn(header?.className, headerEdgeClass),
-      actions: (
-        <>
-          {header?.actions}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsOpen(false)}
-            className="h-7 w-7"
-          >
-            <XIcon className="h-4 w-4" />
-          </Button>
-        </>
-      ),
-    },
+      header: {
+        ...header,
+        className: cn(header?.className, headerEdgeClass),
+        actions: (
+          <>
+            {header?.actions}
+            <TooltipProvider delayDuration={200} skipDelayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setIsOpen(false)}
+                    className="ml-1 h-7 w-7"
+                    aria-label="Close chat"
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Close chat</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </>
+        ),
+      },
     ui: {
       placeholder: ui?.placeholder,
       emptyState: ui?.emptyState,

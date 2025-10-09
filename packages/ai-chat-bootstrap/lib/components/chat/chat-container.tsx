@@ -2,6 +2,7 @@ import type { UIMessage } from "ai";
 import React, {
   useCallback,
   useDeferredValue,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -159,6 +160,7 @@ function ChatContainerView(props: ChatContainerViewProps) {
     sendAICommandMessage,
     regenerate,
     compression,
+    clearError: clearChatError,
   } = chat;
 
   // Ref to control scrolling programmatically
@@ -221,6 +223,7 @@ function ChatContainerView(props: ChatContainerViewProps) {
   const {
     suggestions: generatedSuggestions,
     handleSuggestionClick: suggestionClickHandler,
+    onAssistantFinish,
   } = useSuggestions({
     enabled: suggestionOptions?.enabled ?? false,
     prompt: suggestionOptions?.prompt,
@@ -228,6 +231,39 @@ function ChatContainerView(props: ChatContainerViewProps) {
     numSuggestions: suggestionOptions?.count,
     onSuggestionClick: handleSuggestionClick,
   });
+
+  const assistantMessageCount = useMemo(
+    () => messages.filter((message) => message.role === "assistant").length,
+    [messages]
+  );
+
+  const previousAssistantCountRef = useRef<number>(0);
+  useEffect(() => {
+    if (!suggestionOptions?.enabled) return;
+    if (assistantMessageCount === 0) return;
+
+    const previousCount = previousAssistantCountRef.current;
+    if (assistantMessageCount !== previousCount && !isLoading) {
+      onAssistantFinish();
+    }
+    previousAssistantCountRef.current = assistantMessageCount;
+  }, [
+    assistantMessageCount,
+    suggestionOptions?.enabled,
+    isLoading,
+    onAssistantFinish,
+  ]);
+
+  const previousIsLoadingRef = useRef<boolean>(isLoading);
+  useEffect(() => {
+    if (!suggestionOptions?.enabled) return;
+    const wasLoading = previousIsLoadingRef.current;
+    previousIsLoadingRef.current = isLoading;
+
+    if (wasLoading && !isLoading) {
+      onAssistantFinish();
+    }
+  }, [isLoading, suggestionOptions?.enabled, onAssistantFinish]);
 
   // Defer suggestions to avoid blocking input
   const deferredSuggestions = useDeferredValue(generatedSuggestions);
@@ -244,6 +280,17 @@ function ChatContainerView(props: ChatContainerViewProps) {
       error: state.error,
       setError: state.setError,
     }))
+  );
+
+  const handleSetError = useCallback(
+    (value: string | null) => {
+      if (value) {
+        setError(value);
+        return;
+      }
+      clearChatError();
+    },
+    [clearChatError, setError]
   );
 
   // Memoize header actions to prevent recreating on every render
@@ -393,7 +440,7 @@ function ChatContainerView(props: ChatContainerViewProps) {
             allFocusItems={deferredAllFocusItems}
             clearFocus={clearFocus}
             error={error}
-            setError={setError}
+            setError={handleSetError}
             compression={compression}
           />
         </div>

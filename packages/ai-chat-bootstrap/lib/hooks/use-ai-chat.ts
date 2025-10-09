@@ -973,6 +973,15 @@ export function useAIChat({
     chatHook,
   ]);
 
+  const resetErrorState = useCallback(() => {
+    setError(null);
+    try {
+      getLatestChat().clearError();
+    } catch (error) {
+      logDevError("[acb][useAIChat] failed to clear chat error state", error);
+    }
+  }, [getLatestChat, setError]);
+
   const mutateMessageById = useCallback(
     (
       messageId: string,
@@ -1562,7 +1571,7 @@ export function useAIChat({
 
   const sendMessageWithContext = useCallback(
     (content: string) => {
-      setError(null);
+      resetErrorState();
       chatHookRef.current?.sendMessage({ text: content });
       if (threadStore) {
         // schedule microtask after message appended by hook
@@ -1610,13 +1619,13 @@ export function useAIChat({
         });
       }
     },
-    [threadId, setError, threadStore]
+    [threadId, resetErrorState, threadStore]
   );
 
   // Send AI command message with specific tool filtering
   const sendAICommandMessage = useCallback(
     (content: string, toolName: string, commandSystemPrompt?: string) => {
-      setError(null);
+      resetErrorState();
 
       // Filter tools to only include the specified tool (per-call override via body)
       const allTools = useAIToolsStore.getState().serializeToolsForBackend();
@@ -1652,7 +1661,7 @@ export function useAIChat({
         });
       }
     },
-    [threadId, setError, threadStore]
+    [threadId, resetErrorState, threadStore]
   );
 
   // Retry last message with error recovery
@@ -1668,9 +1677,9 @@ export function useAIChat({
   };
 
   // Clear error function
-  const clearError = () => {
-    setError(null);
-  };
+  const clearError = useCallback(() => {
+    resetErrorState();
+  }, [resetErrorState]);
 
   // --- Internal autosave logic ---
   const lastSavedSignatureRef = useRef<string | undefined>(undefined);

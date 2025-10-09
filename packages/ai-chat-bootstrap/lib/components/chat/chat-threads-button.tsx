@@ -51,24 +51,28 @@ export function ChatThreadsButton({
   className,
   label = "Threads",
 }: ChatThreadsButtonProps) {
-  const listThreads = useChatThreadsStore((s) => s.listThreads);
   const activeThreadId = useChatThreadsStore((s) => s.activeThreadId);
+  const storeScopeKey = useChatThreadsStore((s) => s.scopeKey);
+  const metas = useChatThreadsStore((s) => s.metas);
   const setActiveThread = useChatThreadsStore((s) => s.setActiveThread);
   const createThread = useChatThreadsStore((s) => s.createThread);
   const renameThread = useChatThreadsStore((s) => s.renameThread);
   const isLoaded = useChatThreadsStore((s) => s.isLoaded);
   const loadThreadMetas = useChatThreadsStore((s) => s.loadThreadMetas);
 
+  const threads = React.useMemo(() => {
+    const key = scopeKey ?? storeScopeKey;
+    const all = Array.from(metas.values());
+    const filtered = key ? all.filter((meta) => meta.scopeKey === key) : all;
+    return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [metas, scopeKey, storeScopeKey]);
+
   React.useEffect(() => {
     if (!isLoaded) {
-      loadThreadMetas(scopeKey).catch(() => {});
+      const key = scopeKey ?? storeScopeKey;
+      loadThreadMetas(key).catch(() => {});
     }
-  }, [isLoaded, loadThreadMetas, scopeKey]);
-
-  const threads = React.useMemo(
-    () => listThreads(scopeKey),
-    [listThreads, scopeKey]
-  );
+  }, [isLoaded, loadThreadMetas, scopeKey, storeScopeKey]);
 
   const handleNew = () => {
     const t = createThread({ scopeKey });

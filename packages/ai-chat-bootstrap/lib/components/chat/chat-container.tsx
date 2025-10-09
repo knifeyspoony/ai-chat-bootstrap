@@ -41,7 +41,7 @@ const LazyChatDebugButton = React.lazy(async () =>
 const ThreadsDropdownWrapper: React.FC<{
   scopeKey?: string;
 }> = ({ scopeKey }) => {
-  return <ChatThreadsButton scopeKey={scopeKey} className="ml-1" />;
+  return <ChatThreadsButton scopeKey={scopeKey} />;
 };
 
 export interface ChatContainerProps extends UseAIChatOptions {

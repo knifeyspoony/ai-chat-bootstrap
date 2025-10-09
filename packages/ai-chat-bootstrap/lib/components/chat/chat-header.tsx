@@ -24,11 +24,12 @@ const ChatHeaderImpl = ({
   className,
   actions,
 }: ChatHeaderProps) => {
-  // Memoize hasActions computation
-  const hasActions = useMemo(() =>
-    Boolean(actions),
+  // Normalize actions into an array for consistent spacing
+  const actionItems = useMemo(
+    () => React.Children.toArray(actions ?? []),
     [actions]
   );
+  const hasActions = actionItems.length > 0;
 
   if (!title && !subtitle && !avatar && !hasActions) {
     return null;
@@ -82,8 +83,18 @@ const ChatHeaderImpl = ({
       </div>
 
       {hasActions && (
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {actions}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {actionItems.map((item, index) => {
+            const key =
+              React.isValidElement(item) && item.key != null
+                ? item.key
+                : index;
+            return (
+              <div key={key} className="flex items-center justify-center">
+                {item}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

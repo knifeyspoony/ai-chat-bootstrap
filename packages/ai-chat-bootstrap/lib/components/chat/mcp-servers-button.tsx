@@ -1,9 +1,10 @@
-import { Settings2 } from "lucide-react";
+import { Server } from "lucide-react";
 import React, { useState } from "react";
 import { Button } from "../../components/ui/button";
 import { McpServersDialog } from "./mcp-servers-dialog";
 import { useAIMCPServersStore, useStableMCPServers } from "../../stores";
 import { useShallow } from "zustand/react/shallow";
+import { cn } from "../../utils";
 import {
   Tooltip,
   TooltipContent,
@@ -11,7 +12,11 @@ import {
   TooltipTrigger,
 } from "../../components/ui/tooltip";
 
-export function McpServersButton() {
+export interface McpServersButtonProps {
+  className?: string;
+}
+
+export function McpServersButton({ className }: McpServersButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   // MCP store subscriptions with stable selectors using useShallow
@@ -29,8 +34,6 @@ export function McpServersButton() {
 
   // Use stable MCP servers object to prevent re-renders
   const mcpServersMap = useStableMCPServers();
-
-
   return (
     <>
       <TooltipProvider delayDuration={200} skipDelayDuration={300}>
@@ -42,8 +45,9 @@ export function McpServersButton() {
               size="icon"
               onClick={() => setIsOpen(true)}
               aria-label="Configure MCP servers"
+              className={cn("h-8 w-8", className)}
             >
-              <Settings2 className="h-4 w-4" />
+              <Server className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Configure MCP servers</TooltipContent>

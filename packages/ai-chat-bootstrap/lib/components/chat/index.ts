@@ -3,11 +3,13 @@ export {
   ChatContainer,
   MockChatContainer,
 } from "../../components/chat/chat-container";
+export type { ChatContainerProps } from "../../components/chat/chat-container";
 export { ChatHeader } from "../../components/chat/chat-header";
 export { ChatInput } from "../../components/chat/chat-input";
 export { ChatInputWithCommands } from "../../components/chat/chat-input-with-commands";
 export { ChatMessages } from "../../components/chat/chat-messages";
 export { ChatPopout } from "../../components/chat/chat-popout";
+export type { ChatPopoutProps } from "../../components/chat/chat-popout";
 export { ChatThreadsButton } from "../../components/chat/chat-threads-button";
 export { AssistantMessage } from "./assistant-message";
 export { ChatChainOfThought } from "./chat-chain-of-thought";

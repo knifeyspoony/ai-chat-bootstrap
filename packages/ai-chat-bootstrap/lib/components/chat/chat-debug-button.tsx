@@ -23,11 +23,12 @@ export function ChatDebugButton() {
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => setOpen(true)}
               aria-label="Open debug tools"
+              className="h-8 w-8"
             >
-              <BugIcon size={20} />
+              <BugIcon className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">Open debug tools</TooltipContent>

@@ -96,6 +96,38 @@ export function MyChat() {
 }
 ```
 
+### Header Actions
+
+Supply React nodes via `header.actions` to surface custom controls next to the built-in title/subtitle block:
+
+```tsx
+<ChatContainer
+  transport={{ api: "/api/chat" }}
+  header={{
+    title: "AI Assistant",
+    subtitle: "Connected",
+    actions: (
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="rounded-md border px-2 py-1 text-xs"
+          onClick={() => exportThread()}
+        >
+          Export
+        </button>
+        <button
+          type="button"
+          className="rounded-md border px-2 py-1 text-xs"
+          onClick={() => clearChat()}
+        >
+          Clear
+        </button>
+      </div>
+    ),
+  }}
+/>
+```
+
 ## Features
 
 - **Prompt Actions Toolbar**: Model selector, attachment button, compression usage, and suggestions share a single toolbar (customize placement via variants or `ui.classes.toolbar`).

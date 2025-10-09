@@ -143,7 +143,7 @@ export function ChatThreadsButton({
                 size="icon"
                 variant="ghost"
                 aria-label={label}
-                className={cn("h-7 w-7", className)}
+                className={cn("h-8 w-8", className)}
               >
                 <Spool size={18} />
               </Button>

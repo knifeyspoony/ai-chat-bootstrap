@@ -25,10 +25,12 @@ React UI + hooks for building modern AI chat interfaces fast. Built on top of Ve
 Install with required peer dependencies:
 
 ```bash
-pnpm add ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zod
+pnpm add ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zod shiki
 # or
-npm install ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zod
+npm install ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zod shiki
 ```
+
+Next.js 15 automatically externalizes `shiki` on the server ([docs](https://nextjs.org/docs/app/api-reference/config/next-config-js/serverExternalPackages)), so the package now declares it as a peer dependency. Installing it at your app root avoids the Turbopack warning about `shiki` being external but missing.
 
 If you use a different provider, swap `@ai-sdk/openai` for `@ai-sdk/azure`, `@ai-sdk/google`, etc. `zod` is optional unless you define tool / command schemas (recommended).
 

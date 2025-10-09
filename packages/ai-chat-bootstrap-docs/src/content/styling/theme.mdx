@@ -9,7 +9,9 @@ import { ThemePlayground } from "../../components/ThemePlayground";
 
 AI Chat Bootstrap reads the same CSS custom properties used by **shadcn/ui** (`--background`, `--foreground`, `--card`, `--border`, etc.). Unlike earlier releases, we no longer ship fallback values—if those tokens are missing, every chat surface appears unstyled. The fix is to define the light/dark palette once in your `globals.css` (or wherever you manage Tailwind base styles).
 
-## Required Token Setup
+The CLI scaffold already injects the token block and the extra imports our components expect. If you are wiring things up manually, mirror that layout so animations, tokens, and chat styles stay in sync.
+
+## Required Imports & Token Setup
 
 Import the library tokens, then declare the shadcn-compatible palette. Keep the variable block outside of `@layer base` so it is not hoisted ahead of our imports.
 
@@ -19,6 +21,7 @@ Import the library tokens, then declare the shadcn-compatible palette. Keep the 
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+@import "tw-animate-css";
 @import "ai-chat-bootstrap/tokens.css";
 @import "ai-chat-bootstrap/ai-chat.css";
 
@@ -96,6 +99,9 @@ Customize the palette for your brand, but keep every variable defined—our comp
 
 If you compile the Tailwind utilities yourself, feel free to remove the `@import "ai-chat-bootstrap/ai-chat.css";` line once you confirm your build emits the chat classes.
 
+- `tw-animate-css` ships the shared keyframes the chat popovers, modals, and tooltips use. Install it (`pnpm add tw-animate-css`) and import it before our tokens.
+- Keep the palette objects outside of `@layer base`; Tailwind's hoisting would otherwise move them ahead of the token import.
+
 ## Tailwind Preset
 
 Hook the preset so Tailwind makes the same variables available to your utility classes and components. Remember to let Tailwind scan the package so the generated CSS includes chat utilities.
@@ -112,6 +118,11 @@ export default {
   ],
 };
 ```
+
+## Demo reference
+
+- Global CSS imports and token block used in the Next.js demo: [packages/ai-chat-bootstrap-demo/src/app/globals.css](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/globals.css)
+- Tailwind configuration that consumes the published preset: [packages/ai-chat-bootstrap-demo/tailwind.config.ts](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/tailwind.config.ts)
 
 ## Theme Playground
 

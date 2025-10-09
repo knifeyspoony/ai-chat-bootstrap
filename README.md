@@ -51,9 +51,25 @@ The library accepts **shadcn/ui** and **Tailwind** classes naturally, falling ba
 
 ```css
 /* globals.css */
+@import "tw-animate-css";
 @import "ai-chat-bootstrap/tokens.css";
 @import "ai-chat-bootstrap/ai-chat.css";
 ```
+
+Install `tw-animate-css` alongside the library so the shared animation keyframes used by popovers, menus, and dialogs stay in sync with our components.
+
+Override the shadcn-compatible tokens outside of any `@layer` block:
+
+```css
+:root {
+  --radius: 0.75rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --primary: oklch(0.58 0.2 264);
+}
+```
+
+Copy the complete token set (`--background`, `--card`, `--primary`, etc.) from the CLI scaffold or docs and keep both the light and dark palettes defined—the components reference each value directly.
 
 **Tailwind‑native** (advanced):
 

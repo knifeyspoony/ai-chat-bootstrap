@@ -211,6 +211,11 @@ export const POST = createAIChatHandler({
 
 > Note: Do NOT re-concatenate context data server-side. The client-built `enrichedSystemPrompt` already contains a standardized preamble plus conditional sections (Tools / Context / Focus) and then appends the original `systemPrompt` verbatim.
 
+## Demo reference
+
+- Shared context wiring for the counter, calculations, and system prompt selector: [packages/ai-chat-bootstrap-demo/src/hooks/use-demo-ai.ts](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/hooks/use-demo-ai.ts)
+- Landing page that consumes the hook and lets users toggle focus/context state: [packages/ai-chat-bootstrap-demo/src/app/page.tsx](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/page.tsx)
+
 ## Advanced Usage Patterns
 
 ### Dynamic Context Updates

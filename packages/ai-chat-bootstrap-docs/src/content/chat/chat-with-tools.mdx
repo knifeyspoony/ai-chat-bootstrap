@@ -157,6 +157,12 @@ export const POST = createAIChatHandler({
 
 > Note: `ChatContainer` automatically sends an `enrichedSystemPrompt` with a standardized preamble plus conditional Tools / Context / Focus sections, then appends your original `systemPrompt` (if any). Do not rebuild those sections on the server to avoid duplication.
 
+## Demo reference
+
+- Frontend tool registrations used across the demo: [packages/ai-chat-bootstrap-demo/src/hooks/use-demo-ai.ts](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/hooks/use-demo-ai.ts)
+- Counter widget + tool interactions rendered on the landing page: [packages/ai-chat-bootstrap-demo/src/app/page.tsx](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/page.tsx)
+- Shared streaming handler that receives the tools payload: [packages/ai-chat-bootstrap-demo/src/app/api/chat/route.ts](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/api/chat/route.ts)
+
 ## API Reference
 
 - Hook: [useAIFrontendTool](/api/hooks/use-ai-frontend-tool)

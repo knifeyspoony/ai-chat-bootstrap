@@ -38,7 +38,7 @@ If you use a different provider, swap `@ai-sdk/openai` for `@ai-sdk/azure`, `@ai
 
 ### 1. Define the shadcn tokens
 
-Add (and customize) the light/dark palette in `globals.css`. Keep the block outside of `@layer base` so it is not hoisted in front of our imports.
+Add (and customize) the light/dark palette in `globals.css`. Keep the block outside of `@layer base` so it is not hoisted in front of our imports. Install `tw-animate-css` alongside the library—it exports the shared keyframes our popovers, menus, and dialogs expect.
 
 ```css
 /* globals.css */
@@ -46,6 +46,7 @@ Add (and customize) the light/dark palette in `globals.css`. Keep the block outs
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+@import "tw-animate-css";
 @import "ai-chat-bootstrap/tokens.css";
 @import "ai-chat-bootstrap/ai-chat.css";
 

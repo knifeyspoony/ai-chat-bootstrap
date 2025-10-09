@@ -74,6 +74,11 @@ export { handler as POST };
 
 > Note: The `useAIChat` hook automatically sends an `enrichedSystemPrompt` containing a standardized preamble plus conditional sections (Tools / Context / Focus) and then appends your `systemPrompt` (if provided). Always prefer `enrichedSystemPrompt` when present and do not rebuild those sections again on the server.
 
+## Demo reference
+
+- Next.js route that implements this exact setup: [packages/ai-chat-bootstrap-demo/src/app/basic/page.tsx](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/basic/page.tsx)
+- Streaming chat handler used by the demo routes: [packages/ai-chat-bootstrap-demo/src/app/api/chat/route.ts](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/api/chat/route.ts)
+
 ## How it works
 
 1. **Frontend**: The `ChatContainer` component manages message state and automatically posts to `/api/chat`

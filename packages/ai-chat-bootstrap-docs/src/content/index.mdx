@@ -21,8 +21,6 @@ npm install ai-chat-bootstrap react react-dom ai @ai-sdk/react @ai-sdk/openai zo
 
 Required peers: `react`, `react-dom`, `ai`, `@ai-sdk/react`. Add one provider package (e.g. `@ai-sdk/openai`, `@ai-sdk/azure`, etc.). `zod` strongly recommended for tools/commands.
 
-Upgrading from &lt;=0.2.x? Add `ai @ai-sdk/react` explicitly—they're now peers.
-
 ## Styling
 
 The library accepts **shadcn/ui** and **Tailwind** classes naturally, falling back to built-in styles. Two setup modes:
@@ -31,19 +29,25 @@ The library accepts **shadcn/ui** and **Tailwind** classes naturally, falling ba
 
 ```css
 /* globals.css */
+@import "tw-animate-css";
 @import "ai-chat-bootstrap/tokens.css";
 @import "ai-chat-bootstrap/ai-chat.css";
 ```
 
 `tokens.css` defines the design tokens + minimal globals. `ai-chat.css` adds the component styles.
 
-To theme, override CSS custom properties:
+Install `tw-animate-css` once (the CLI adds it automatically) so shared animation keyframes stay in sync with our components.
+
+To theme, override the shadcn-compatible CSS custom properties that live outside of any `@layer` block:
 ```css
 :root {
-	--radius: 0.75rem;
-	--primary: oklch(0.58 0.2 264);
+  --radius: 0.75rem;
+  --primary: oklch(0.58 0.2 264);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
 }
 ```
+Copy the full shadcn token set (`--background`, `--card`, `--primary`, etc.) from the CLI scaffold or [Theme System guide](/styling/theme) and adjust the values for your brand.
 
 ### Tailwind‑native (advanced)
 
@@ -77,6 +81,23 @@ export function App() {
 ```
 
 For a full end‑to‑end example (including API route + streaming) see <Link href="/chat/basic-chat">Basic Chat</Link>.
+
+## Demo reference
+
+- Next.js showcase using `ChatPopout`, tools, compression, and MCP: [packages/ai-chat-bootstrap-demo/src/app/page.tsx](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/page.tsx)
+- Minimal chat route that mirrors this quick start: [packages/ai-chat-bootstrap-demo/src/app/basic/page.tsx](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/basic/page.tsx)
+- Streaming API handler used by the demo: [packages/ai-chat-bootstrap-demo/src/app/api/chat/route.ts](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/api/chat/route.ts)
+
+### Run it locally
+
+```bash
+git clone https://github.com/knifeyspoony/ai-chat-bootstrap
+cd ai-chat-bootstrap
+pnpm install
+pnpm --filter ai-chat-bootstrap-demo dev
+```
+
+The command launches the Next.js demo alongside the library watcher so code edits reflect immediately.
 
 ## Server Templates
 
@@ -112,6 +133,7 @@ Also available: `createCompressionHandler`, `createSuggestionsHandler`, `createT
 
 - `ai-chat-bootstrap/tokens.css`: design tokens + minimal globals
 - `ai-chat-bootstrap/ai-chat.css`: chat component styles without Tailwind preflight
+- `tw-animate-css`: shared keyframes/animations used by menu, dialog, and tooltip primitives
 - Tailwind preset: maps tokens into Tailwind theme when compiling yourself
 - Theme by overriding CSS variables (`--background`, `--foreground`, `--primary`, etc.)
 

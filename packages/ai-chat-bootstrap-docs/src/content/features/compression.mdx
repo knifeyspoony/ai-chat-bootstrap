@@ -54,6 +54,12 @@ export const POST = createCompressionHandler({
 
 The handler receives the **pinned messages**, **surviving message ids**, and **existing artifacts**. It returns a new snapshot and artifact list which the client merges into its compression store.
 
+## Demo reference
+
+- Compression playground that pins messages, reviews artifacts, and stresses low-budget models: [packages/ai-chat-bootstrap-demo/src/app/compression/page.tsx](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/compression/page.tsx)
+- Post-compression transcript viewer that hydrates stored snapshots: [packages/ai-chat-bootstrap-demo/src/app/compression/post/page.tsx](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/compression/post/page.tsx)
+- Azure-backed compression endpoint used by both pages: [packages/ai-chat-bootstrap-demo/src/app/api/compression/route.ts](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/api/compression/route.ts)
+
 ## Configuration
 
 `CompressionConfig` is shared by `ChatContainer`, `useAIChat`, and `useAIChatCompression`:

@@ -13,10 +13,10 @@ React UI + hooks for building modern AI chat interfaces fast. Built on top of Ve
 - Site: https://knifeyspoony.github.io/ai-chat-bootstrap/
 - Quick Start: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/basic-chat
 - Tools: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/chat-with-tools
-- Tool Result Rendering: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/tool-result-rendering
-- Focus Items: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/focus-items
-- Sharing Context: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/ai-context
-- Commands: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/commands
+- Tool Result Rendering: https://knifeyspoony.github.io/ai-chat-bootstrap/features/tool-result-rendering
+- Focus Items: https://knifeyspoony.github.io/ai-chat-bootstrap/features/focus-items
+- Sharing Context: https://knifeyspoony.github.io/ai-chat-bootstrap/features/ai-context
+- Commands: https://knifeyspoony.github.io/ai-chat-bootstrap/features/commands
 - API Reference: https://knifeyspoony.github.io/ai-chat-bootstrap/api
 - Components: https://knifeyspoony.github.io/ai-chat-bootstrap/api/components
 
@@ -504,4 +504,4 @@ Issues & source: https://github.com/knifeyspoony/ai-sdk-chat
 
 ## Changelog
 
-See the monorepo root [CHANGELOG](../../CHANGELOG.md) for release notes.
+See https://github.com/knifeyspoony/ai-sdk-chat/releases for release notes.

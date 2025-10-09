@@ -23,7 +23,7 @@ Required peers: `react`, `react-dom`, `ai`, `@ai-sdk/react`. Add one provider pa
 
 ## Styling
 
-The library accepts **shadcn/ui** and **Tailwind** classes naturally, falling back to built-in styles. Two setup modes:
+The library requires **shadcn/ui-compatible CSS variables** (light and dark palettes) to be present. Choose one setup mode to supply tokens and component styles:
 
 ### Zero‑config (recommended)
 
@@ -38,7 +38,7 @@ The library accepts **shadcn/ui** and **Tailwind** classes naturally, falling ba
 
 Install `tw-animate-css` once (the CLI adds it automatically) so shared animation keyframes stay in sync with our components.
 
-To theme, override the shadcn-compatible CSS custom properties that live outside of any `@layer` block:
+To theme, override the shadcn-compatible CSS custom properties that live outside of any `@layer` block. Provide the full light **and** dark palettes—the components reference every variable directly:
 ```css
 :root {
   --radius: 0.75rem;

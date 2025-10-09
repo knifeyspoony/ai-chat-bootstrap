@@ -5,21 +5,15 @@ description: Access the compression controller, pinned messages, artifacts, and 
 
 # useAIChatCompression
 
-`useAIChatCompression` exposes the **compression controller** that powers message pinning, artifact review, and auto-compression inside `ChatContainer`. It normalizes your `CompressionConfig`, syncs the global compression store, and returns helpers for manually triggering compression runs when you need direct control.
+> ⚠️ **Internal API**: `useAIChatCompression` is not part of the public entry point. It exists so `ChatContainer`/`ChatPopout` can coordinate compression state. Depend on it only if you are mirroring the internals for a custom container and can absorb breaking changes.
 
-Most apps interact with compression through `ChatContainer` or `useAIChat`. Reach for this hook when you are composing your own UI, rendering custom pinned message indicators, or wiring a manual "Compress now" button.
+The hook normalises a `CompressionConfig`, keeps the compression store in sync, and exposes the controller that manages pinned messages, artifacts, and token usage.
 
 ## Signature
 
 ```ts
-import { useAIChatCompression } from "ai-chat-bootstrap";
-
-interface UseAIChatCompressionOptions {
-  compression?: CompressionConfig;
-}
-
 function useAIChatCompression(
-  options?: UseAIChatCompressionOptions
+  options?: { compression?: CompressionConfig }
 ): {
   config: NormalizedCompressionConfig;
   controller: CompressionController;
@@ -27,56 +21,45 @@ function useAIChatCompression(
     messages: UIMessage[],
     options?: CompressionRunOptions
   ) => Promise<BuildCompressionPayloadResult>;
-}
+};
 ```
 
-The optional `compression` object matches the configuration you pass to `ChatContainer` / `useAIChat` (`enabled`, `api`, `maxTokenBudget`, `pinnedMessageLimit`, etc.).
+The `compression` object matches the configuration used by `ChatContainer`.
 
-## Return value
+## What you get back
 
-- `config` – The normalized compression configuration (defaults applied, strings coerced).
-- `controller` – Live compression state (`pinnedMessages`, `artifacts`, `snapshot`, `usage`, `shouldCompress`, `overBudget`) plus mutating `actions` such as `pinMessage`, `clearArtifacts`, and `setUsage`.
-- `buildPayload(messages, options?)` – Builds the payload sent to your compression endpoint. It merges pinned messages and previous artifacts, records usage, and (when compression is enabled) POSTs to the configured service. Returns the updated compression metadata, surviving message ids, and pinned/artifact references.
+- `config` – Normalised settings with defaults applied.
+- `controller` – Live state (`usage`, `pinnedMessages`, `artifacts`, `snapshot`) plus mutators such as `pinMessage`, `clearArtifacts`, and `runCompression`.
+- `buildPayload(messages, options?)` – Helper that assembles the payload sent to your compression endpoint. It merges pinned messages and artifacts before optionally POSTing via the configured fetcher.
 
-> Tip: `controller.runCompression` already wraps `buildPayload` with the currently tracked message set—use that when possible instead of invoking `buildPayload` manually.
+> Tip: Prefer `controller.runCompression` unless you need to inspect the payload yourself.
 
-## Example – Manual compression button
+## Manual compression button
 
 ```tsx
-import { useAIChat, useAIChatCompression } from "ai-chat-bootstrap";
-
 function ManualCompressionControl() {
-  const chat = useAIChat({
-    compression: { enabled: true, maxTokenBudget: 16_000 },
-  });
+  const chat = useAIChat({ compression: { enabled: true, maxTokenBudget: 16_000 } });
   const { controller } = useAIChatCompression();
 
+  const handleClick = async () => {
+    if (!controller.config.enabled) return;
+    await controller.runCompression?.({ force: true });
+  };
+
   return (
-    <button
-      type="button"
-      onClick={() => controller.runCompression?.({ force: true })}
-      disabled={!controller.config.enabled || chat.messages.length === 0}
-    >
+    <button type="button" onClick={handleClick} disabled={chat.messages.length === 0}>
       Compress history
     </button>
   );
 }
 ```
 
-## CompressionConfig overview
+## CompressionConfig cheatsheet
 
-`CompressionConfig` is shared across the hook, `useAIChat`, and `ChatContainer`:
+- `enabled` – master toggle.
+- `api` – endpoint consumed by [`createCompressionHandler`](/api/server-templates/create-compression-handler).
+- `maxTokenBudget` / `compressionThreshold` – drive the `overBudget` and `shouldCompress` flags.
+- `pinnedMessageLimit` – cap per-thread pins.
+- `model`, `onCompression`, `onError`, `fetcher` – customise backend behaviour.
 
-| Option | Type | Default | Description |
-| ------ | ---- | ------- | ----------- |
-| `enabled` | `boolean` | `false` | Master switch for compression features |
-| `api` | `string` | `"/api/compression"` | Endpoint used by `createCompressionHandler` (or your own handler) |
-| `maxTokenBudget` | `number \| null` | `null` | Target token ceiling for the transcript (used to compute `overBudget`) |
-| `compressionThreshold` | `number` | `0.85` | Ratio of usage to budget that triggers automatic compressions |
-| `pinnedMessageLimit` | `number \| null` | `null` | Maximum number of messages users can pin |
-| `model` | `string \| null` | `null` | Preferred compression model id (mirrors server template option) |
-| `onCompression` | `(result) => void` | `undefined` | Callback invoked after a successful compression run |
-| `onError` | `(error) => void` | `undefined` | Callback invoked when the compression service fails |
-| `fetcher` | `CompressionServiceFetcher` | `undefined` | Replace the default `fetch` implementation |
-
-Combine this hook with [`createCompressionHandler`](/api/server-templates/create-compression-handler) to keep transcripts within the context window while providing users with artifact review and pinning controls.
+Pair this hook with the server template to keep transcripts within budget while giving users artifact review and pin management.

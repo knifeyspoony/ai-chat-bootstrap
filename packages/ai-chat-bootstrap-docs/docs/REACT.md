@@ -158,236 +158,117 @@ const handleClick = useCallback(() => {
 
 ```typescript
 // ❌ Bad - Everything updates synchronously
-const results = searchItems(query);
+const filtered = items.filter((item) => item.matches(query));
+```
 
-// ✅ Good - Input stays responsive
+```typescript
+// ✅ Good - Non-critical updates deferred
 const deferredQuery = useDeferredValue(query);
-const results = searchItems(deferredQuery);
-```
-
-**Decision criteria:**
-
-- Use for search results
-- Use for filtering large lists
-- Use for expensive visualizations
-- Skip for critical user feedback
-
-### Pattern 5: State Hoisting Prevention
-
-**When to use:** Keep state local unless sharing is required
-
-```typescript
-// ❌ Bad - State in parent causes unnecessary re-renders
-function Parent() {
-  const [inputValue, setInputValue] = useState("");
-  return <Child value={inputValue} onChange={setInputValue} />;
-}
-
-// ✅ Good - State stays local
-function Child() {
-  const [inputValue, setInputValue] = useState("");
-  return (
-    <input value={inputValue} onChange={(e) => setInputValue(e.target.value)} />
-  );
-}
-```
-
-**Decision criteria:**
-
-- Keep state in component if only that component uses it
-- Lift state only when multiple components need it
-- Use context for deeply nested sharing
-
-### Pattern 6: Granular Store Subscriptions
-
-**When to use:** When using state management libraries
-
-```typescript
-// ❌ Bad - Subscribes to entire store
-const state = useStore();
-
-// ✅ Good - Subscribes to specific slice
-const userData = useStore((state) => state.user.data);
-
-// 🎯 Best - Multiple granular subscriptions with shallow equality
-const userName = useStore((state) => state.user.name);
-const userRole = useStore((state) => state.user.role);
-```
-
-**Decision criteria:**
-
-- Always use selectors
-- Use shallow equality for object selections
-- Split into multiple subscriptions for granularity
-
-### Pattern 7: Throttling and Debouncing
-
-**When to use:** For high-frequency updates
-
-```typescript
-// For continuous streams (scrolling, mousemove)
-const throttledUpdate = useThrottle(update, 100); // Max 10 updates/second
-
-// For user input (typing, searching)
-const debouncedSearch = useDebounce(search, 300); // Wait 300ms after typing stops
-
-// For real-time data (websockets, streaming)
-const throttledStream = {
-  experimental_throttle: 100, // AI SDK pattern
-};
-```
-
-**Decision criteria:**
-
-- Throttle: Continuous events (scroll, resize, mousemove)
-- Debounce: User input (search, validation)
-- Stream throttle: Real-time data updates
-
-### Pattern 8: Component Splitting
-
-**When to use:** When parts of a component update at different rates
-
-```typescript
-// ❌ Bad - Entire component re-renders for input changes
-function Component() {
-  const [input, setInput] = useState("");
-  const expensiveData = useExpensiveComputation();
-
-  return (
-    <>
-      <input value={input} onChange={(e) => setInput(e.target.value)} />
-      <ExpensiveVisualization data={expensiveData} />
-    </>
-  );
-}
-
-// ✅ Good - Split into separate components
-function InputSection() {
-  const [input, setInput] = useState("");
-  return <input value={input} onChange={(e) => setInput(e.target.value)} />;
-}
-
-function DataSection() {
-  const expensiveData = useExpensiveComputation();
-  return <ExpensiveVisualization data={expensiveData} />;
-}
-```
-
-### Pattern 9: Virtual Scrolling
-
-**When to use:** For lists with >100 items
-
-```typescript
-// Use libraries like react-window or @tanstack/react-virtual
-import { VirtualList } from "@tanstack/react-virtual";
-
-// Only renders visible items + buffer
-<VirtualList
-  count={10000}
-  height={600}
-  itemHeight={50}
-  renderItem={({ index }) => <Item key={index} data={items[index]} />}
-/>;
-```
-
-### Pattern 10: Lazy Loading
-
-**When to use:** For code splitting and reducing initial bundle
-
-```typescript
-// Split heavy components
-const HeavyComponent = React.lazy(() => import("./HeavyComponent"));
-
-// Split routes
-const AdminPanel = React.lazy(() => import("./routes/AdminPanel"));
-
-// Conditional features
-const AdvancedEditor = React.lazy(() =>
-  userHasPremium ? import("./AdvancedEditor") : import("./BasicEditor")
+const filtered = useMemo(
+  () => items.filter((item) => item.matches(deferredQuery)),
+  [items, deferredQuery]
 );
 ```
 
----
+**Decision criteria:**
 
-## 🤔 Decision Framework
+- Use for search results, analytics panels, large list filtering
+- Avoid for mission-critical UI (validation, buttons)
 
-### When to Optimize?
+### Pattern 5: Event Throttling and Debouncing
 
-```mermaid
-graph TD
-    A[Component Performance Issue?] --> B{Renders > 16ms?}
-    B -->|Yes| C{Re-renders frequently?}
-    B -->|No| D[No optimization needed]
-    C -->|Yes| E{Has expensive computation?}
-    C -->|No| F[Add React.memo]
-    E -->|Yes| G[Add useMemo + React.memo]
-    E -->|No| H{Updates block input?}
-    H -->|Yes| I[Add useDeferredValue]
-    H -->|No| F
+**When to use:** High-frequency events like scroll, resize, typing
+
+```typescript
+const handleScroll = useMemo(
+  () =>
+    throttle(() => {
+      // ...
+    }, 100),
+  []
+);
 ```
 
-### Optimization Priority Matrix
+**Decision criteria:**
 
-| Frequency | Impact | Action                       |
-| --------- | ------ | ---------------------------- |
-| High      | High   | React.memo + useMemo + defer |
-| High      | Low    | React.memo only              |
-| Low       | High   | useMemo only                 |
-| Low       | Low    | No optimization              |
+- Use throttle for continuous updates (scroll)
+- Use debounce for bursty updates (search input)
+- Always cancel on unmount
+
+---
+
+## 🧠 Decision Framework
+
+1. **Profile First**
+   - Use React DevTools Profiler
+   - Identify components with >16ms render time
+2. **Stabilize Props**
+   - Ensure all props have stable identities
+   - Convert inline objects/arrays to useMemo
+3. **Memoize Computations**
+   - Cache expensive operations
+   - Move result caching out of render when possible
+4. **Split Layout**
+   - Separate slow and fast updates
+   - Use Suspense for asynchronous work
+5. **Optimize Events**
+   - Throttle or debounce heavy handlers
+   - Use requestAnimationFrame for visual updates
 
 ---
 
 ## ✅ Implementation Checklist
 
-### Phase 1: Identify Hot Spots (1 hour)
+### Component-Level
 
-- [ ] Run React DevTools Profiler
-- [ ] Identify components rendering >16ms
-- [ ] Find components with >10 renders/second
-- [ ] List expensive computations
-- [ ] Map state subscriptions
+- [ ] Wrapped with React.memo (when appropriate)
+- [ ] Stable function props via useCallback
+- [ ] Derived data memoized with useMemo
+- [ ] Event handlers throttled/debounced
+- [ ] Heavy computation moved outside render
 
-### Phase 2: Component Optimization (2-4 hours)
+### State Management
 
-- [ ] Add React.memo to hot components
-- [ ] Write custom comparison functions
-- [ ] Memoize expensive computations with useMemo
-- [ ] Stabilize callbacks with useCallback
-- [ ] Test re-render behavior
+- [ ] Minimal state surface
+- [ ] Derived state kept out of React state
+- [ ] Context usage minimized (split contexts)
+- [ ] Zustand selectors with shallow equality (if applicable)
 
-### Phase 3: State Optimization (1-2 hours)
+### Rendering Patterns
 
-- [ ] Move local state out of parent components
-- [ ] Implement granular store selectors
-- [ ] Add shallow equality checks
-- [ ] Remove unnecessary subscriptions
+- [ ] Lazy-loaded heavy components
+- [ ] Suspense boundaries around async work
+- [ ] Virtualized large lists
+- [ ] Error boundaries around risky components
 
-### Phase 4: Update Optimization (1 hour)
+### Bundle Strategy
 
-- [ ] Add useDeferredValue for search/filter
-- [ ] Implement throttling for streams
-- [ ] Add debouncing for user input
-- [ ] Test responsiveness
-
-### Phase 5: Bundle Optimization (2 hours)
-
-- [ ] Implement code splitting
-- [ ] Add lazy loading for routes
-- [ ] Optimize images and assets
-- [ ] Analyze bundle size
+- [ ] Code-splitting for rarely used routes
+- [ ] Dynamic imports for large vendor modules
+- [ ] Tree-shaking verified
+- [ ] Analyze bundle with source-map-explorer
 
 ---
 
-## ❌ Anti-Patterns to Avoid
+## 🚫 Anti-Patterns to Avoid
 
-### 1. Over-Memoization
+### 1. Overusing Context
 
 ```typescript
-// ❌ Bad - Memoizing primitives
-const userName = useMemo(() => user.name, [user.name]);
+// ❌ Bad - Single context for everything
+const AppContext = createContext({
+  user: null,
+  theme: "light",
+  settings: {},
+  notifications: [],
+});
+```
 
-// ✅ Good - Just use the value
-const userName = user.name;
+```typescript
+// ✅ Good - Split contexts
+const UserContext = createContext(null);
+const ThemeContext = createContext("light");
+const NotificationsContext = createContext([]);
 ```
 
 ### 2. Inline Object Creation
@@ -395,7 +276,9 @@ const userName = user.name;
 ```typescript
 // ❌ Bad - New object every render
 <Component style={{ margin: 10 }} />;
+```
 
+```typescript
 // ✅ Good - Stable reference
 const style = useMemo(() => ({ margin: 10 }), []);
 <Component style={style} />;
@@ -408,7 +291,9 @@ const style = useMemo(() => ({ margin: 10 }), []);
 {
   items.map((item, index) => <Item key={index} />);
 }
+```
 
+```typescript
 // ✅ Good - Stable unique key
 {
   items.map((item) => <Item key={item.id} />);
@@ -421,7 +306,9 @@ const style = useMemo(() => ({ margin: 10 }), []);
 // ❌ Bad - React won't detect change
 state.items.push(newItem);
 setState(state);
+```
 
+```typescript
 // ✅ Good - Create new reference
 setState({ ...state, items: [...state.items, newItem] });
 ```
@@ -431,7 +318,9 @@ setState({ ...state, items: [...state.items, newItem] });
 ```typescript
 // ❌ Bad - Runs on every render
 const [state] = useState(expensiveComputation());
+```
 
+```typescript
 // ✅ Good - Runs once
 const [state] = useState(() => expensiveComputation());
 ```

@@ -21,10 +21,10 @@ This repository contains:
 - Site: https://knifeyspoony.github.io/ai-chat-bootstrap/
 - Quick Start: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/basic-chat
 - Tools: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/chat-with-tools
-- Tool Result Rendering: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/tool-result-rendering
-- Focus Items: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/focus-items
-- Sharing Context: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/ai-context
-- Commands: https://knifeyspoony.github.io/ai-chat-bootstrap/chat/commands
+- Tool Result Rendering: https://knifeyspoony.github.io/ai-chat-bootstrap/features/tool-result-rendering
+- Focus Items: https://knifeyspoony.github.io/ai-chat-bootstrap/features/focus-items
+- Sharing Context: https://knifeyspoony.github.io/ai-chat-bootstrap/features/ai-context
+- Commands: https://knifeyspoony.github.io/ai-chat-bootstrap/features/commands
 - API Reference: https://knifeyspoony.github.io/ai-chat-bootstrap/api
 - Components: https://knifeyspoony.github.io/ai-chat-bootstrap/api/components
 
@@ -45,7 +45,7 @@ Peer warning notes:
 
 ## Styling
 
-The library accepts **shadcn/ui** and **Tailwind** classes naturally, falling back to built-in styles. Two setup modes:
+The library **requires** a shadcn-compatible CSS token layer (light and dark) alongside either the precompiled CSS bundle or the Tailwind preset. Choose one integration path:
 
 **Zero‑config** (recommended):
 
@@ -245,11 +245,11 @@ Example enabling suggestions and commands:
 ## Development (Monorepo)
 
 ```bash
-pnpm install              # install all workspace deps
-pnpm run dev              # runs demo app (and any watch scripts)
-pnpm run build:lib        # build library (ai-chat-bootstrap)
-pnpm run lint             # eslint across workspace
-pnpm run typecheck        # typecheck all packages
+pnpm install                                   # install all workspace deps
+pnpm --filter ai-chat-bootstrap-demo dev       # run the demo + library watcher
+pnpm run build:lib                             # build library (ai-chat-bootstrap)
+pnpm run lint                                  # eslint across workspace
+pnpm run typecheck                             # typecheck all packages
 ```
 
 Targeted:
@@ -267,20 +267,17 @@ pnpm rebuild:lib
 
 ## Publishing
 
-See `PUBLISH.md` for the full checklist. Quick sequence:
+Run the scoped release script to lint, test, build, and publish:
 
 ```bash
-pnpm --filter ai-chat-bootstrap lint && \
-pnpm --filter ai-chat-bootstrap typecheck && \
-pnpm --filter ai-chat-bootstrap build && \
-cd packages/ai-chat-bootstrap && npm publish --access public
+pnpm --filter ai-chat-bootstrap release
 ```
 
 After publish: tag & push.
 
 ## Changelog
 
-See [CHANGELOG.md](./CHANGELOG.md) for release history.
+See https://github.com/knifeyspoony/ai-sdk-chat/releases for release history.
 
 ## Project Structure
 

@@ -426,7 +426,7 @@ If you need additional variant surfaces, open an issue or PR—extending CVA con
 
 - `header`: title, subtitle, avatar, badge, actions, className
 - `ui`: placeholder, className, classes (`header`, `messages`, `message`, `input`, `assistantActions`), emptyState
-- `suggestions`: enabled, prompt, count
+- `suggestions`: enabled, prompt, count, api override, strategy, debounce
 - `commands`: enabled
 - `assistantActions`: enable built-in buttons (`copy`, `regenerate`, `debug`, `feedback`) or supply a `custom` array of `AssistantAction`s for bespoke controls
 - `devtools`: `{ headerDebugButton?: boolean }` – development-only header debug toggle (defaults to `false`)

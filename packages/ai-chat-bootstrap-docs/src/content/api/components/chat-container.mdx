@@ -44,6 +44,9 @@ interface ChatContainerProps extends UseAIChatOptions {
     enabled?: boolean;
     prompt?: string;
     count?: number;
+    api?: string;
+    strategy?: 'assistant-finish' | 'eager' | 'manual';
+    debounceMs?: number;
   };
 
   commands?: {
@@ -67,7 +70,7 @@ interface ChatContainerProps extends UseAIChatOptions {
 }
 ```
 
-> All AI configuration (API endpoint, system prompt, models, MCP, threading, compression, etc.) is supplied via the `UseAIChatOptions` keys: `transport`, `messages`, `threads`, `features`, `mcp`, `models`, and `compression`.
+> All AI configuration (API endpoint, system prompt, models, MCP, threading, compression, suggestions, etc.) is supplied via the `UseAIChatOptions` keys: `transport`, `messages`, `threads`, `features`, `mcp`, `models`, `compression`, and `suggestions`.
 
 ## Usage
 

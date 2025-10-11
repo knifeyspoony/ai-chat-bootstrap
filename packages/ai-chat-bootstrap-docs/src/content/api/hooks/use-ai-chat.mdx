@@ -21,7 +21,7 @@ The hook orchestrates transport calls, context/focus/tool hydration, compression
 function useAIChat(options?: UseAIChatOptions): UseAIChatReturn;
 ```
 
-`UseAIChatOptions` matches the props accepted by `ChatContainer` (`transport`, `messages`, `threads`, `features`, `mcp`, `models`, `compression`).
+`UseAIChatOptions` matches the props accepted by `ChatContainer` (`transport`, `messages`, `threads`, `features`, `mcp`, `models`, `compression`, `suggestions`).
 
 ### System prompt enrichment
 
@@ -42,6 +42,7 @@ Override it per-call via `chat.sendMessage({ body: { enrichedSystemPrompt: "..."
 - `mcp.*` – surface Model Context Protocol integrations.
 - `models.available` / `models.initial` – populate the model selector.
 - `compression` – enable automatic compression, pinned messages, and artifact review.
+- `suggestions` – configure auto-fetching follow-up suggestions (prompt, count, API endpoint).
 
 ## Return highlights
 
@@ -56,6 +57,7 @@ Override it per-call via `chat.sendMessage({ body: { enrichedSystemPrompt: "..."
 - Feature state: `threadId`, `scopeKey`, `chainOfThoughtEnabled`, `mcpEnabled`.
 - Compression controller: `compression` (usage, pinned messages, artifacts, `runCompression`).
 - Branching controller: `branching` (enabled flag + `selectBranch`).
+- Suggestions controller: `suggestions` (enabled flag, `items`, `handleSuggestionClick`, `fetchSuggestions`, `clearSuggestions`).
 
 ## Minimal usage example
 

@@ -196,6 +196,16 @@ export function useMockAIChat(options: MockChatOptions = {}): MockChat {
     scopeKey: undefined,
     compression,
     branching: { enabled: false as const },
+    suggestions: {
+      enabled: false,
+      items: [],
+      count: 0,
+      isLoading: false,
+      error: null,
+      handleSuggestionClick: () => {},
+      fetchSuggestions: () => Promise.resolve(),
+      clearSuggestions: () => {},
+    },
 
     // Utility functions for tests
     setIsLoading,

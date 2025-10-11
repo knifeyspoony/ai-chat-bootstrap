@@ -7,6 +7,7 @@ import {
 import isEqual from "fast-deep-equal";
 import React, {
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -27,15 +28,15 @@ import { useChatStore } from "../stores/";
 import type { SerializedMCPServer } from "../stores/mcp";
 import type { SerializedTool } from "../stores/tools";
 // Planning types and schemas removed - using flow capture instead
-import type { ChatModelOption, ChatRequest } from "../types/chat";
+import type { ChatModelOption, ChatRequest, Suggestion } from "../types/chat";
 import {
   COMPRESSION_THREAD_METADATA_KEY,
+  type BuildCompressionPayloadResult,
   type CompressionConfig,
   type CompressionPinnedMessage,
   type CompressionRunOptions,
-  type PersistedCompressionState,
-  type BuildCompressionPayloadResult,
   type CompressionUsage,
+  type PersistedCompressionState,
 } from "../types/compression";
 import { buildCompressionPayload } from "../utils/compression/build-payload";
 import {
@@ -49,11 +50,12 @@ import {
   buildPersistedCompressionState,
   clonePersistedCompressionState,
 } from "../utils/compression/persistence";
-import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
 import { logDevError } from "../utils/dev-logger";
-import { useChainOfThought } from "./use-chain-of-thought";
-import { useAIChatCompression } from "./use-ai-chat-compression";
+import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
 import { useAIChatBranching } from "./use-ai-chat-branching";
+import { useAIChatCompression } from "./use-ai-chat-compression";
+import { useChainOfThought } from "./use-chain-of-thought";
+import { useSuggestions, type UseSuggestionsOptions } from "./use-suggestions";
 
 const EMPTY_MODEL_OPTIONS: ChatModelOption[] = [];
 
@@ -98,6 +100,16 @@ export interface ThreadsOptions {
   title?: ThreadTitleOptions;
 }
 
+export interface SuggestionsOptions {
+  enabled?: boolean;
+  prompt?: string;
+  count?: number;
+  strategy?: UseSuggestionsOptions["strategy"];
+  debounceMs?: number;
+  api?: string;
+  fetcher?: UseSuggestionsOptions["fetcher"];
+}
+
 export interface UseAIChatOptions {
   transport?: {
     api?: string;
@@ -121,6 +133,7 @@ export interface UseAIChatOptions {
     initial?: string;
   };
   compression?: CompressionConfig;
+  suggestions?: SuggestionsOptions;
 }
 
 const isSerializedToolArray = (value: unknown): value is SerializedTool[] =>
@@ -165,6 +178,7 @@ export function useAIChat({
   mcp,
   models: modelsGroup,
   compression: compressionOptions,
+  suggestions: suggestionsOptions,
 }: UseAIChatOptions = {}) {
   const api = transport?.api ?? "/api/chat";
   const systemPrompt = messages?.systemPrompt;
@@ -178,9 +192,7 @@ export function useAIChat({
   const threadTitleEnabled =
     threadTitleOptions?.enabled ?? Boolean(threadTitleOptions?.api);
   const threadTitleApi =
-    threadTitleEnabled && threadTitleOptions?.api
-      ? threadTitleOptions.api
-      : "";
+    threadTitleEnabled && threadTitleOptions?.api ? threadTitleOptions.api : "";
   const threadTitleSampleCount = threadTitleOptions?.sampleCount ?? 8;
   const autoCreateThread = threadsGroup.autoCreate ?? true;
   const warnOnMissingThread = threadsGroup.warnOnMissing ?? false;
@@ -188,6 +200,9 @@ export function useAIChat({
   const incomingModels = modelsGroup?.available ?? EMPTY_MODEL_OPTIONS;
   const providedModel = modelsGroup?.initial;
   const mcpEnabled = mcp?.enabled ?? false;
+  const suggestionsConfig = suggestionsOptions;
+  const suggestionsEnabled = suggestionsConfig?.enabled ?? false;
+  const suggestionCount = suggestionsConfig?.count ?? 3;
 
   const { models, selectedModelId } = useAIModelsStore(
     useShallow((state) => ({
@@ -201,15 +216,15 @@ export function useAIChat({
 
   if (compressionEnabled) {
     const missingContextWindow = incomingModels.filter((model) => {
-        const windowSize = model.contextWindowTokens;
-        return (
-          windowSize === undefined ||
-          windowSize === null ||
-          typeof windowSize !== "number" ||
-          !Number.isFinite(windowSize) ||
-          windowSize <= 0
-        );
-      });
+      const windowSize = model.contextWindowTokens;
+      return (
+        windowSize === undefined ||
+        windowSize === null ||
+        typeof windowSize !== "number" ||
+        !Number.isFinite(windowSize) ||
+        windowSize <= 0
+      );
+    });
 
     if (missingContextWindow.length > 0) {
       const missingIds = missingContextWindow
@@ -232,7 +247,9 @@ export function useAIChat({
     return models[0] ?? null;
   }, [models, selectedModelId]);
 
-  const resolvedCompressionOptions = useMemo<CompressionConfig | undefined>(() => {
+  const resolvedCompressionOptions = useMemo<
+    CompressionConfig | undefined
+  >(() => {
     if (!compressionOptions) {
       return compressionEnabled ? { enabled: true } : undefined;
     }
@@ -263,10 +280,7 @@ export function useAIChat({
       typeof modelThreshold === "number" &&
       Number.isFinite(modelThreshold)
     ) {
-      base.compressionThreshold = Math.min(
-        Math.max(modelThreshold, 0),
-        1
-      );
+      base.compressionThreshold = Math.min(Math.max(modelThreshold, 0), 1);
     }
 
     return base;
@@ -307,7 +321,8 @@ export function useAIChat({
           model.label === incoming.label &&
           model.description === incoming.description &&
           model.contextWindowTokens === incoming.contextWindowTokens &&
-          model.contextCompressionThreshold === incoming.contextCompressionThreshold
+          model.contextCompressionThreshold ===
+            incoming.contextCompressionThreshold
         );
       });
 
@@ -364,10 +379,7 @@ export function useAIChat({
       ...compressionModelMetadata,
       lastUpdatedAt: Date.now(),
     });
-  }, [
-    compressionModelMetadata,
-    setCompressionModelMetadata,
-  ]);
+  }, [compressionModelMetadata, setCompressionModelMetadata]);
 
   const setModel = React.useCallback((modelId: string) => {
     useAIModelsStore.getState().setSelectedModelId(modelId);
@@ -502,7 +514,9 @@ export function useAIChat({
             await state.loadThreadMetas(scope);
           } catch (error) {
             logDevError(
-              `[acb][useAIChat] failed to load thread metadata before selecting default thread (scope "${scope ?? "(default)"}")`,
+              `[acb][useAIChat] failed to load thread metadata before selecting default thread (scope "${
+                scope ?? "(default)"
+              }")`,
               error
             );
           }
@@ -825,6 +839,7 @@ export function useAIChat({
 
   // Create refs to access chat functions without causing re-renders
   const chatHookRef = useRef<ChatHelpers | null>(null);
+  const suggestionsFinishRef = useRef<(() => void) | null>(null);
 
   const chatHook = useChat({
     transport: chatTransport,
@@ -846,6 +861,7 @@ export function useAIChat({
       }
     },
     onFinish: () => {
+      suggestionsFinishRef.current?.();
       // Persist updated messages into thread (if any)
       if (threadStore) {
         try {
@@ -969,9 +985,10 @@ export function useAIChat({
 
   const baseCompressionActions = baseCompressionController.actions;
 
-  const getLatestChat = useCallback(() => chatHookRef.current ?? chatHook, [
-    chatHook,
-  ]);
+  const getLatestChat = useCallback(
+    () => chatHookRef.current ?? chatHook,
+    [chatHook]
+  );
 
   const resetErrorState = useCallback(() => {
     setError(null);
@@ -1220,9 +1237,8 @@ export function useAIChat({
       return;
     }
 
-    lastHydratedCompressionRef.current = clonePersistedCompressionState(
-      persisted
-    );
+    lastHydratedCompressionRef.current =
+      clonePersistedCompressionState(persisted);
 
     const compressionStore = useAICompressionStore.getState();
 
@@ -1300,7 +1316,9 @@ export function useAIChat({
       .map((message, index) => {
         const idPart = message.id ?? `idx-${index}`;
         const rolePart = message.role ?? "unknown";
-        const partCount = Array.isArray(message.parts) ? message.parts.length : 0;
+        const partCount = Array.isArray(message.parts)
+          ? message.parts.length
+          : 0;
         return `${idPart}:${rolePart}:${partCount}`;
       })
       .join("|");
@@ -1330,7 +1348,8 @@ export function useAIChat({
     });
 
     const usageChanged = hasMeaningfulUsageChange(store.usage, result.usage);
-    const shouldCompressChanged = store.shouldCompress !== result.shouldCompress;
+    const shouldCompressChanged =
+      store.shouldCompress !== result.shouldCompress;
     const overBudgetChanged = store.overBudget !== result.overBudget;
 
     if (!usageChanged && !shouldCompressChanged && !overBudgetChanged) {
@@ -1376,11 +1395,9 @@ export function useAIChat({
 
       if (effectiveThreadId) {
         try {
-          threadStore
-            .getState()
-            .updateThreadMetadata(effectiveThreadId, {
-              [COMPRESSION_THREAD_METADATA_KEY]: null,
-            });
+          threadStore.getState().updateThreadMetadata(effectiveThreadId, {
+            [COMPRESSION_THREAD_METADATA_KEY]: null,
+          });
         } catch (error) {
           logDevError(
             `[acb][useAIChat] failed to clear compression metadata for thread "${effectiveThreadId}"`,
@@ -1401,9 +1418,8 @@ export function useAIChat({
     }
 
     const normalizedPersisted = clonePersistedCompressionState(persisted);
-    lastPersistedCompressionRef.current = clonePersistedCompressionState(
-      normalizedPersisted
-    );
+    lastPersistedCompressionRef.current =
+      clonePersistedCompressionState(normalizedPersisted);
 
     let nextMessages = (chatHook.messages as UIMessage[]) ?? [];
     let changed = false;
@@ -1446,14 +1462,11 @@ export function useAIChat({
 
     if (effectiveThreadId) {
       try {
-        threadStore
-          .getState()
-          .updateThreadMetadata(effectiveThreadId, {
-            [COMPRESSION_THREAD_METADATA_KEY]: normalizedPersisted,
-          });
-        lastHydratedCompressionRef.current = clonePersistedCompressionState(
-          normalizedPersisted
-        );
+        threadStore.getState().updateThreadMetadata(effectiveThreadId, {
+          [COMPRESSION_THREAD_METADATA_KEY]: normalizedPersisted,
+        });
+        lastHydratedCompressionRef.current =
+          clonePersistedCompressionState(normalizedPersisted);
       } catch (error) {
         logDevError(
           `[acb][useAIChat] failed to persist compression metadata for thread "${effectiveThreadId}"`,
@@ -1622,6 +1635,14 @@ export function useAIChat({
     [threadId, resetErrorState, threadStore]
   );
 
+  const handleSuggestionSend = useCallback(
+    (suggestion: Suggestion) => {
+      if (!suggestion?.longSuggestion) return;
+      sendMessageWithContext(suggestion.longSuggestion);
+    },
+    [sendMessageWithContext]
+  );
+
   // Send AI command message with specific tool filtering
   const sendAICommandMessage = useCallback(
     (content: string, toolName: string, commandSystemPrompt?: string) => {
@@ -1737,6 +1758,33 @@ export function useAIChat({
     persistMessagesIfChanged,
   });
 
+  const deferredSuggestionMessages = useDeferredValue(chatHook.messages);
+  const {
+    suggestions: suggestionItems,
+    isLoading: suggestionsLoading,
+    error: suggestionsError,
+    fetchSuggestions,
+    clearSuggestions,
+    handleSuggestionClick: baseHandleSuggestionClick,
+    onAssistantFinish,
+  } = useSuggestions({
+    enabled: suggestionsEnabled,
+    prompt: suggestionsConfig?.prompt,
+    messages: deferredSuggestionMessages,
+    onSuggestionClick: handleSuggestionSend,
+    strategy: suggestionsConfig?.strategy,
+    debounceMs: suggestionsConfig?.debounceMs,
+    numSuggestions: suggestionsConfig?.count,
+    api: suggestionsConfig?.api,
+    fetcher: suggestionsConfig?.fetcher,
+  });
+
+  useEffect(() => {
+    suggestionsFinishRef.current = suggestionsEnabled
+      ? onAssistantFinish
+      : null;
+  }, [suggestionsEnabled, onAssistantFinish]);
+
   // Persist whenever messages settle and we are idle (not streaming/submitting)
   useEffect(() => {
     const effectiveId = threadId ?? storeActiveThreadId;
@@ -1792,5 +1840,15 @@ export function useAIChat({
           selectBranch: branching.selectBranch,
         } as const)
       : ({ enabled: false as const } as const),
+    suggestions: {
+      enabled: suggestionsEnabled,
+      items: suggestionItems,
+      count: suggestionCount,
+      isLoading: suggestionsLoading,
+      error: suggestionsError,
+      handleSuggestionClick: baseHandleSuggestionClick,
+      fetchSuggestions,
+      clearSuggestions,
+    },
   };
 }

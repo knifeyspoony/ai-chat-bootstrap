@@ -1,5 +1,5 @@
 import { GripVerticalIcon, MessageCircleIcon, XIcon } from "lucide-react";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChatContainer,
   type ChatContainerProps,
@@ -42,26 +42,12 @@ export interface ChatPopoutProps extends ChatContainerProps {
 
 export function ChatPopout(props: ChatPopoutProps) {
   const {
-    // AI configuration props (passed through to ChatContainer)
-    transport,
-    messages: messagesOptions,
-    features,
-    enableBranching,
-    mcp,
-    models: modelsOptions,
-    compression: compressionOptions,
-    devtools,
-    // UI configuration props
-    header,
-    ui,
-    suggestions: suggestionOptions,
-    commands: commandOptions,
-    threads: threadsOptions,
-    assistantActions: assistantActionOptions,
-    ["data-acb-unstyled"]: unstyledProp,
-    // Popout-specific props
     popout,
     button,
+    header,
+    ui,
+    ["data-acb-unstyled"]: unstyledProp,
+    ...chatContainerRest
   } = props;
 
   // Popout shell config with defaults
@@ -81,24 +67,24 @@ export function ChatPopout(props: ChatPopoutProps) {
   const blendEdgeStyle: React.CSSProperties | undefined = isChatUnstyled
     ? undefined
     : position === "right"
-      ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 }
-      : { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 };
+    ? { borderTopRightRadius: 0, borderBottomRightRadius: 0 }
+    : { borderTopLeftRadius: 0, borderBottomLeftRadius: 0 };
 
   const shellRadiusStyle: React.CSSProperties | undefined = isChatUnstyled
     ? undefined
     : position === "right"
-      ? {
-          borderTopRightRadius: 0,
-          borderBottomRightRadius: 0,
-          borderTopLeftRadius: "var(--acb-chat-container-radius)",
-          borderBottomLeftRadius: "var(--acb-chat-container-radius)",
-        }
-      : {
-          borderTopLeftRadius: 0,
-          borderBottomLeftRadius: 0,
-          borderTopRightRadius: "var(--acb-chat-container-radius)",
-          borderBottomRightRadius: "var(--acb-chat-container-radius)",
-        };
+    ? {
+        borderTopRightRadius: 0,
+        borderBottomRightRadius: 0,
+        borderTopLeftRadius: "var(--acb-chat-container-radius)",
+        borderBottomLeftRadius: "var(--acb-chat-container-radius)",
+      }
+    : {
+        borderTopLeftRadius: 0,
+        borderBottomLeftRadius: 0,
+        borderTopRightRadius: "var(--acb-chat-container-radius)",
+        borderBottomRightRadius: "var(--acb-chat-container-radius)",
+      };
 
   const headerEdgeClass = !isChatUnstyled
     ? position === "right"
@@ -111,16 +97,6 @@ export function ChatPopout(props: ChatPopoutProps) {
       ? "rounded-br-none"
       : "rounded-bl-none"
     : undefined;
-
-  const mergedFeatures = useMemo(() => {
-    if (enableBranching === undefined) {
-      return features;
-    }
-    return {
-      ...features,
-      branching: enableBranching,
-    } as ChatPopoutProps["features"];
-  }, [features, enableBranching]);
 
   // Button config with defaults
   const showToggleButton = button?.show ?? true;
@@ -139,7 +115,6 @@ export function ChatPopout(props: ChatPopoutProps) {
   const [isDragging, setIsDragging] = useState(false);
 
   const widthRef = useRef(defaultWidth);
-
 
   // Refs for resizing
   const popoutRef = useRef<HTMLDivElement>(null);
@@ -199,51 +174,39 @@ export function ChatPopout(props: ChatPopoutProps) {
   const getChatContainerProps = (
     includeContentClassInUI: boolean
   ): ChatContainerProps => ({
-    // Pass through AI configuration
-    transport,
-    messages: messagesOptions,
-    features: mergedFeatures,
-    enableBranching,
-    mcp,
-    models: modelsOptions,
-    compression: compressionOptions,
-    "data-acb-unstyled": unstyledProp,
-    devtools,
-      header: {
-        ...header,
-        className: cn(header?.className, headerEdgeClass),
-        actions: (
-          <>
-            {header?.actions}
-            <TooltipProvider delayDuration={200} skipDelayDuration={300}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsOpen(false)}
-                    className="ml-1 h-7 w-7"
-                    aria-label="Close chat"
-                  >
-                    <XIcon className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Close chat</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </>
-        ),
-      },
+    ...chatContainerRest,
+    header: {
+      ...(header ?? {}),
+      className: cn(header?.className, headerEdgeClass),
+      actions: (
+        <>
+          {header?.actions}
+          <TooltipProvider delayDuration={200} skipDelayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsOpen(false)}
+                  className="ml-1 h-7 w-7"
+                  aria-label="Close chat"
+                >
+                  <XIcon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Close chat</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </>
+      ),
+    },
     ui: {
       placeholder: ui?.placeholder,
       emptyState: ui?.emptyState,
       classes: {
         ...(ui?.classes ?? {}),
         header: cn(ui?.classes?.header, headerEdgeClass),
-        inputWrapper: cn(
-          ui?.classes?.inputWrapper,
-          inputWrapperEdgeClass
-        ),
+        inputWrapper: cn(ui?.classes?.inputWrapper, inputWrapperEdgeClass),
       },
       className: cn(
         "h-full",
@@ -254,16 +217,7 @@ export function ChatPopout(props: ChatPopoutProps) {
         ? { ...(ui?.style ?? {}), ...blendEdgeStyle }
         : ui?.style,
     },
-    suggestions: {
-      enabled: suggestionOptions?.enabled,
-      prompt: suggestionOptions?.prompt,
-      count: suggestionOptions?.count,
-    },
-    commands: {
-      enabled: commandOptions?.enabled,
-    },
-    threads: threadsOptions,
-    assistantActions: assistantActionOptions,
+    "data-acb-unstyled": unstyledProp,
   });
 
   // Handle resize drag
@@ -374,15 +328,15 @@ export function ChatPopout(props: ChatPopoutProps) {
             // side borders removed per request
             popoutClassName
           )}
-        style={{
-          width: effectiveIsOpen ? `${width}px` : "0px",
-          minWidth: effectiveIsOpen ? `${minWidth}px` : "0px",
-          maxWidth: effectiveIsOpen ? `${maxWidth}px` : "0px",
-          height: typeof height === "number" ? `${height}px` : height,
-          overflow: effectiveIsOpen ? "visible" : "hidden",
-          ...(shellRadiusStyle ?? {}),
-        }}
-      >
+          style={{
+            width: effectiveIsOpen ? `${width}px` : "0px",
+            minWidth: effectiveIsOpen ? `${minWidth}px` : "0px",
+            maxWidth: effectiveIsOpen ? `${maxWidth}px` : "0px",
+            height: typeof height === "number" ? `${height}px` : height,
+            overflow: effectiveIsOpen ? "visible" : "hidden",
+            ...(shellRadiusStyle ?? {}),
+          }}
+        >
           {/* Resize Handle for inline mode */}
           <div
             className={cn(

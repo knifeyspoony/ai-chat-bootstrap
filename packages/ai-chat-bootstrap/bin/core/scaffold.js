@@ -200,6 +200,7 @@ async function scaffold({ projectName, tailwindNative, localPath }) {
       "@ai-sdk/openai",
       "zod",
       "tw-animate-css",
+      "shiki@^3.12.2",
     ];
     try {
       execSync(`npm install ${deps.join(" ")}`, { stdio: "inherit" });

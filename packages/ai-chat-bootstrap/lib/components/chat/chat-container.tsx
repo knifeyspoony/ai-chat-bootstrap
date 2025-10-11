@@ -2,7 +2,6 @@ import type { UIMessage } from "ai";
 import React, {
   useCallback,
   useDeferredValue,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -19,7 +18,6 @@ import {
   type ThreadsOptions,
   type UseAIChatOptions,
 } from "../../hooks/use-ai-chat";
-import { useSuggestions } from "../../hooks/use-suggestions";
 import { useChatStore } from "../../stores/chat";
 import type { AssistantAction } from "../../types/actions";
 import type { Suggestion } from "../../types/chat";
@@ -29,8 +27,8 @@ import { logDevError } from "../../utils/dev-logger";
 import { ChatThreadsButton } from "./chat-threads-button";
 import { McpServersButton } from "./mcp-servers-button";
 
-import { ChatHeader } from "./chat-header";
 import { SheetPortalProvider } from "../ui/sheet-context";
+import { ChatHeader } from "./chat-header";
 
 // Lazily load the debug button (development only) so it is tree-shaken away in production
 const LazyChatDebugButton = React.lazy(async () =>
@@ -80,13 +78,6 @@ export interface ChatContainerProps extends UseAIChatOptions {
     style?: React.CSSProperties;
   };
 
-  // Suggestions group
-  suggestions?: {
-    enabled?: boolean;
-    prompt?: string;
-    count?: number;
-  };
-
   // Commands group
   commands?: {
     enabled?: boolean;
@@ -134,7 +125,6 @@ function ChatContainerView(props: ChatContainerViewProps) {
     chat,
     header,
     ui,
-    suggestions: suggestionOptions,
     commands: commandOptions,
     threads: threadsOptions,
     assistantActions: assistantActionOptions,
@@ -161,6 +151,7 @@ function ChatContainerView(props: ChatContainerViewProps) {
     regenerate,
     compression,
     clearError: clearChatError,
+    suggestions: suggestionsState,
   } = chat;
 
   // Ref to control scrolling programmatically
@@ -208,65 +199,24 @@ function ChatContainerView(props: ChatContainerViewProps) {
   );
 
   // Stable suggestion click handler
+  const baseSuggestionClick = suggestionsState?.handleSuggestionClick;
+  const suggestionItems = suggestionsState?.items ?? [];
+  const suggestionsEnabled = suggestionsState?.enabled ?? false;
+  const suggestionCount = suggestionsState?.count ?? 3;
+
   const handleSuggestionClick = useCallback(
     (suggestion: Suggestion) => {
-      sendMessageWithContext(suggestion.longSuggestion);
+      baseSuggestionClick?.(suggestion);
       // Scroll after next frame so message is rendered
       requestAnimationFrame(() => {
         messagesRef.current?.scrollToBottom();
       });
     },
-    [sendMessageWithContext]
+    [baseSuggestionClick]
   );
-
-  // Handle suggestions
-  const {
-    suggestions: generatedSuggestions,
-    handleSuggestionClick: suggestionClickHandler,
-    onAssistantFinish,
-  } = useSuggestions({
-    enabled: suggestionOptions?.enabled ?? false,
-    prompt: suggestionOptions?.prompt,
-    messages: deferredMessages, // Use deferred messages for suggestions
-    numSuggestions: suggestionOptions?.count,
-    onSuggestionClick: handleSuggestionClick,
-  });
-
-  const assistantMessageCount = useMemo(
-    () => messages.filter((message) => message.role === "assistant").length,
-    [messages]
-  );
-
-  const previousAssistantCountRef = useRef<number>(0);
-  useEffect(() => {
-    if (!suggestionOptions?.enabled) return;
-    if (assistantMessageCount === 0) return;
-
-    const previousCount = previousAssistantCountRef.current;
-    if (assistantMessageCount !== previousCount && !isLoading) {
-      onAssistantFinish();
-    }
-    previousAssistantCountRef.current = assistantMessageCount;
-  }, [
-    assistantMessageCount,
-    suggestionOptions?.enabled,
-    isLoading,
-    onAssistantFinish,
-  ]);
-
-  const previousIsLoadingRef = useRef<boolean>(isLoading);
-  useEffect(() => {
-    if (!suggestionOptions?.enabled) return;
-    const wasLoading = previousIsLoadingRef.current;
-    previousIsLoadingRef.current = isLoading;
-
-    if (wasLoading && !isLoading) {
-      onAssistantFinish();
-    }
-  }, [isLoading, suggestionOptions?.enabled, onAssistantFinish]);
 
   // Defer suggestions to avoid blocking input
-  const deferredSuggestions = useDeferredValue(generatedSuggestions);
+  const deferredSuggestions = useDeferredValue(suggestionItems);
 
   // Optimized store subscriptions - useAIFocus already uses useShallow internally
   const { allFocusItems, clearFocus } = useAIFocus();
@@ -428,10 +378,10 @@ function ChatContainerView(props: ChatContainerViewProps) {
             selectedModelId={model}
             onModelChange={setModel}
             // Suggestions props
-            enableSuggestions={suggestionOptions?.enabled}
+            enableSuggestions={suggestionsEnabled}
             suggestions={deferredSuggestions}
-            suggestionsCount={suggestionOptions?.count ?? 3}
-            onSuggestionClick={suggestionClickHandler}
+            suggestionsCount={suggestionCount}
+            onSuggestionClick={handleSuggestionClick}
             // Commands props
             enableCommands={commandOptions?.enabled}
             onCommandExecute={undefined}
@@ -459,6 +409,7 @@ function ChatContainerImpl(props: ChatContainerProps) {
     mcp,
     models: modelsOptions,
     compression: compressionOptions,
+    suggestions: suggestionsOptions,
     ...uiProps
   } = props;
 
@@ -480,9 +431,12 @@ function ChatContainerImpl(props: ChatContainerProps) {
     mcp,
     models: modelsOptions,
     compression: compressionOptions,
+    suggestions: suggestionsOptions,
   });
 
-  return <ChatContainerView {...uiProps} threads={threadsOptions} chat={chat} />;
+  return (
+    <ChatContainerView {...uiProps} threads={threadsOptions} chat={chat} />
+  );
 }
 
 // Optimized with React.memo to prevent re-renders during streaming

@@ -19,6 +19,7 @@ import type { AssistantActionsConfig } from "../../types/actions";
 import type { CompressionController, CompressionUsage } from "../../types/compression";
 import { normalizeCompressionConfig } from "../../types/compression";
 import { cn } from "../../utils";
+import type { ResponseProps } from "../ai-elements/response";
 import { AssistantMessage } from "./assistant-message";
 import { ChatMessagePinToggle } from "./chat-message-pin-toggle";
 import { ChatMessagePart } from "./chat-message-part";
@@ -120,6 +121,7 @@ export interface ChatMessagesProps {
       branchIndex: number
     ) => void;
   };
+  responseProps?: ResponseProps;
 }
 
 export interface ChatMessagesHandle {
@@ -157,6 +159,7 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
       assistantActionsConfig,
       compression,
       branching,
+      responseProps,
     },
     ref
   ) => {
@@ -328,6 +331,7 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                       actionsClassName={assistantActionsClassName}
                       actionsConfig={assistantActionsConfig}
                       branching={branching}
+                      responseProps={responseProps}
                       pinState={
                         canTogglePin
                           ? {
@@ -362,6 +366,7 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                     assistantAvatar={assistantAvatar}
                     userAvatar={userAvatar}
                     messageClassName={messageClassName}
+                    responseProps={responseProps}
                     pinState={
                       canTogglePin
                         ? {
@@ -435,6 +440,7 @@ interface ChatMessageItemProps {
     pinned: boolean;
     toggle: () => void;
   };
+  responseProps?: ResponseProps;
 }
 
 const ChatMessageItem = React.memo(
@@ -445,6 +451,7 @@ const ChatMessageItem = React.memo(
     userAvatar,
     messageClassName,
     pinState,
+    responseProps,
   }: ChatMessageItemProps) {
     const isUser = message.role === "user";
     const isSystem = message.role === "system";
@@ -525,6 +532,7 @@ const ChatMessageItem = React.memo(
                 key={partIndex}
                 part={part}
                 streaming={isStreaming}
+                responseProps={responseProps}
               />
             ))}
           </MessageContent>
@@ -561,7 +569,8 @@ const ChatMessageItem = React.memo(
     if (
       prev.message === next.message &&
       prev.isStreaming === next.isStreaming &&
-      prev.pinState?.pinned === next.pinState?.pinned
+      prev.pinState?.pinned === next.pinState?.pinned &&
+      prev.responseProps === next.responseProps
     )
       return true;
 
@@ -574,6 +583,7 @@ const ChatMessageItem = React.memo(
       prev.userAvatar === next.userAvatar &&
       prev.messageClassName === next.messageClassName &&
       prev.pinState?.pinned === next.pinState?.pinned &&
+      prev.responseProps === next.responseProps &&
       isEqual(prev.message.parts, next.message.parts)
     );
   }

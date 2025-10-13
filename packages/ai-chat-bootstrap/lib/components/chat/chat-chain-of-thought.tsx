@@ -45,6 +45,7 @@ function ChatChainOfThoughtImpl({
   isStreaming,
   isLastMessage,
   className,
+  responseProps,
 }: ChainOfThoughtProps) {
   // Parse message parts to extract chain of thought data
   // Memoized to prevent expensive processing on every render
@@ -177,6 +178,7 @@ function ChatChainOfThoughtImpl({
                         key={getPartKey(child, cidx)}
                         part={child}
                         streaming={isStreaming}
+                        responseProps={responseProps}
                       />
                     );
                   })}
@@ -193,6 +195,7 @@ function ChatChainOfThoughtImpl({
               key={getPartKey(part, idx)}
               part={part}
               streaming={isStreaming}
+              responseProps={responseProps}
             />
           ))}
         </div>
@@ -211,7 +214,8 @@ export const ChatChainOfThought = React.memo(
       prev.message === next.message &&
       prev.isStreaming === next.isStreaming &&
       prev.isLastMessage === next.isLastMessage &&
-      prev.className === next.className
+      prev.className === next.className &&
+      prev.responseProps === next.responseProps
     ) {
       return true;
     }

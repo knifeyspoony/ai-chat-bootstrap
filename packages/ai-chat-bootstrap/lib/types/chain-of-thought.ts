@@ -1,4 +1,5 @@
 import type { ToolUIPart, UIMessage } from "ai";
+import type { ResponseProps } from "../components/ai-elements/response";
 
 export const COT_START_CHAIN_TOOL_NAME = "acb_start_chain_of_thought";
 export const COT_START_STEP_TOOL_NAME = "acb_start_chain_of_thought_step";
@@ -49,6 +50,7 @@ export interface ChainOfThoughtProps {
   isStreaming: boolean;
   isLastMessage: boolean;
   className?: string;
+  responseProps?: ResponseProps;
 }
 
 // Extended message metadata to include chain-of-thought data

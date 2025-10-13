@@ -29,6 +29,7 @@ import { McpServersButton } from "./mcp-servers-button";
 
 import { SheetPortalProvider } from "../ui/sheet-context";
 import { ChatHeader } from "./chat-header";
+import type { ResponseProps } from "../ai-elements/response";
 
 // Lazily load the debug button (development only) so it is tree-shaken away in production
 const LazyChatDebugButton = React.lazy(async () =>
@@ -74,6 +75,7 @@ export interface ChatContainerProps extends UseAIChatOptions {
       assistantActions?: string;
       inputWrapper?: string;
     };
+    response?: ResponseProps;
     emptyState?: React.ReactNode;
     style?: React.CSSProperties;
   };
@@ -352,6 +354,7 @@ function ChatContainerView(props: ChatContainerViewProps) {
           assistantActionsConfig={assistantActionsConfig}
           compression={compression}
           branching={branching}
+          responseProps={ui?.response}
         />
 
         <div
@@ -512,6 +515,7 @@ export const ChatContainer = React.memo(ChatContainerImpl, (prev, next) => {
 
   if (prev.ui?.placeholder !== next.ui?.placeholder) return false;
   if (prev.ui?.className !== next.ui?.className) return false;
+  if (prev.ui?.response !== next.ui?.response) return false;
   if (prev.header?.title !== next.header?.title) return false;
   if (prev.header?.subtitle !== next.header?.subtitle) return false;
 

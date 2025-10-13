@@ -12,22 +12,29 @@ import { CompactReasoning } from "./elements/compact-reasoning";
 import { CompactResponse } from "./elements/compact-response";
 import { CompactSource } from "./elements/compact-source";
 import { CompactTool } from "./elements/compact-tool";
+import type { ResponseProps } from "../ai-elements/response";
 
 type AnyUIPart = UIMessage["parts"][number];
 
 function ChatMessagePartCompactImpl({
   part,
   streaming = false,
+  responseProps,
 }: {
   part: AnyUIPart;
   streaming?: boolean;
+  responseProps?: ResponseProps;
 }) {
   const getTool = useAIToolsStore((s) => s.getTool);
   void streaming;
 
   switch (part.type) {
     case "text":
-      return <CompactResponse>{part.text}</CompactResponse>;
+      return (
+        <CompactResponse {...(responseProps ?? {})}>
+          {part.text}
+        </CompactResponse>
+      );
 
     case "reasoning":
       return (
@@ -158,12 +165,14 @@ export const ChatMessagePartCompact = React.memo(
   (prev, next) => {
     if (
       prev.part === next.part &&
-      prev.streaming === next.streaming
+      prev.streaming === next.streaming &&
+      prev.responseProps === next.responseProps
     )
       return true;
 
     if (prev.part.type !== next.part.type) return false;
     if (prev.streaming !== next.streaming) return false;
+    if (prev.responseProps !== next.responseProps) return false;
 
     return isEqual(prev.part, next.part);
   }

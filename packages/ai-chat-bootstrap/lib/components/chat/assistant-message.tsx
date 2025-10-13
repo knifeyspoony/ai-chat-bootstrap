@@ -6,6 +6,7 @@ import {
   MessageAvatar,
   MessageContent,
 } from "../../components/ai-elements/message";
+import type { ResponseProps } from "../ai-elements/response";
 import { useAIBranchesStore } from "../../stores";
 import type { AssistantActionsConfig } from "../../types/actions";
 import { cn } from "../../utils";
@@ -48,6 +49,7 @@ interface AssistantMessageProps {
       branchIndex: number
     ) => void;
   };
+  responseProps?: ResponseProps;
 }
 
 const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
@@ -63,6 +65,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
   actionsConfig,
   pinState,
   branching,
+  responseProps,
 }) => {
   const branchingEnabled = branching?.enabled ?? false;
   const messageId = message.id;
@@ -119,6 +122,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
                 isStreaming={options.streaming}
                 isLastMessage={options.isLast}
                 className="w-full max-w-full"
+                responseProps={responseProps}
               />
             </div>
           )}
@@ -136,6 +140,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
                     key={partIndex}
                     part={part}
                     streaming={options.streaming}
+                    responseProps={responseProps}
                   />
                 ))}
               </MessageContent>
@@ -159,7 +164,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
         </div>
       );
     },
-    [handlePinPressedChange, pinState]
+    [handlePinPressedChange, pinState, responseProps]
   );
 
   const rawBranchEntries = useMemo(
@@ -435,7 +440,8 @@ export const AssistantMessage = React.memo(
       prev.message === next.message &&
       prev.isStreaming === next.isStreaming &&
       prev.isLatestAssistant === next.isLatestAssistant &&
-      prev.pinState?.pinned === next.pinState?.pinned
+      prev.pinState?.pinned === next.pinState?.pinned &&
+      prev.responseProps === next.responseProps
     )
       return true;
 
@@ -452,6 +458,7 @@ export const AssistantMessage = React.memo(
       prev.latestActions === next.latestActions &&
       prev.actionsConfig === next.actionsConfig &&
       prev.pinState?.pinned === next.pinState?.pinned &&
+      prev.responseProps === next.responseProps &&
       isEqual(prev.message.parts, next.message.parts) &&
       isEqual(prev.message.metadata, next.message.metadata)
     );

@@ -13,6 +13,7 @@ import {
   ReasoningTrigger,
 } from "../../components/ai-elements/reasoning";
 import { Response } from "../../components/ai-elements/response";
+import type { ResponseProps } from "../ai-elements/response";
 import { Source } from "../../components/ai-elements/sources";
 import {
   Tool,
@@ -28,15 +29,20 @@ type AnyUIPart = UIMessage["parts"][number];
 function ChatMessagePartImpl({
   part,
   streaming = false,
+  responseProps,
 }: {
   part: AnyUIPart;
   streaming?: boolean;
+  responseProps?: ResponseProps;
 }) {
   const getTool = useAIToolsStore((s) => s.getTool);
 
   switch (part.type) {
     case "text":
-      return <Response>{part.text}</Response>;
+      return React.createElement(Response, {
+        ...(responseProps ?? {}),
+        children: part.text,
+      });
 
     case "reasoning":
       return (
@@ -179,11 +185,17 @@ function ChatMessagePartImpl({
 
 export const ChatMessagePart = React.memo(ChatMessagePartImpl, (prev, next) => {
   // Fast path: same reference
-  if (prev.part === next.part && prev.streaming === next.streaming) return true;
+  if (
+    prev.part === next.part &&
+    prev.streaming === next.streaming &&
+    prev.responseProps === next.responseProps
+  )
+    return true;
 
   // Type-specific comparisons
   if (prev.part.type !== next.part.type) return false;
   if (prev.streaming !== next.streaming) return false;
+  if (prev.responseProps !== next.responseProps) return false;
 
   // Deep compare the part content
   return isEqual(prev.part, next.part);

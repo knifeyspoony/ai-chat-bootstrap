@@ -208,6 +208,7 @@ export function ChatPopout(props: ChatPopoutProps) {
         header: cn(ui?.classes?.header, headerEdgeClass),
         inputWrapper: cn(ui?.classes?.inputWrapper, inputWrapperEdgeClass),
       },
+      response: ui?.response,
       className: cn(
         "h-full",
         ui?.className,

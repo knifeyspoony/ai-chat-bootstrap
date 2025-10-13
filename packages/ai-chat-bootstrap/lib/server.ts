@@ -21,6 +21,7 @@ export * from "./utils/token-utils";
 export type {
   MCPServerToolsRequest,
   MCPServerToolsResponse,
+  MCPServerToolError,
   SerializedMCPServer,
 } from "./stores/mcp";
 export { SuggestionsSchema } from "./types/chat";

@@ -1,10 +1,17 @@
-import { create } from "zustand";
 import { useMemo } from "react";
+import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
 export interface MCPToolSummary {
   name: string;
   description?: string;
+}
+
+export interface MCPServerToolError {
+  serverId: string;
+  serverName?: string;
+  url: string;
+  message: string;
 }
 
 export type MCPServerTransport =
@@ -52,7 +59,11 @@ interface MCPServersStore {
   unregisterServer: (id: string) => void;
   setServerLoading: (id: string, isLoading: boolean) => void;
   setServerError: (id: string, error: string | null) => void;
-  setServerTools: (id: string, tools: MCPToolSummary[]) => void;
+  setServerTools: (
+    id: string,
+    tools: MCPToolSummary[],
+    error?: string | null
+  ) => void;
   serializeServersForBackend: () => SerializedMCPServer[];
   getAllToolSummaries: () => MCPToolSummary[];
   setConfigurations: (servers: SerializedMCPServer[]) => void;
@@ -69,6 +80,7 @@ export interface MCPServerToolsRequest {
 
 export interface MCPServerToolsResponse {
   tools: MCPToolSummary[];
+  errors?: MCPServerToolError[];
   error?: string;
 }
 
@@ -148,15 +160,17 @@ export const useAIMCPServersStore = create<MCPServersStore>((set, get) => ({
     });
   },
 
-  setServerTools: (id, tools) => {
+  setServerTools: (id, tools, error) => {
     set((state) => {
       const current = state.servers.get(id);
       if (!current) return state;
+      const nextError =
+        error === undefined ? null : error === null ? null : error;
       const servers = new Map(state.servers);
       servers.set(id, {
         ...current,
         tools,
-        error: null,
+        error: nextError,
         isLoading: false,
         lastLoadedAt: Date.now(),
       });
@@ -205,7 +219,9 @@ export const useAIMCPServersStore = create<MCPServersStore>((set, get) => ({
 
   removeConfiguration: (id) => {
     set((state) => {
-      const configurations = state.configurations.filter((cfg) => cfg.id !== id);
+      const configurations = state.configurations.filter(
+        (cfg) => cfg.id !== id
+      );
       const servers = new Map(state.servers);
       servers.delete(id);
       return { configurations, servers };

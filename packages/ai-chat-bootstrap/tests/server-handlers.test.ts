@@ -441,6 +441,7 @@ describe("createMcpToolsHandler", () => {
     loadMcpToolsMock.mockResolvedValue({
       tools: {},
       toolSummaries: [{ name: "tool", description: "desc" }],
+      errors: [],
     });
 
     const handler = createMcpToolsHandler();
@@ -458,6 +459,7 @@ describe("createMcpToolsHandler", () => {
     );
 
     expect(loadMcpToolsMock).toHaveBeenCalled();
+    expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       tools: [{ name: "tool", description: "desc" }],
     });
@@ -474,5 +476,87 @@ describe("createMcpToolsHandler", () => {
     );
     expect(res.status).toBe(400);
     expect(loadMcpToolsMock).not.toHaveBeenCalled();
+  });
+
+  it("surfaces load errors in response", async () => {
+    loadMcpToolsMock.mockResolvedValue({
+      tools: {},
+      toolSummaries: [],
+      errors: [
+        {
+          serverId: "s",
+          serverName: "Server",
+          url: "http://example",
+          message: "boom",
+        },
+      ],
+    });
+
+    const handler = createMcpToolsHandler();
+    const res = await handler(
+      new Request("http://test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          server: {
+            id: "s",
+            name: "Server",
+            transport: { type: "sse", url: "http://example" },
+          },
+        }),
+      })
+    );
+
+    expect(res.status).toBe(207);
+    expect(await res.json()).toEqual({
+      tools: [],
+      errors: [
+        {
+          serverId: "s",
+          serverName: "Server",
+          url: "http://example",
+          message: "boom",
+        },
+      ],
+    });
+  });
+
+  it("forwards configured headers to the MCP descriptor", async () => {
+    loadMcpToolsMock.mockResolvedValue({
+      tools: {},
+      toolSummaries: [],
+      errors: [],
+    });
+
+    const handler = createMcpToolsHandler({
+      forwardHeaders: ["authorization", "x-custom"],
+    });
+    await handler(
+      new Request("http://test", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer token",
+          "X-Custom": "value",
+        },
+        body: JSON.stringify({
+          server: {
+            id: "s",
+            transport: { type: "sse", url: "http://example", headers: { foo: "bar" } },
+          },
+        }),
+      })
+    );
+
+    expect(loadMcpToolsMock).toHaveBeenCalledWith([
+      {
+        id: "s",
+        transport: {
+          type: "sse",
+          url: "http://example",
+          headers: { foo: "bar", authorization: "Bearer token", "x-custom": "value" },
+        },
+      },
+    ]);
   });
 });

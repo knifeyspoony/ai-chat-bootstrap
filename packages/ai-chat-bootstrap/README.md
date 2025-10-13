@@ -184,7 +184,7 @@ Available handlers:
 - `createThreadTitleHandler` - Auto thread titles
 - `createMcpToolsHandler` - MCP tool discovery bridge used by `useMCPServer`
 
-Each handler ships focused options; see the API docs for details. (`createMcpToolsHandler` only exposes an optional `onError` callback because MCP server descriptors are supplied by the client.)
+Each handler ships focused options; see the API docs for details. (`createMcpToolsHandler` lets you forward selected headers to the MCP transport and captures discovery errors so the UI can display failures.)
 
 ## Features
 

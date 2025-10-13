@@ -20,7 +20,7 @@ interface UseMCPServerOptions {
   headers?: Record<string, string>;
   name?: string;
   autoFetchTools?: boolean;
-  transportType?: "sse" | "ws";
+  transportType?: "sse" | "streamable-http";
   api?: string;
 }
 
@@ -39,15 +39,21 @@ interface UseMCPServerReturn {
 
 | Option | Type | Default | Description |
 | ------ | ---- | ------- | ----------- |
-| `url` | `string` | — | MCP server URL (SSE or WebSocket) – required |
+| `url` | `string` | — | MCP server URL (SSE or streamable HTTP) – required |
 | `id` | `string` | `url` | Override the identifier used in stores + API payloads |
 | `name` | `string` | `undefined` | Friendly server name shown in the UI |
 | `headers` | `Record<string,string>` | `{}` | Extra headers forwarded to the MCP transport |
-| `transportType` | `"sse" \| "ws"` | `"sse"` | Protocol used when connecting |
+| `transportType` | `"sse" \| "streamable-http"` | `"sse"` | Protocol used when connecting |
 | `api` | `string` | `"/api/mcp"` or `mcp.api` default | Endpoint invoked to fetch tool summaries |
 | `autoFetchTools` | `boolean` | `true` | Automatically call `refresh()` on mount |
 
 The hook registers the server with the internal MCP store on mount and unregisters it on unmount. Tool summaries are fetched by POSTing to the MCP bridge endpoint (use [`createMcpToolsHandler`](/api/server-templates/create-mcp-tools-handler)).
+
+### Discovery flow
+
+1. The browser supplies the MCP descriptor (URL, headers, name) and calls your bridge endpoint (`/api/mcp` by default).
+2. The bridge runs server-side, optionally merges additional headers (see `forwardHeaders` on `createMcpToolsHandler`), validates the MCP server, and returns the tool summaries plus any connection errors.
+3. `useMCPServer` stores the tool list locally. If the bridge returns an `errors` array or a top-level `error`, the hook sets `error` so your UI can display a warning while still exposing any tools that loaded successfully.
 
 ## Return value
 
@@ -93,3 +99,5 @@ function MCPDemo() {
 ```
 
 Pair this with [`createAIChatHandler`](/api/server-templates/create-ai-chat-handler) (set `mcpEnabled: true`) and a [`createMcpToolsHandler`](/api/server-templates/create-mcp-tools-handler) bridge to expose remote capability lists in the prompt and actions toolbar.
+
+If your clients need to send per-request auth headers, keep them out of the serialized descriptor and instead provide the header names in the server handler (`forwardHeaders: ["Authorization"]`). The handler merges those values into the transport just before connecting.

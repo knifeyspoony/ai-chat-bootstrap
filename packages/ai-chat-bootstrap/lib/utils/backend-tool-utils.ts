@@ -1,9 +1,10 @@
 import { jsonSchema } from "@ai-sdk/provider-utils";
-import { experimental_createMCPClient, tool } from "ai";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { experimental_createMCPClient, tool } from "ai";
 import type { EventSourceInitDict } from "eventsource";
 import type {
+  MCPServerToolError,
   MCPServerTransport,
   MCPToolSummary,
   SerializedMCPServer,
@@ -39,6 +40,7 @@ export function deserializeFrontendTools(serialized?: SerializedTool[] | null) {
 export interface LoadMcpToolsResult {
   tools: Record<string, BackendTool>;
   toolSummaries: MCPToolSummary[];
+  errors: MCPServerToolError[];
 }
 
 type ExperimentalMcpClient = Awaited<
@@ -165,11 +167,12 @@ export async function loadMcpTools(
   servers?: SerializedMCPServer[] | null
 ): Promise<LoadMcpToolsResult> {
   if (!servers || servers.length === 0) {
-    return { tools: {}, toolSummaries: [] };
+    return { tools: {}, toolSummaries: [], errors: [] };
   }
 
   const aggregated: Record<string, BackendTool> = {};
   const summaries: MCPToolSummary[] = [];
+  const failures: MCPServerToolError[] = [];
 
   for (const server of servers) {
     try {
@@ -186,8 +189,18 @@ export async function loadMcpTools(
         error
       );
       await invalidateClient(server.id);
+      const errorMessage =
+        error instanceof Error && typeof error.message === "string"
+          ? error.message
+          : "Failed to load MCP tools";
+      failures.push({
+        serverId: server.id,
+        serverName: server.name,
+        url: server.transport.url,
+        message: errorMessage,
+      });
     }
   }
 
-  return { tools: aggregated, toolSummaries: summaries };
+  return { tools: aggregated, toolSummaries: summaries, errors: failures };
 }

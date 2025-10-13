@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
   useAIMCPServersStore,
+  type MCPServerToolsResponse,
   type MCPServerTransport,
   type MCPToolSummary,
-  type MCPServerToolsResponse,
 } from "../stores";
 
 export interface UseMCPServerOptions {
@@ -83,7 +83,14 @@ export function useMCPServer(options: UseMCPServerOptions): UseMCPServerReturn {
     return () => {
       unregisterServer(serverId);
     };
-  }, [registerServer, unregisterServer, serverId, name, transport, configSignature]);
+  }, [
+    registerServer,
+    unregisterServer,
+    serverId,
+    name,
+    transport,
+    configSignature,
+  ]);
 
   const mountedRef = useRef(true);
   useEffect(() => {
@@ -112,12 +119,21 @@ export function useMCPServer(options: UseMCPServerOptions): UseMCPServerReturn {
         throw new Error(`Failed to load MCP tools: ${response.status}`);
       }
       const data: MCPServerToolsResponse = await response.json();
-      if (data.error) {
-        throw new Error(data.error);
-      }
       const summaries = Array.isArray(data.tools) ? data.tools : [];
+      const errorMessage =
+        Array.isArray(data.errors) && data.errors.length > 0
+          ? data.errors[0]?.message ?? "Failed to load MCP tools"
+          : data.error
+          ? typeof data.error === "string"
+            ? data.error
+            : "Failed to load MCP tools"
+          : null;
       if (mountedRef.current) {
-        setServerTools(serverId, summaries);
+        setServerTools(serverId, summaries, errorMessage ?? undefined);
+        if (errorMessage && summaries.length === 0) {
+          // Ensure the error is surfaced if no tools were updated.
+          setServerError(serverId, errorMessage);
+        }
       }
     } catch (error: unknown) {
       const message =

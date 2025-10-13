@@ -5,9 +5,20 @@ description: Minimal bridge endpoint used by the MCP client hooks to discover re
 
 # createMcpToolsHandler
 
-`createMcpToolsHandler` ships a ready-made POST handler that proxies a single Model Context Protocol (MCP) server descriptor from the frontend to the AI SDK MCP client. It returns only the tool summaries that the UI needs to display available MCP capabilities.
+`createMcpToolsHandler` ships a ready-made POST handler that proxies a single Model Context Protocol (MCP) server descriptor from the frontend to the AI SDK MCP client. It returns only the tool summaries that the UI needs to display available MCP capabilities and surfaces any discovery errors back to the caller.
 
 > This handler is typically paired with the `useMCPServer` hook on the client and `createAIChatHandler` on the backend. The client controls which MCP servers are queried; the backend only needs an endpoint that accepts those descriptors.
+
+## Why a bridge endpoint?
+
+MCP servers run wherever your data or tools live (for example, on an internal host or a SaaS vendor). Browsers cannot speak the MCP transports directly, so the UI calls `/api/mcp` on **your** backend instead. The bridge:
+
+- Receives the serialized MCP descriptor from the browser.
+- Optionally injects request headers (for auth or tenancy) that only the server should know.
+- Performs the MCP handshake inside Node.js to validate that the server is reachable and to list its tools.
+- Returns only the lightweight tool summaries that the UI needs until the next chat request.
+
+At runtime the chat handler will reconnect to the original MCP server URL when messages are streamed; `/api/mcp` is purely for discovery/validation.
 
 ## Import
 
@@ -24,6 +35,12 @@ interface CreateMcpToolsHandlerOptions {
    * or the MCP client throws during tool discovery.
    */
   onError?: (error: unknown, ctx: { req: Request }) => void;
+  /**
+   * Optionally copy selected HTTP headers from the incoming request onto the
+   * MCP transport config. Useful for forwarding bearer tokens or tenancy IDs
+   * supplied by the browser.
+   */
+  forwardHeaders?: string[];
 }
 
 declare function createMcpToolsHandler(
@@ -60,10 +77,16 @@ On success the handler returns:
 ```ts
 interface MCPServerToolsResponse {
   tools: Array<{ name: string; description?: string }>;
+  errors?: Array<{
+    serverId: string;
+    serverName?: string;
+    url: string;
+    message: string;
+  }>;
 }
 ```
 
-If the request is invalid or the MCP client fails, the response body is `{ error: string }` with status `400` or `500`.
+If every MCP query succeeds you receive a `200` response with populated `tools`. If one or more servers fail, the handler still returns `tools` that succeeded but includes the failure details in `errors` and responds with status `207` so the client can show a warning. Completely invalid requests (bad JSON, missing `server`) return `400`; unexpected crashes respond with `500` and `{ error: string }`.
 
 ## Example: Next.js App Router
 
@@ -75,6 +98,7 @@ const handler = createMcpToolsHandler({
   onError(error) {
     console.error("[mcp] failed to load tools", error);
   },
+  forwardHeaders: ["Authorization"],
 });
 
 export { handler as POST };
@@ -134,3 +158,5 @@ function DemoChat() {
 ```
 
 When a server is registered, the hook automatically POSTs the descriptor shown above to `/api/mcp`, stores the returned tool summaries, and exposes them to the chat UI. Those same summaries are merged into the enriched system prompt and forwarded to `createAIChatHandler`, which reconnects to the remote MCP servers during each chat request.
+
+If the bridge returns an `errors` array, `useMCPServer` records the message so the UI can surface which MCP servers failed discovery while still rendering any tools that loaded successfully.

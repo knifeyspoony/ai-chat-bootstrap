@@ -267,6 +267,7 @@ interface PureToolbarRightProps {
   suggestionsCount?: number;
   onSuggestionClick?: (suggestion: Suggestion) => void;
   compression?: CompressionController;
+  onStop?: () => void;
 }
 
 const PureToolbarRight = ({
@@ -278,10 +279,12 @@ const PureToolbarRight = ({
   suggestionsCount = 3,
   onSuggestionClick,
   compression,
+  onStop,
 }: PureToolbarRightProps) => {
   const hasCompressionArtifacts = Boolean(
     compression && (compression.artifacts.length > 0 || compression.snapshot)
   );
+  const showStop = status === "streaming" && typeof onStop === "function";
 
   return (
     <div className="flex items-center gap-1">
@@ -299,7 +302,19 @@ const PureToolbarRight = ({
 
       <PromptInputSubmit
         status={status}
-        disabled={submitDisabled || !hasContent}
+        disabled={showStop ? false : submitDisabled || !hasContent}
+        onClick={
+          showStop
+            ? (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onStop();
+              }
+            : undefined
+        }
+        type={showStop ? "button" : undefined}
+        aria-label={showStop ? "Stop response" : undefined}
+        title={showStop ? "Stop response" : undefined}
       />
     </div>
   );
@@ -323,9 +338,10 @@ export interface ChatInputProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-  // onStop is handled by status now
   onAttach?: () => void;
   onRetry?: () => void;
+  /** Invoked when the stop button is pressed during streaming */
+  onStop?: () => void;
   placeholder?: string;
   disabled?: boolean;
   // Submit-specific disabled state (separate from general disabled)
@@ -369,6 +385,7 @@ const ChatInputImpl = ({
   models,
   selectedModelId,
   onModelChange,
+  onStop,
 
   // Suggestions props
   enableSuggestions = false,
@@ -541,6 +558,7 @@ const ChatInputImpl = ({
             suggestionsCount={suggestionsCount}
             onSuggestionClick={onSuggestionClick}
             compression={compression}
+            onStop={onStop}
           />
         </PromptInputToolbar>
       </PromptInput>

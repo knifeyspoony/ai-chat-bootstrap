@@ -154,6 +154,7 @@ function ChatContainerView(props: ChatContainerViewProps) {
     compression,
     clearError: clearChatError,
     suggestions: suggestionsState,
+    stop,
   } = chat;
 
   // Ref to control scrolling programmatically
@@ -376,6 +377,7 @@ function ChatContainerView(props: ChatContainerViewProps) {
             // Submit is disabled when actually loading (not just streaming)
             submitDisabled={isLoading}
             status={status}
+            onStop={stop}
             className={ui?.classes?.input}
             models={models}
             selectedModelId={model}

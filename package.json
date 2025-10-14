@@ -1,6 +1,6 @@
 {
   "name": "ai-chat-bootstrap-workspace",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "private": true,
   "description": "Monorepo for AI Chat Bootstrap library and demo",
   "scripts": {

@@ -284,7 +284,10 @@ const PureToolbarRight = ({
   const hasCompressionArtifacts = Boolean(
     compression && (compression.artifacts.length > 0 || compression.snapshot)
   );
-  const showStop = status === "streaming" && typeof onStop === "function";
+  const canStop = status === "streaming" || status === "submitted";
+  const showStop = canStop && typeof onStop === "function";
+  const submitStatus =
+    showStop && status === "submitted" ? ("streaming" as ChatStatus) : status;
 
   return (
     <div className="flex items-center gap-1">
@@ -301,7 +304,7 @@ const PureToolbarRight = ({
       )}
 
       <PromptInputSubmit
-        status={status}
+        status={submitStatus}
         disabled={showStop ? false : submitDisabled || !hasContent}
         onClick={
           showStop

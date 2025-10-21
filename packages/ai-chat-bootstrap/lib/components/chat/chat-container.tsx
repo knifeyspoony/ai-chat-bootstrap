@@ -78,6 +78,8 @@ export interface ChatContainerProps extends UseAIChatOptions {
     response?: ResponseProps;
     emptyState?: React.ReactNode;
     style?: React.CSSProperties;
+    assistantAvatar?: string | React.ReactNode;
+    userAvatar?: string | React.ReactNode;
   };
 
   // Commands group
@@ -356,6 +358,8 @@ function ChatContainerView(props: ChatContainerViewProps) {
           compression={compression}
           branching={branching}
           responseProps={ui?.response}
+          assistantAvatar={ui?.assistantAvatar}
+          userAvatar={ui?.userAvatar}
         />
 
         <div

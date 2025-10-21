@@ -5,6 +5,7 @@ const meta = {
   "tool-result-rendering": "Tool Result Rendering",
   "ai-context": "Sharing Context",
   compression: "Compression",
+  "mcp-servers": "MCP Servers",
 };
 
 export default meta;

@@ -102,8 +102,8 @@ function buildCompressionSummary(systemText?: string | null): string | null {
 
 export interface ChatMessagesProps {
   messages: UIMessage[];
-  assistantAvatar?: string;
-  userAvatar?: string;
+  assistantAvatar?: string | React.ReactNode;
+  userAvatar?: string | React.ReactNode;
   isLoading?: boolean;
   className?: string;
   messageClassName?: string;

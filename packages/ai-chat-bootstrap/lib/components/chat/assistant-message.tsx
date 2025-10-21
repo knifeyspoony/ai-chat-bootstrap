@@ -29,7 +29,7 @@ import { ChatMessagePinToggle } from "./chat-message-pin-toggle";
 interface AssistantMessageProps {
   message: UIMessage;
   isStreaming: boolean;
-  assistantAvatar?: string;
+  assistantAvatar?: string | React.ReactNode;
   messageClassName?: string;
   isLastMessage?: boolean;
   actions?: React.ReactNode;

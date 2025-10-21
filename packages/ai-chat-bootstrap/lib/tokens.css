@@ -47,9 +47,6 @@
   --acb-chat-message-radius: var(--radius);
   --acb-chat-input-wrapper-bg: oklch(from var(--background) l c h / 0.5);
   --acb-chat-input-wrapper-border: var(--secondary);
-  --acb-chat-input-bg: var(--background);
-  --acb-chat-input-border: var(--input);
-  --acb-chat-input-fg: var(--foreground);
   --acb-chat-input-toolbar-bg: var(--background);
   --acb-chat-input-toolbar-border: var(--border);
   --acb-scrollbar-track: var(--border);
@@ -81,9 +78,9 @@
   --acb-code-border: var(--border);
   --acb-code-radius: calc(var(--radius) - 2px);
   --acb-code-line-number-fg: var(--muted-foreground);
-  --acb-prompt-border: var(--acb-chat-input-border);
-  --acb-prompt-bg: var(--acb-chat-input-bg);
-  --acb-prompt-fg: var(--acb-chat-input-fg);
+  --acb-prompt-border: var(--border);
+  --acb-prompt-bg: var(--background);
+  --acb-prompt-fg: var(--foreground);
 }
 
 /* Dark-only hook adjustments. */

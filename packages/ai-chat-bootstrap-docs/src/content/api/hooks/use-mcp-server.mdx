@@ -44,14 +44,14 @@ interface UseMCPServerReturn {
 | `name` | `string` | `undefined` | Friendly server name shown in the UI |
 | `headers` | `Record<string,string>` | `{}` | Extra headers forwarded to the MCP transport |
 | `transportType` | `"sse" \| "streamable-http"` | `"sse"` | Protocol used when connecting |
-| `api` | `string` | `"/api/mcp"` or `mcp.api` default | Endpoint invoked to fetch tool summaries |
+| `api` | `string` | `"/api/mcp-discovery"` or `mcp.api` default | Endpoint invoked to fetch tool summaries |
 | `autoFetchTools` | `boolean` | `true` | Automatically call `refresh()` on mount |
 
 The hook registers the server with the internal MCP store on mount and unregisters it on unmount. Tool summaries are fetched by POSTing to the MCP bridge endpoint (use [`createMcpToolsHandler`](/api/server-templates/create-mcp-tools-handler)).
 
 ### Discovery flow
 
-1. The browser supplies the MCP descriptor (URL, headers, name) and calls your bridge endpoint (`/api/mcp` by default).
+1. The browser supplies the MCP descriptor (URL, headers, name) and calls your bridge endpoint (`/api/mcp-discovery` by default).
 2. The bridge runs server-side, optionally merges additional headers (see `forwardHeaders` on `createMcpToolsHandler`), validates the MCP server, and returns the tool summaries plus any connection errors.
 3. `useMCPServer` stores the tool list locally. If the bridge returns an `errors` array or a top-level `error`, the hook sets `error` so your UI can display a warning while still exposing any tools that loaded successfully.
 
@@ -91,7 +91,7 @@ function MCPDemo() {
 
       <ChatContainer
         transport={{ api: "/api/chat" }}
-        mcp={{ enabled: true, api: "/api/mcp" }}
+        mcp={{ enabled: true, api: "/api/mcp-discovery" }}
       />
     </div>
   );

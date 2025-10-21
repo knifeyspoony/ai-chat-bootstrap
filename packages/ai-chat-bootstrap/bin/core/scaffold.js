@@ -260,7 +260,7 @@ async function scaffold({ projectName, tailwindNative, localPath }) {
     const tmplDir = path.join(__dirname, "templates");
     const apiChatDir = path.join("src", "app", "api", "chat");
     const apiSugDir = path.join("src", "app", "api", "suggestions");
-    const apiMcpDir = path.join("src", "app", "api", "mcp");
+    const apiMcpDir = path.join("src", "app", "api", "mcp-discovery");
     const apiThreadTitleDir = path.join("src", "app", "api", "thread-title");
     const apiCompressionDir = path.join("src", "app", "api", "compression");
     fs.mkdirSync(apiChatDir, { recursive: true });

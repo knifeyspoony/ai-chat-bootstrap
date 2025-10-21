@@ -32,5 +32,77 @@ describe('buildEnrichedSystemPrompt', () => {
     expect(text).not.toMatch(/## Context/);
     expect(text).not.toMatch(/## Focus/);
   });
+
+  it('includes MCP explanation when MCP tools are present', () => {
+    const text = buildEnrichedSystemPrompt({
+      tools: [
+        { name: 'local-tool', description: 'A local tool', source: 'frontend' },
+        { name: 'mcp-tool', description: 'An MCP tool', source: 'mcp' },
+      ],
+    });
+
+    expect(text).toMatch(/## Tools/);
+    expect(text).toMatch(/Model Context Protocol/);
+    expect(text).toMatch(/MCP.*an open standard/i);
+    expect(text).toMatch(/\[MCP\] \*\*mcp-tool\*\*: An MCP tool/);
+  });
+
+  it('does not include MCP explanation when only frontend tools', () => {
+    const text = buildEnrichedSystemPrompt({
+      tools: [
+        { name: 'local-tool', description: 'A local tool', source: 'frontend' },
+      ],
+    });
+
+    expect(text).toMatch(/## Tools/);
+    expect(text).not.toMatch(/Model Context Protocol/);
+    expect(text).not.toMatch(/\[MCP\]/);
+    expect(text).toMatch(/\*\*local-tool\*\*: A local tool/);
+  });
+
+  it('marks MCP tools with [MCP] prefix', () => {
+    const text = buildEnrichedSystemPrompt({
+      tools: [
+        { name: 'tool1', description: 'Frontend tool', source: 'frontend' },
+        { name: 'tool2', description: 'MCP tool 1', source: 'mcp' },
+        { name: 'tool3', description: 'MCP tool 2', source: 'mcp' },
+        { name: 'tool4', description: 'Backend tool' }, // no source specified
+      ],
+    });
+
+    expect(text).toMatch(/- \*\*tool1\*\*: Frontend tool/);
+    expect(text).toMatch(/- \[MCP\] \*\*tool2\*\*: MCP tool 1/);
+    expect(text).toMatch(/- \[MCP\] \*\*tool3\*\*: MCP tool 2/);
+    expect(text).toMatch(/- \*\*tool4\*\*: Backend tool/);
+  });
+
+  it('includes MCP mention in initial preamble', () => {
+    const text = buildEnrichedSystemPrompt({
+      tools: [{ name: 'mcp-tool', source: 'mcp' }],
+    });
+
+    expect(text).toMatch(/Model Context Protocol.*connects you to external data sources/);
+  });
+
+  it('handles tools without descriptions', () => {
+    const text = buildEnrichedSystemPrompt({
+      tools: [
+        { name: 'tool-no-desc', source: 'mcp' },
+      ],
+    });
+
+    expect(text).toMatch(/\[MCP\] \*\*tool-no-desc\*\*/);
+  });
+
+  it('handles custom tool sources', () => {
+    const text = buildEnrichedSystemPrompt({
+      tools: [
+        { name: 'custom-tool', description: 'Custom source', source: 'custom-source' },
+      ],
+    });
+
+    expect(text).not.toMatch(/\[MCP\]/);
+    expect(text).toMatch(/\*\*custom-tool\*\*: Custom source/);
+  });
 });
 

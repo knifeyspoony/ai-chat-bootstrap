@@ -103,7 +103,7 @@ export function useMCPServer(options: UseMCPServerOptions): UseMCPServerReturn {
     setServerLoading(serverId, true);
     setServerError(serverId, null);
     try {
-      const targetApi = api ?? defaultApi ?? "/api/mcp";
+      const targetApi = api ?? defaultApi ?? "/api/mcp-discovery";
       const response = await fetch(targetApi, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

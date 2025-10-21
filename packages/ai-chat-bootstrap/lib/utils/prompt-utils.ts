@@ -67,7 +67,7 @@ export function buildEnrichedSystemPrompt(
   // Always start with a concise capability declaration (markdown heading).
   lines.push(
     "# Enhanced Chat System\n",
-    "You are an assistant who operates within an application that can optionally provide structured application context, user focus selections, and callable tools. Use these capabilities to give more accurate, grounded, and actionable responses.\n"
+    "You are an assistant who operates within an application that can optionally provide structured application context, user focus selections, and callable tools (including tools from MCP servers via the Model Context Protocol, which connects you to external data sources and services). Use these capabilities to give more accurate, grounded, and actionable responses.\n"
   );
 
   if (chainOfThoughtEnabled) {

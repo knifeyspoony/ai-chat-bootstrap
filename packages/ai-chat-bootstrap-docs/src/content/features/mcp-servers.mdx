@@ -1,0 +1,338 @@
+---
+title: MCP Servers
+description: Connect your AI assistant to external data sources and services using the Model Context Protocol (MCP).
+---
+
+import { Api as API } from "../../components/ApiLink";
+
+# Configuring MCP Servers
+
+The **Model Context Protocol (MCP)** is an open standard that allows AI assistants to securely connect to external data sources and services. MCP enables your chat assistant to access real-time information, interact with APIs, query databases, and perform actions across various systems.
+
+AI Chat Bootstrap provides full support for MCP through the <API name="useMCPServer">useMCPServer</API> hook and <API name="createMcpToolsHandler">createMcpToolsHandler</API> server handler.
+
+## How MCP Works
+
+MCP servers expose **tools** (functions) that the AI can discover and invoke. When you configure an MCP server:
+
+1. The client registers the server with <API name="useMCPServer">useMCPServer</API>
+2. The hook fetches available tools from your backend via `/api/mcp-discovery`
+3. The backend connects to the MCP server and returns tool summaries
+4. Tools are automatically included in the AI's system prompt
+5. When the AI needs to use a tool, it calls your chat API
+6. The backend executes the tool via MCP and returns the result
+
+## Quick Start
+
+### 1. Set up the MCP Discovery Endpoint
+
+The scaffold automatically creates `/api/mcp-discovery/route.ts`:
+
+```ts
+import { createMcpToolsHandler } from "ai-chat-bootstrap/server";
+
+const handler = createMcpToolsHandler({
+  onError: (error) => {
+    console.error("[mcp-api]", error);
+  },
+});
+
+export { handler as POST };
+```
+
+This endpoint receives MCP server configurations from the client and returns available tools.
+
+### 2. Register an MCP Server on the Client
+
+Use <API name="useMCPServer">useMCPServer</API> to connect to an MCP server:
+
+```tsx
+"use client";
+import { ChatContainer, useMCPServer } from "ai-chat-bootstrap";
+
+export function ChatWithMCP() {
+  const mcpServer = useMCPServer({
+    url: "http://localhost:3030/mcp",
+    name: "Local Tools",
+    transportType: "sse", // or "streamable-http"
+  });
+
+  return (
+    <div>
+      {mcpServer.isLoading && <p>Loading MCP tools...</p>}
+      {mcpServer.error && <p>Error: {mcpServer.error}</p>}
+      {mcpServer.tools.length > 0 && (
+        <p>{mcpServer.tools.length} tools available</p>
+      )}
+
+      <ChatContainer
+        transport={{ api: "/api/chat" }}
+        mcp={{ enabled: true, api: "/api/mcp-discovery" }}
+      />
+    </div>
+  );
+}
+```
+
+### 3. Enable MCP in Your Chat Handler
+
+Make sure your chat handler has MCP enabled:
+
+```ts
+import { createAIChatHandler } from "ai-chat-bootstrap/server";
+import { openai } from "@ai-sdk/openai";
+
+const handler = createAIChatHandler({
+  model: openai("gpt-4o"),
+  mcpEnabled: true, // Important!
+});
+
+export { handler as POST };
+```
+
+## Configuration Options
+
+### useMCPServer Options
+
+| Option | Type | Default | Description |
+| ------ | ---- | ------- | ----------- |
+| `url` | `string` | — | MCP server URL (required) |
+| `name` | `string` | `undefined` | Friendly server name shown in UI |
+| `transportType` | `"sse"` \| `"streamable-http"` | `"sse"` | Protocol for connecting to MCP server |
+| `headers` | `Record<string, string>` | `{}` | Extra headers forwarded to the MCP server |
+| `api` | `string` | `"/api/mcp-discovery"` | Your backend discovery endpoint |
+| `autoFetchTools` | `boolean` | `true` | Automatically fetch tools on mount |
+| `id` | `string` | `url` | Override the server identifier |
+
+## Multiple MCP Servers
+
+You can connect to multiple MCP servers simultaneously:
+
+```tsx
+function MultiMCPChat() {
+  const weatherServer = useMCPServer({
+    url: "http://localhost:3030/mcp",
+    name: "Weather Tools",
+  });
+
+  const databaseServer = useMCPServer({
+    url: "http://localhost:3031/mcp",
+    name: "Database Tools",
+  });
+
+  return (
+    <div>
+      <div className="space-y-2 mb-4">
+        <ServerStatus server={weatherServer} />
+        <ServerStatus server={databaseServer} />
+      </div>
+
+      <ChatContainer
+        transport={{ api: "/api/chat" }}
+        mcp={{ enabled: true }}
+      />
+    </div>
+  );
+}
+
+function ServerStatus({ server }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="font-medium">{server.name}:</span>
+      {server.isLoading ? (
+        <span>Loading...</span>
+      ) : server.error ? (
+        <span className="text-red-500">{server.error}</span>
+      ) : (
+        <span className="text-green-500">
+          {server.tools.length} tools available
+        </span>
+      )}
+      {server.error && (
+        <button onClick={server.refresh} className="underline">
+          Retry
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+## Authentication & Headers
+
+### Client-Side Headers
+
+Pass headers that are safe to expose on the client:
+
+```tsx
+useMCPServer({
+  url: "https://api.example.com/mcp",
+  headers: {
+    "X-Client-Version": "1.0.0",
+  },
+});
+```
+
+### Server-Side Headers (Secure)
+
+For sensitive credentials, use `forwardHeaders` in your MCP handler to inject server-side environment variables:
+
+```ts
+// /api/mcp-discovery/route.ts
+import { createMcpToolsHandler } from "ai-chat-bootstrap/server";
+
+const handler = createMcpToolsHandler({
+  forwardHeaders: ["authorization"],
+  onError: (error) => {
+    console.error("[mcp-api]", error);
+  },
+});
+
+export { handler as POST };
+```
+
+Then set the header in your request middleware or pass it from your chat API.
+
+## Environment Variables
+
+MCP server URLs can be configured via environment variables:
+
+```env
+# .env.local
+NEXT_PUBLIC_MCP_SERVER_URL=http://localhost:3030/mcp
+MCP_API_KEY=your-secret-key
+```
+
+```tsx
+useMCPServer({
+  url: process.env.NEXT_PUBLIC_MCP_SERVER_URL!,
+  name: "Local Tools",
+});
+```
+
+## Tool Discovery & Prompts
+
+When MCP servers are registered, their tools are automatically:
+
+1. **Listed in the system prompt** with `[MCP]` badges
+2. **Available for the AI to invoke** via the standard tool calling mechanism
+3. **Executed server-side** through the MCP transport
+
+The AI receives information like:
+
+```
+## Tools
+
+**Model Context Protocol (MCP)**: Some tools are provided via MCP, an open
+standard that allows AI assistants to securely connect to external data sources
+and services. MCP tools enable you to access real-time information, interact
+with APIs, query databases, and perform actions across various systems.
+
+**Available MCP Tools:**
+- **weather_get_forecast**: Get weather forecast for a location
+- **database_query**: Execute a read-only database query
+- **file_read**: Read contents of a file
+```
+
+## Error Handling
+
+The <API name="useMCPServer">useMCPServer</API> hook provides error state management:
+
+```tsx
+const server = useMCPServer({ url: "..." });
+
+if (server.error) {
+  return (
+    <div className="error-banner">
+      <p>Failed to connect to MCP server: {server.error}</p>
+      <button onClick={server.refresh}>Retry Connection</button>
+    </div>
+  );
+}
+```
+
+### Partial Tool Loading
+
+Even if some tools fail to load, successfully loaded tools will still be available:
+
+```tsx
+// Server returns:
+// { tools: [tool1, tool2], errors: [{ message: "tool3 failed" }] }
+
+// The hook will:
+// - Set tools to [tool1, tool2]
+// - Set error to "tool3 failed"
+// - Allow the chat to continue with available tools
+```
+
+## Dynamic Server Configuration
+
+Let users configure MCP servers at runtime:
+
+```tsx
+"use client";
+import { useState } from "react";
+import { ChatContainer, useMCPServer } from "ai-chat-bootstrap";
+
+export function DynamicMCPChat() {
+  const [serverUrl, setServerUrl] = useState("");
+  const [enabledServers, setEnabledServers] = useState<string[]>([]);
+
+  return (
+    <div>
+      <div className="mb-4">
+        <input
+          type="text"
+          value={serverUrl}
+          onChange={(e) => setServerUrl(e.target.value)}
+          placeholder="Enter MCP server URL"
+        />
+        <button
+          onClick={() => {
+            if (serverUrl) {
+              setEnabledServers([...enabledServers, serverUrl]);
+              setServerUrl("");
+            }
+          }}
+        >
+          Add Server
+        </button>
+      </div>
+
+      {enabledServers.map((url) => (
+        <MCPServerConnection key={url} url={url} />
+      ))}
+
+      <ChatContainer
+        transport={{ api: "/api/chat" }}
+        mcp={{ enabled: true }}
+      />
+    </div>
+  );
+}
+
+function MCPServerConnection({ url }: { url: string }) {
+  const server = useMCPServer({ url });
+  return <div>Connected to {url}</div>;
+}
+```
+
+## Best Practices
+
+1. **Use environment variables** for MCP server URLs in production
+2. **Handle errors gracefully** - show retry buttons and clear error messages
+3. **Keep credentials server-side** - use `forwardHeaders` for sensitive data
+4. **Test tool discovery** - verify tools load correctly before deploying
+5. **Monitor performance** - MCP calls add latency to tool execution
+6. **Document available tools** - help users understand what MCP tools can do
+
+## Related Documentation
+
+- <API name="useMCPServer">useMCPServer Hook</API>
+- <API name="createMcpToolsHandler">createMcpToolsHandler Server Handler</API>
+- <API name="createAIChatHandler">createAIChatHandler (mcpEnabled option)</API>
+
+## Learn More
+
+- [Model Context Protocol Specification](https://modelcontextprotocol.io)
+- [MCP Server Implementations](https://github.com/modelcontextprotocol)

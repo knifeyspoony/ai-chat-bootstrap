@@ -90,7 +90,7 @@ export default function Page() {
         }}
         models={{ available: MODEL_OPTIONS, initial: DEFAULT_MODEL_ID }}
         compression={COMPRESSION_CONFIG}
-        mcp={{ enabled: true, api: "/api/mcp" }}
+        mcp={{ enabled: true, api: "/api/mcp-discovery" }}
         suggestions={{ enabled: true, count: 3, api: "/api/suggestions" }}
         commands={{ enabled: true }}
         button={{ label: "Open Chat" }}

@@ -87,7 +87,7 @@ export interface MCPServerToolsResponse {
 export const useAIMCPServersStore = create<MCPServersStore>((set, get) => ({
   servers: new Map<string, MCPServerEntry>(),
   configurations: [],
-  defaultApi: "/api/mcp",
+  defaultApi: "/api/mcp-discovery",
   enabled: false,
 
   registerServer: ({ id, name, transport, configSignature }) => {

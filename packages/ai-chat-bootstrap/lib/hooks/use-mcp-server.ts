@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
   useAIMCPServersStore,
-  type MCPServerToolsResponse,
   type MCPServerTransport,
   type MCPToolSummary,
 } from "../stores";
+import { fetchMCPServerTools } from "../utils/mcp-utils";
 
 export interface UseMCPServerOptions {
   id?: string;
@@ -14,7 +14,6 @@ export interface UseMCPServerOptions {
   name?: string;
   autoFetchTools?: boolean;
   transportType?: MCPServerTransport["type"];
-  api?: string;
 }
 
 export interface UseMCPServerReturn {
@@ -40,7 +39,6 @@ export function useMCPServer(options: UseMCPServerOptions): UseMCPServerReturn {
     name,
     autoFetchTools = true,
     transportType = "sse",
-    api,
   } = options;
 
   if (!url) {
@@ -102,50 +100,22 @@ export function useMCPServer(options: UseMCPServerOptions): UseMCPServerReturn {
   const refreshTools = useCallback(async () => {
     setServerLoading(serverId, true);
     setServerError(serverId, null);
-    try {
-      const targetApi = api ?? defaultApi ?? "/api/mcp-discovery";
-      const response = await fetch(targetApi, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          server: {
-            id: serverId,
-            name,
-            transport,
-          },
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to load MCP tools: ${response.status}`);
-      }
-      const data: MCPServerToolsResponse = await response.json();
-      const summaries = Array.isArray(data.tools) ? data.tools : [];
-      const errorMessage =
-        Array.isArray(data.errors) && data.errors.length > 0
-          ? data.errors[0]?.message ?? "Failed to load MCP tools"
-          : data.error
-          ? typeof data.error === "string"
-            ? data.error
-            : "Failed to load MCP tools"
-          : null;
-      if (mountedRef.current) {
-        setServerTools(serverId, summaries, errorMessage ?? undefined);
-        if (errorMessage && summaries.length === 0) {
-          // Ensure the error is surfaced if no tools were updated.
-          setServerError(serverId, errorMessage);
-        }
-      }
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error && typeof error.message === "string"
-          ? error.message
-          : "Failed to load MCP tools";
-      if (mountedRef.current) {
-        setServerError(serverId, message);
+
+    const result = await fetchMCPServerTools({
+      serverId,
+      name,
+      transport,
+      api: defaultApi ?? "/api/mcp-discovery",
+    });
+
+    if (mountedRef.current) {
+      setServerTools(serverId, result.tools, result.error ?? undefined);
+      if (result.error && result.tools.length === 0) {
+        // Ensure the error is surfaced if no tools were updated.
+        setServerError(serverId, result.error);
       }
     }
   }, [
-    api,
     defaultApi,
     name,
     serverId,

@@ -208,12 +208,12 @@ describe('loadMcpTools', () => {
       close: vi.fn().mockResolvedValue(undefined),
     };
 
-    mockExperimentalCreateMCPClient.mockResolvedValue(mockClient);
+    mockExperimentalCreateMCPClient.mockResolvedValueOnce(mockClient);
 
     const servers: SerializedMCPServer[] = [
       {
-        id: 'server1',
-        transport: { type: 'sse', url: 'http://localhost:3030/mcp' },
+        id: 'server-no-desc',
+        transport: { type: 'sse', url: 'http://localhost:3033/mcp' },
       },
     ];
 

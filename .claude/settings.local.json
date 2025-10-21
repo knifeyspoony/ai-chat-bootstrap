@@ -17,7 +17,8 @@
       "WebFetch(domain:ui.shadcn.com)",
       "Bash(pnpm ls:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(pnpm test:*)"
     ],
     "deny": [],
     "ask": []

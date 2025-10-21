@@ -33,7 +33,19 @@ describe('buildEnrichedSystemPrompt', () => {
     expect(text).not.toMatch(/## Focus/);
   });
 
-  it('includes MCP explanation when MCP tools are present', () => {
+  it('always mentions MCP in preamble regardless of tool presence', () => {
+    const text = buildEnrichedSystemPrompt({
+      tools: [
+        { name: 'local-tool', description: 'A local tool', source: 'frontend' },
+      ],
+    });
+
+    // MCP is always mentioned in the preamble to educate the AI about MCP capabilities
+    expect(text).toMatch(/Model Context Protocol/);
+    expect(text).toMatch(/including tools from MCP servers/);
+  });
+
+  it('includes detailed MCP explanation in Tools section when MCP tools are present', () => {
     const text = buildEnrichedSystemPrompt({
       tools: [
         { name: 'local-tool', description: 'A local tool', source: 'frontend' },
@@ -42,12 +54,14 @@ describe('buildEnrichedSystemPrompt', () => {
     });
 
     expect(text).toMatch(/## Tools/);
+    // Preamble mention
     expect(text).toMatch(/Model Context Protocol/);
-    expect(text).toMatch(/MCP.*an open standard/i);
+    // Detailed explanation in Tools section
+    expect(text).toMatch(/a standard that exposes remote data and actions/i);
     expect(text).toMatch(/\[MCP\] \*\*mcp-tool\*\*: An MCP tool/);
   });
 
-  it('does not include MCP explanation when only frontend tools', () => {
+  it('does not add [MCP] prefix to frontend tools', () => {
     const text = buildEnrichedSystemPrompt({
       tools: [
         { name: 'local-tool', description: 'A local tool', source: 'frontend' },
@@ -55,7 +69,6 @@ describe('buildEnrichedSystemPrompt', () => {
     });
 
     expect(text).toMatch(/## Tools/);
-    expect(text).not.toMatch(/Model Context Protocol/);
     expect(text).not.toMatch(/\[MCP\]/);
     expect(text).toMatch(/\*\*local-tool\*\*: A local tool/);
   });
@@ -76,12 +89,14 @@ describe('buildEnrichedSystemPrompt', () => {
     expect(text).toMatch(/- \*\*tool4\*\*: Backend tool/);
   });
 
-  it('includes MCP mention in initial preamble', () => {
+  it('includes MCP mention even without tools', () => {
     const text = buildEnrichedSystemPrompt({
-      tools: [{ name: 'mcp-tool', source: 'mcp' }],
+      originalSystemPrompt: 'Test prompt',
     });
 
-    expect(text).toMatch(/Model Context Protocol.*connects you to external data sources/);
+    // MCP is mentioned in preamble even when no tools are provided
+    expect(text).toMatch(/Model Context Protocol/);
+    expect(text).toMatch(/connects you to external data sources/);
   });
 
   it('handles tools without descriptions', () => {

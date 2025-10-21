@@ -715,6 +715,7 @@ export default function Home() {
         }}
         mcp={{
           enabled: true,
+          api: "/api/mcp",
         }}
         models={{ available: DEMO_MODELS, initial: DEMO_MODELS[0].id }}
         header={{

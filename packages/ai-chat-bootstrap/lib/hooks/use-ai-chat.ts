@@ -46,6 +46,7 @@ import {
   withCompressionPinnedState,
   type CompressionMessagePinnedState,
 } from "../utils/compression/message-metadata";
+import { fetchMCPServerTools } from "../utils/mcp-utils";
 import {
   buildPersistedCompressionState,
   clonePersistedCompressionState,
@@ -409,6 +410,12 @@ export function useAIChat({
   const setMcpConfigurations = useAIMCPServersStore(
     (state) => state.setConfigurations
   );
+  const registerServer = useAIMCPServersStore((state) => state.registerServer);
+  const setServerLoading = useAIMCPServersStore(
+    (state) => state.setServerLoading
+  );
+  const setServerError = useAIMCPServersStore((state) => state.setServerError);
+  const setServerTools = useAIMCPServersStore((state) => state.setServerTools);
 
   // Only register the chain of thought hook, passing chainOfThoughtEnabled
   useChainOfThought({
@@ -442,6 +449,59 @@ export function useAIChat({
     setMcpDefaultApi,
     setMcpEnabled,
     setMcpConfigurations,
+  ]);
+
+  // Auto-fetch tools for servers configured via mcp.servers prop
+  useEffect(() => {
+    if (!mcpEnabled || !Array.isArray(mcp?.servers)) return;
+
+    const api = mcp?.api ?? "/api/mcp-discovery";
+
+    // Fetch tools for each configured server
+    mcp.servers.forEach((server) => {
+      const configSignature = JSON.stringify({
+        name: server.name ?? null,
+        transport: server.transport,
+      });
+
+      // Register the server first
+      registerServer({
+        id: server.id,
+        name: server.name,
+        transport: server.transport,
+        configSignature,
+      });
+
+      // Then fetch its tools
+      setServerLoading(server.id, true);
+      setServerError(server.id, null);
+
+      fetchMCPServerTools({
+        serverId: server.id,
+        name: server.name,
+        transport: server.transport,
+        api,
+      })
+        .then((result) => {
+          setServerTools(server.id, result.tools, result.error ?? undefined);
+          if (result.error && result.tools.length === 0) {
+            setServerError(server.id, result.error);
+          }
+        })
+        .catch((error) => {
+          const message =
+            error instanceof Error ? error.message : "Failed to load MCP tools";
+          setServerError(server.id, message);
+        });
+    });
+  }, [
+    mcpEnabled,
+    mcp?.api,
+    mcp?.servers,
+    registerServer,
+    setServerLoading,
+    setServerError,
+    setServerTools,
   ]);
 
   // Direct reference to the zustand store object (not a hook call) for imperative ops

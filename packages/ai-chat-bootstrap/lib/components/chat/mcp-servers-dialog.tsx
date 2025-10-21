@@ -1,4 +1,4 @@
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Button } from "../../components/ui/button";
@@ -34,6 +34,7 @@ export interface McpServersDialogProps {
   configs: SerializedMCPServer[];
   onSave: (server: SerializedMCPServer) => void;
   onRemove: (id: string) => void;
+  onRefresh?: (serverId: string) => void;
   serversMap: Map<string, MCPServerEntry> | Record<string, MCPServerEntry>;
 }
 
@@ -50,6 +51,7 @@ function McpServersDialogImpl({
   configs,
   onSave,
   onRemove,
+  onRefresh,
   serversMap,
 }: McpServersDialogProps) {
   const [form, setForm] = useState(EMPTY_FORM);
@@ -218,6 +220,19 @@ function McpServersDialogImpl({
                           )}
                         </div>
                         <div className="flex items-center gap-2">
+                          {onRefresh && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => onRefresh(config.id)}
+                              aria-label="Refresh server tools"
+                              disabled={status?.isLoading}
+                            >
+                              <RefreshCw
+                                className={`h-4 w-4 ${status?.isLoading ? "animate-spin" : ""}`}
+                              />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -373,6 +388,7 @@ export const McpServersDialog = React.memo(
     if (prev.onOpenChange !== next.onOpenChange) return false;
     if (prev.onSave !== next.onSave) return false;
     if (prev.onRemove !== next.onRemove) return false;
+    if (prev.onRefresh !== next.onRefresh) return false;
 
     // Fast path: reference equality for data
     if (prev.configs === next.configs && prev.serversMap === next.serversMap) {

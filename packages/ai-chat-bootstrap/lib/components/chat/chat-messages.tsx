@@ -1,7 +1,12 @@
 import { type UIMessage } from "ai";
 import isEqual from "fast-deep-equal";
 import { MessageSquare, UserIcon } from "lucide-react";
-import React, { forwardRef, useEffect, useImperativeHandle, useMemo } from "react";
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+} from "react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
 import {
   Conversation,
@@ -16,23 +21,29 @@ import {
 } from "../../components/ai-elements/message";
 import { Badge } from "../../components/ui/badge";
 import type { AssistantActionsConfig } from "../../types/actions";
-import type { CompressionController, CompressionUsage } from "../../types/compression";
+import type {
+  CompressionController,
+  CompressionUsage,
+} from "../../types/compression";
 import { normalizeCompressionConfig } from "../../types/compression";
 import { cn } from "../../utils";
-import type { ResponseProps } from "../ai-elements/response";
-import { AssistantMessage } from "./assistant-message";
-import { ChatMessagePinToggle } from "./chat-message-pin-toggle";
-import { ChatMessagePart } from "./chat-message-part";
 import { buildCompressionPayload } from "../../utils/compression/build-payload";
 import { getCompressionMessageCompressionState } from "../../utils/compression/message-metadata";
+import type { ResponseProps } from "../ai-elements/response";
+import { AssistantMessage } from "./assistant-message";
+import { ChatMessagePart } from "./chat-message-part";
+import { ChatMessagePinToggle } from "./chat-message-pin-toggle";
 
-const tokenNumberFormatter = typeof Intl !== "undefined"
-  ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 })
-  : null;
+const tokenNumberFormatter =
+  typeof Intl !== "undefined"
+    ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 })
+    : null;
 
 function formatTokenNumber(value: number): string {
   const safeValue = Math.max(0, Math.round(value));
-  return tokenNumberFormatter ? tokenNumberFormatter.format(safeValue) : `${safeValue}`;
+  return tokenNumberFormatter
+    ? tokenNumberFormatter.format(safeValue)
+    : `${safeValue}`;
 }
 
 function buildCompressionSummary(systemText?: string | null): string | null {
@@ -67,7 +78,9 @@ function buildCompressionSummary(systemText?: string | null): string | null {
 
   if (hasBefore && hasAfter) {
     const parts: string[] = [
-      `from ${formatTokenNumber(before)} tokens to ${formatTokenNumber(after)} tokens`,
+      `from ${formatTokenNumber(before)} tokens to ${formatTokenNumber(
+        after
+      )} tokens`,
     ];
 
     if (before > 0) {
@@ -88,7 +101,9 @@ function buildCompressionSummary(systemText?: string | null): string | null {
   if (hasSaved) {
     if (hasBefore && before > 0) {
       const afterComputed = Math.max(before - (saved ?? 0), 0);
-      return `saved ${formatTokenNumber(saved!)} tokens (now ${formatTokenNumber(afterComputed)} tokens)`;
+      return `saved ${formatTokenNumber(
+        saved!
+      )} tokens (now ${formatTokenNumber(afterComputed)} tokens)`;
     }
     return `saved ${formatTokenNumber(saved!)} tokens`;
   }
@@ -263,10 +278,7 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
         return;
       }
 
-      if (
-        usageSignatureRef.current === usageSignature &&
-        !shouldUpdateFlags
-      ) {
+      if (usageSignatureRef.current === usageSignature && !shouldUpdateFlags) {
         usageSignatureRef.current = usageSignature;
         return;
       }
@@ -433,8 +445,8 @@ ChatMessagesInner.displayName = "ChatMessages";
 interface ChatMessageItemProps {
   message: UIMessage;
   isStreaming: boolean;
-  assistantAvatar?: string;
-  userAvatar?: string;
+  assistantAvatar?: string | React.ReactNode;
+  userAvatar?: string | React.ReactNode;
   messageClassName?: string;
   pinState?: {
     pinned: boolean;
@@ -460,8 +472,7 @@ const ChatMessageItem = React.memo(
       const firstPart = message.parts?.[0];
       const systemText =
         firstPart && "text" in firstPart ? firstPart.text : "System message";
-      const compressionState =
-        getCompressionMessageCompressionState(message);
+      const compressionState = getCompressionMessageCompressionState(message);
       const isCompressionEvent =
         compressionState?.kind === "event" &&
         compressionState.reason === "compression-event";

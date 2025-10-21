@@ -456,6 +456,7 @@ export function useAIChat({
     if (!mcpEnabled || !Array.isArray(mcp?.servers)) return;
 
     const api = mcp?.api ?? "/api/mcp-discovery";
+    const mcpStore = useAIMCPServersStore.getState();
 
     // Fetch tools for each configured server
     mcp.servers.forEach((server) => {
@@ -464,7 +465,16 @@ export function useAIChat({
         transport: server.transport,
       });
 
-      // Register the server first
+      // Check if server already exists with same config
+      const existingServer = mcpStore.servers.get(server.id);
+      const shouldFetch =
+        !existingServer ||
+        existingServer.configSignature !== configSignature ||
+        (!existingServer.tools.length &&
+          !existingServer.error &&
+          !existingServer.isLoading);
+
+      // Register the server (registerServer handles config changes)
       registerServer({
         id: server.id,
         name: server.name,
@@ -472,27 +482,29 @@ export function useAIChat({
         configSignature,
       });
 
-      // Then fetch its tools
-      setServerLoading(server.id, true);
-      setServerError(server.id, null);
+      // Only fetch if needed
+      if (shouldFetch) {
+        setServerLoading(server.id, true);
+        setServerError(server.id, null);
 
-      fetchMCPServerTools({
-        serverId: server.id,
-        name: server.name,
-        transport: server.transport,
-        api,
-      })
-        .then((result) => {
-          setServerTools(server.id, result.tools, result.error ?? undefined);
-          if (result.error && result.tools.length === 0) {
-            setServerError(server.id, result.error);
-          }
+        fetchMCPServerTools({
+          serverId: server.id,
+          name: server.name,
+          transport: server.transport,
+          api,
         })
-        .catch((error) => {
-          const message =
-            error instanceof Error ? error.message : "Failed to load MCP tools";
-          setServerError(server.id, message);
-        });
+          .then((result) => {
+            setServerTools(server.id, result.tools, result.error ?? undefined);
+            if (result.error && result.tools.length === 0) {
+              setServerError(server.id, result.error);
+            }
+          })
+          .catch((error) => {
+            const message =
+              error instanceof Error ? error.message : "Failed to load MCP tools";
+            setServerError(server.id, message);
+          });
+      }
     });
   }, [
     mcpEnabled,

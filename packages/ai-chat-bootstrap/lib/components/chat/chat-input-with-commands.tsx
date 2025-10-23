@@ -49,6 +49,7 @@ const ChatInputWithCommandsImpl = ({
   submitDisabled,
   ...props
 }: ChatInputWithCommandsProps) => {
+  const { onStop, status } = props;
   const setError = useChatStore((state) => state.setError);
 
   // Local storage for draft persistence - similar to Vercel's approach
@@ -285,6 +286,21 @@ const ChatInputWithCommandsImpl = ({
   // Handle keyboard events
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        !e.altKey &&
+        !e.shiftKey &&
+        e.key.toLowerCase() === "c"
+      ) {
+        const canStop = status === "streaming" || status === "submitted";
+        if (canStop && typeof onStop === "function") {
+          e.preventDefault();
+          e.stopPropagation();
+          onStop();
+          return;
+        }
+      }
+
       // Access current values via refs for stability
       const currentMatchingCommands = matchingCommandsRef.current;
       const currentValueNow = currentValueRef.current;
@@ -415,6 +431,8 @@ const ChatInputWithCommandsImpl = ({
       historyIndex,
       savedDraft,
       updateValue,
+      onStop,
+      status,
     ]
     // Note: showCommands, currentValue, selectedCommandIndex now accessed via refs for stability
   );

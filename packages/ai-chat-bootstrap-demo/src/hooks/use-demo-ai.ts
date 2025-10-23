@@ -57,7 +57,7 @@ interface UseDemoAIReturn {
 }
 
 const DEFAULT_MCP_SERVER_URL =
-  process.env.NEXT_PUBLIC_MCP_SERVER_URL ?? "http://127.0.0.1:3030/mcp";
+  process.env.NEXT_PUBLIC_MCP_SERVER_URL ?? "http://127.0.0.1:3031/mcp";
 
 export function useDemoAI({
   counter,

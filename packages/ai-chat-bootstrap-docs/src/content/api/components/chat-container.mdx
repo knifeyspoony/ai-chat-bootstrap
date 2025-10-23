@@ -99,6 +99,41 @@ export function MyChat() {
 }
 ```
 
+### Customizing the transport request
+
+`transport.prepareSendMessagesRequest` lets you enrich the payload before it reaches your `/api/chat` route. When adding per-request data, prefer storing it in `metadata` instead of mutating the outgoing messages:
+
+```tsx
+<ChatContainer
+  transport={{
+    api: "/api/chat",
+    prepareSendMessagesRequest: async (options) => {
+      const body = options.body ?? {};
+      const metadata =
+        typeof body.metadata === "object" && body.metadata !== null
+          ? body.metadata
+          : {};
+
+      return {
+        body: {
+          ...body,
+          metadata: {
+            ...metadata,
+            transportDemo: {
+              signatureActive: true,
+              signature: "Sent via transport hook ✨",
+              preparedAt: new Date().toISOString(),
+            },
+          },
+        },
+      };
+    },
+  }}
+/>
+```
+
+See the demo route at [`packages/ai-chat-bootstrap-demo/src/app/transport/page.tsx`](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/transport/page.tsx) for a full UI that previews the prepared payload.
+
 ### Header Actions
 
 Supply React nodes via `header.actions` to surface custom controls next to the built-in title/subtitle block:

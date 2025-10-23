@@ -4,6 +4,7 @@ import {
   lastAssistantMessageIsCompleteWithToolCalls,
   UIMessage,
 } from "ai";
+import type { PrepareSendMessagesRequest } from "ai";
 import isEqual from "fast-deep-equal";
 import React, {
   useCallback,
@@ -114,6 +115,7 @@ export interface SuggestionsOptions {
 export interface UseAIChatOptions {
   transport?: {
     api?: string;
+    prepareSendMessagesRequest?: PrepareSendMessagesRequest<UIMessage>;
   };
   messages?: {
     systemPrompt?: string;
@@ -181,7 +183,10 @@ export function useAIChat({
   compression: compressionOptions,
   suggestions: suggestionsOptions,
 }: UseAIChatOptions = {}) {
-  const api = transport?.api ?? "/api/chat";
+  const transportOptions = transport ?? {};
+  const api = transportOptions.api ?? "/api/chat";
+  const userPrepareSendMessagesRequest =
+    transportOptions.prepareSendMessagesRequest;
   const systemPrompt = messages?.systemPrompt;
   const initialMessages = messages?.initial;
   const threadsGroup = threads ?? {};
@@ -899,13 +904,55 @@ export function useAIChat({
           body.model = selectedModelRef.current;
         }
 
-        return {
+        const preparedRequest = {
           ...options,
           body,
         };
+
+        if (!userPrepareSendMessagesRequest) {
+          return preparedRequest;
+        }
+
+        try {
+          const userResult = await userPrepareSendMessagesRequest({
+            ...options,
+            body,
+          });
+
+          if (!userResult) {
+            return preparedRequest;
+          }
+
+          const mergedBody = userResult.body ?? preparedRequest.body;
+          const mergedHeaders =
+            userResult.headers ?? preparedRequest.headers;
+          const mergedCredentials =
+            userResult.credentials ?? preparedRequest.credentials;
+          const mergedApi =
+            userResult.api ?? preparedRequest.api ?? api;
+
+          return {
+            ...options,
+            body: mergedBody,
+            headers: mergedHeaders,
+            credentials: mergedCredentials,
+            api: mergedApi,
+          };
+        } catch (error) {
+          logDevError(
+            "[acb][useAIChat] prepareSendMessagesRequest callback failed",
+            error
+          );
+          return preparedRequest;
+        }
       },
     });
-  }, [api, chainOfThoughtEnabled, buildCompressionRequestPayload]);
+  }, [
+    api,
+    chainOfThoughtEnabled,
+    buildCompressionRequestPayload,
+    userPrepareSendMessagesRequest,
+  ]);
 
   const [draftInput, setDraftInput] = useState("");
 

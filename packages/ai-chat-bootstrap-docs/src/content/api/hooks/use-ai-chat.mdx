@@ -36,6 +36,7 @@ Override it per-call via `chat.sendMessage({ body: { enrichedSystemPrompt: "..."
 ## Key options
 
 - `transport.api` (default `/api/chat`) – endpoint used by the client transport.
+- `transport.prepareSendMessagesRequest` – optional callback to adjust the request before it is sent; prefer annotating `metadata` instead of mutating `messages`.
 - `messages.systemPrompt` / `messages.initial` – seed instructions and historical messages.
 - `threads.*` – enable scoped thread persistence, auto-titling, and warn-on-miss behaviour.
 - `features.chainOfThought` / `features.branching` – opt into reasoning blocks or experimental branching helpers.

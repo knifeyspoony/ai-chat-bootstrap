@@ -415,7 +415,7 @@ If you need additional variant surfaces, open an issue or PR—extending CVA con
 
 **Chat Configuration (AI Settings):**
 
-- `transport`: `{ api?: string }` – endpoint for AI requests
+- `transport`: `{ api?: string; prepareSendMessagesRequest?: (options) => { body, headers?, credentials?, api? } }` – endpoint override + final request customization hook
 - `messages`: `{ systemPrompt?: string; initial?: UIMessage[] }`
 - `threads`: `{ enabled?: boolean; id?: string; scopeKey?: string; autoCreate?: boolean; warnOnMissing?: boolean; title?: { enabled?: boolean; api?: string; sampleCount?: number } }`
 - `features`: `{ chainOfThought?: boolean }`
@@ -430,6 +430,41 @@ If you need additional variant surfaces, open an issue or PR—extending CVA con
 - `commands`: enabled
 - `assistantActions`: enable built-in buttons (`copy`, `regenerate`, `debug`, `feedback`) or supply a `custom` array of `AssistantAction`s for bespoke controls
 - `devtools`: `{ headerDebugButton?: boolean }` – development-only header debug toggle (defaults to `false`)
+
+### Customize the outgoing request
+
+Use `transport.prepareSendMessagesRequest` to annotate the request before it is posted to your `/api/chat` handler. The safest pattern is to leave `messages` untouched and only enrich metadata or headers:
+
+```tsx
+<ChatContainer
+  transport={{
+    api: "/api/chat",
+    prepareSendMessagesRequest: async (options) => {
+      const body = options.body ?? {};
+      const existingMetadata =
+        typeof body.metadata === "object" && body.metadata !== null
+          ? body.metadata
+          : {};
+
+      return {
+        body: {
+          ...body,
+          metadata: {
+            ...existingMetadata,
+            transportDemo: {
+              signatureActive: true,
+              signature: "Sent via transport hook ✨",
+              preparedAt: new Date().toISOString(),
+            },
+          },
+        },
+      };
+    },
+  }}
+/>
+```
+
+The demo app includes a working example at `packages/ai-chat-bootstrap-demo/src/app/transport/page.tsx`.
 
 ### ChatPopout
 

@@ -1,6 +1,6 @@
 {
   "name": "ai-chat-bootstrap",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "description": "React UI + hooks for building modern AI chat interfaces fast. Based on AISDK and AISDK Elements",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

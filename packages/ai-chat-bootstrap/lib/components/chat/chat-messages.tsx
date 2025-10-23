@@ -203,6 +203,7 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
               (part.type === "reasoning" && part.text?.trim()) ||
               (part.type?.startsWith("tool-") &&
                 !part.type?.startsWith("tool-acb")) ||
+              part.type === "dynamic-tool" ||
               part.type?.startsWith("data-") ||
               part.type === "file" ||
               part.type === "source-url" ||

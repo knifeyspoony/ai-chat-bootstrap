@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { z } from "zod";
 
-const DEFAULT_PORT = 3030;
+const DEFAULT_PORT = 3031;
 const DEFAULT_PATH = "/mcp";
 
 const port = Number.parseInt(process.env.MCP_PORT ?? `${DEFAULT_PORT}`, 10);

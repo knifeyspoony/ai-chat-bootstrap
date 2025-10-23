@@ -533,7 +533,7 @@ export function useAIChat({
         return;
       }
 
-      if (store.mode !== "persistent") {
+      if (store.mode !== "persistent" || !store.persistence) {
         store.initializePersistent?.();
       }
     } catch (error) {
@@ -1669,6 +1669,9 @@ export function useAIChat({
                 effectiveId,
                 chatHookRef.current?.messages as UIMessage[]
               );
+              // Persist immediately after user sends message (don't wait for idle)
+              // This ensures user messages are saved even if API fails or page crashes
+              persistMessagesIfChanged("send");
               // Initial placeholder title: first user message preview if untitled
               const t = state.threads.get(effectiveId);
               if (t && (!t.title || hasAutoTitledFlag(t.metadata))) {
@@ -1704,7 +1707,9 @@ export function useAIChat({
         });
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [threadId, resetErrorState, threadStore]
+    // persistMessagesIfChanged is stable via useCallback and called in microtask
   );
 
   const handleSuggestionSend = useCallback(
@@ -1805,14 +1810,38 @@ export function useAIChat({
       if (!effectiveId) return;
       try {
         const store = threadStore.getState();
-        const loaded = store.getThreadIfLoaded?.(effectiveId);
-        if (!loaded) return; // only persist hydrated threads
-        const msgs = chatHook.messages as UIMessage[];
-        const sig = computeSignature(msgs);
-        if (sig === lastSavedSignatureRef.current) return;
+        const thread = store.threads.get(effectiveId);
+        if (!thread) return;
+
+        const storeMessages = (thread.messages ?? []) as UIMessage[];
+        const helper = chatHookRef.current ?? chatHook;
+        const candidateMessages = (helper?.messages ?? []) as UIMessage[];
+
+        const storeSignature = computeSignature(storeMessages);
+        const candidateSignature = computeSignature(candidateMessages);
+
+        let msgs: UIMessage[];
+        let signature: string;
+
+        if (candidateMessages.length > storeMessages.length) {
+          msgs = candidateMessages;
+          signature = candidateSignature;
+        } else if (candidateMessages.length < storeMessages.length) {
+          msgs = storeMessages;
+          signature = storeSignature;
+        } else if (candidateSignature !== storeSignature) {
+          // Same length but content differs - prefer the candidate snapshot to capture latest edits
+          msgs = candidateMessages;
+          signature = candidateSignature;
+        } else {
+          msgs = storeMessages;
+          signature = storeSignature;
+        }
+
+        if (signature === lastSavedSignatureRef.current) return;
+
         store.updateThreadMessages(effectiveId, msgs);
-        lastSavedSignatureRef.current = sig;
-        // Optionally debug: console.debug('[acb][autosave]', reason, sig)
+        lastSavedSignatureRef.current = signature;
       } catch (error) {
         logDevError(
           `[acb][useAIChat] failed to persist messages for thread "${effectiveId}"`,
@@ -1820,7 +1849,7 @@ export function useAIChat({
         );
       }
     },
-    [threadId, threadStore, chatHook.messages]
+    [threadId, threadStore, chatHook, chatHookRef]
   );
 
   const branching = useAIChatBranching({

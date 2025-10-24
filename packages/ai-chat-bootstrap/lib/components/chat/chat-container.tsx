@@ -503,7 +503,33 @@ export const ChatContainer = React.memo(ChatContainerImpl, (prev, next) => {
     return false;
   if (prevMcpServers && nextMcpServers) {
     for (let i = 0; i < prevMcpServers.length; i++) {
-      if (prevMcpServers[i].id !== nextMcpServers[i].id) return false;
+      const prevServer = prevMcpServers[i];
+      const nextServer = nextMcpServers[i];
+      if (prevServer.id !== nextServer.id) return false;
+      if ((prevServer.name ?? "") !== (nextServer.name ?? "")) return false;
+      if (prevServer.transport.type !== nextServer.transport.type) return false;
+      if (prevServer.transport.url !== nextServer.transport.url) return false;
+
+      const prevHeaders = prevServer.transport.headers;
+      const nextHeaders = nextServer.transport.headers;
+
+      const prevHeaderKeys = prevHeaders
+        ? Object.keys(prevHeaders).sort()
+        : [];
+      const nextHeaderKeys = nextHeaders
+        ? Object.keys(nextHeaders).sort()
+        : [];
+
+      if (prevHeaderKeys.length !== nextHeaderKeys.length) return false;
+
+      for (let j = 0; j < prevHeaderKeys.length; j++) {
+        const key = prevHeaderKeys[j];
+        const nextKey = nextHeaderKeys[j];
+        if (key !== nextKey) return false;
+        const prevValue = prevHeaders ? prevHeaders[key] : undefined;
+        const nextValue = nextHeaders ? nextHeaders[key] : undefined;
+        if (prevValue !== nextValue) return false;
+      }
     }
   }
 

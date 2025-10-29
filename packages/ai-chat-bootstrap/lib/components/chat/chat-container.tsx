@@ -377,7 +377,7 @@ function ChatContainerView(props: ChatContainerViewProps) {
           {isRestoringThread && (
             <div
               data-acb-part="thread-loading-overlay"
-              className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 px-6 text-center text-sm backdrop-blur-sm"
+              className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 px-6 text-center text-sm"
               role="status"
               aria-live="polite"
               style={{
@@ -397,7 +397,7 @@ function ChatContainerView(props: ChatContainerViewProps) {
           data-acb-part="input-wrapper"
           className={cn(
             !isUnstyled &&
-              "backdrop-blur-sm p-4 rounded-b-md bg-[var(--acb-chat-input-wrapper-bg)]",
+              "p-4 rounded-b-md bg-[var(--acb-chat-input-wrapper-bg)]",
             isUnstyled && "p-0",
             ui?.classes?.inputWrapper
           )}

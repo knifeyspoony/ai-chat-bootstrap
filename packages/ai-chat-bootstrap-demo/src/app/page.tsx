@@ -262,7 +262,7 @@ export default function Home() {
 
   const pageContent = (
     <>
-      <header className="sticky top-0 z-40 w-full border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-40 w-full border-b bg-background/90 supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
@@ -449,7 +449,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto max-w-7xl px-4 py-12">{pageContent}</div>
+      <div className="container mx-auto max-w-7xl px-4 py-12">
+        {pageContent}
+      </div>
       {/* Chat Interface */}
       <ChatPopout
         transport={{ api: "/api/chat" }}

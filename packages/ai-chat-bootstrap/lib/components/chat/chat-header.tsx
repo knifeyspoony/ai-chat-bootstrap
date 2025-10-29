@@ -39,7 +39,7 @@ const ChatHeaderImpl = ({
     <div
       data-acb-part="header"
       className={cn(
-        "flex items-center justify-between px-4 py-3 rounded-t-md border-b backdrop-blur-sm shadow-sm",
+        "flex items-center justify-between px-4 py-3 rounded-t-md border-b shadow-sm",
         "bg-[var(--acb-chat-header-bg)] text-[var(--acb-chat-header-fg)] border-[var(--acb-chat-header-border)]",
         className
       )}
@@ -86,9 +86,7 @@ const ChatHeaderImpl = ({
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {actionItems.map((item, index) => {
             const key =
-              React.isValidElement(item) && item.key != null
-                ? item.key
-                : index;
+              React.isValidElement(item) && item.key != null ? item.key : index;
             return (
               <div key={key} className="flex items-center justify-center">
                 {item}
@@ -111,7 +109,10 @@ export const ChatHeader = memo(ChatHeaderImpl, (prevProps, nextProps) => {
   // Check React.ReactNode props (these are often recreated)
   if (prevProps.avatar !== nextProps.avatar) {
     // For string avatars, do deep comparison
-    if (typeof prevProps.avatar === 'string' && typeof nextProps.avatar === 'string') {
+    if (
+      typeof prevProps.avatar === "string" &&
+      typeof nextProps.avatar === "string"
+    ) {
       if (prevProps.avatar !== nextProps.avatar) return false;
     } else {
       // For ReactNode avatars, assume reference equality is needed
@@ -121,7 +122,10 @@ export const ChatHeader = memo(ChatHeaderImpl, (prevProps, nextProps) => {
 
   if (prevProps.badge !== nextProps.badge) {
     // For string badges, do deep comparison
-    if (typeof prevProps.badge === 'string' && typeof nextProps.badge === 'string') {
+    if (
+      typeof prevProps.badge === "string" &&
+      typeof nextProps.badge === "string"
+    ) {
       if (prevProps.badge !== nextProps.badge) return false;
     } else {
       // For ReactNode badges, assume reference equality is needed

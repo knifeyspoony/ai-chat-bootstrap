@@ -13,7 +13,7 @@ export const chatHeaderVariants = cva(
       chrome: {
         default: "px-4 py-3 border-b shadow-sm backdrop-blur-sm rounded-t-md",
         minimal: "px-3 py-2 border-b rounded-t-md",
-        clean: "px-3 py-2 border-none shadow-none backdrop-blur-0",
+        clean: "px-3 py-2 border-none shadow-none",
       },
       shadow: {
         none: "shadow-none",

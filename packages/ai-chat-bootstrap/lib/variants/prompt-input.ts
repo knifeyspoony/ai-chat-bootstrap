@@ -13,7 +13,7 @@ export const promptInputVariants = cva(
       chrome: {
         full: "",
         minimal:
-          "shadow-none backdrop-blur-0 border-[color-mix(in_oklab,var(--acb-prompt-border)_60%,transparent)] divide-[color-mix(in_oklab,var(--acb-prompt-border)_60%,transparent)]",
+          "shadow-none border-[color-mix(in_oklab,var(--acb-prompt-border)_60%,transparent)] divide-[color-mix(in_oklab,var(--acb-prompt-border)_60%,transparent)]",
         outline: "shadow-none bg-transparent dark:bg-transparent",
         unstyled:
           "border-0 shadow-none bg-transparent dark:bg-transparent divide-y-0 p-0",

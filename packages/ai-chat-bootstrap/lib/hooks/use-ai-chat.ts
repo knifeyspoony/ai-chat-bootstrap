@@ -54,6 +54,7 @@ import {
 import { logDevError } from "../utils/dev-logger";
 import { fetchMCPServerTools } from "../utils/mcp-utils";
 import { normalizeMessagesMetadata } from "../utils/message-normalization";
+import { computeMessagesSignature } from "../utils/message-signature";
 import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
 import { useAIChatBranching } from "./use-ai-chat-branching";
 import { useAIChatCompression } from "./use-ai-chat-compression";
@@ -1978,15 +1979,6 @@ export function useAIChat({
   // --- Internal autosave logic ---
   const lastSavedSignatureRef = useRef<string | undefined>(undefined);
 
-  function computeSignature(msgs: UIMessage[]): string {
-    // Use length + last 5 ids for cheap change detection
-    const tailIds = msgs
-      .slice(-5)
-      .map((m) => m.id)
-      .join("|");
-    return `${msgs.length}:${tailIds}`;
-  }
-
   const persistMessagesIfChanged = useCallback(
     (reason?: string) => {
       void reason;
@@ -2014,8 +2006,8 @@ export function useAIChat({
         const helper = chatHookRef.current ?? chatHook;
         const candidateMessages = (helper?.messages ?? []) as UIMessage[];
 
-        const storeSignature = computeSignature(storeMessages);
-        const candidateSignature = computeSignature(candidateMessages);
+        const storeSignature = computeMessagesSignature(storeMessages);
+        const candidateSignature = computeMessagesSignature(candidateMessages);
 
         let msgs: UIMessage[];
         let signature: string;

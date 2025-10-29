@@ -208,21 +208,26 @@ function writeCompressionMetadata(
     delete baseMetadata[COMPRESSION_MESSAGE_METADATA_KEY];
   }
 
-  const hasMetadata = Object.keys(baseMetadata).length > 0;
+  const normalizedMetadata =
+    Object.keys(baseMetadata).length > 0 ? baseMetadata : {};
 
-  if (!hasMetadata) {
-    if (!message.metadata) {
+  if (isRecord(message.metadata)) {
+    const previous = message.metadata as Record<string, unknown>;
+    const sameSize =
+      Object.keys(previous).length === Object.keys(normalizedMetadata).length;
+    if (
+      sameSize &&
+      Object.keys(normalizedMetadata).every((key) =>
+        Object.is(previous[key], normalizedMetadata[key])
+      )
+    ) {
       return message;
     }
-    return {
-      ...message,
-      metadata: undefined,
-    } as UIMessage;
   }
 
   return {
     ...message,
-    metadata: baseMetadata,
+    metadata: normalizedMetadata,
   } as UIMessage;
 }
 
@@ -464,6 +469,9 @@ export function buildCompressionEventMessage({
         text,
       } as UIMessage["parts"][number],
     ],
+    metadata: {
+      timestamp: snapshot.createdAt,
+    },
   };
 
   return withCompressionCompressionState(base, {

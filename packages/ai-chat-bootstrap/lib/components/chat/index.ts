@@ -13,6 +13,8 @@ export type { ChatPopoutProps } from "../../components/chat/chat-popout";
 export { ChatThreadsButton } from "../../components/chat/chat-threads-button";
 export { AssistantMessage } from "./assistant-message";
 export { ChatChainOfThought } from "./chat-chain-of-thought";
+export { ChatLoader } from "./chat-loader";
+export type { ChatLoaderProps } from "./chat-loader";
 export { CompressionArtifactsSheet } from "./compression-artifacts-sheet";
 export { CompressionBanner } from "./compression-banner";
 export { CompressionUsageIndicator } from "./compression-usage-indicator";

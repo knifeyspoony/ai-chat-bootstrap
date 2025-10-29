@@ -45,5 +45,23 @@ export type {
   NormalizedCompressionConfig,
 } from "./types/compression";
 
+export type {
+  ChatThread,
+  ChatThreadMeta,
+  ChatThreadPersistence,
+  CreateThreadOptions,
+  CloneThreadOptions,
+} from "./types/threads";
+
+export {
+  createIndexedDBChatThreadPersistence,
+  getDefaultChatThreadPersistence,
+} from "./persistence/chat-threads-indexeddb";
+
+export {
+  ensureMessageMetadata,
+  normalizeMessagesMetadata,
+} from "./utils/message-normalization";
+
 // Optional: Variant helpers (CVA) for consumers wanting pure class composition
 export * from "./variants";

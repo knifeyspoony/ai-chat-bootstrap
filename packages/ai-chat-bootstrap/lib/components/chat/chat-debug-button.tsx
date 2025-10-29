@@ -12,10 +12,6 @@ import { ChatDebugSheet } from "./chat-debug-sheet";
 export function ChatDebugButton() {
   const [open, setOpen] = React.useState(false);
 
-  if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
-    return null;
-  }
-
   return (
     <>
       <TooltipProvider delayDuration={200} skipDelayDuration={300}>

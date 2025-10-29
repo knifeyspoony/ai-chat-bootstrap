@@ -41,6 +41,12 @@ export default function BasicChatPage() {
             api: "/api/thread-title",
           },
         }}
+        ui={{
+          showTimestamps: true,
+        }}
+        devTools={{
+          enabled: true,
+        }}
       />
     </div>
   );

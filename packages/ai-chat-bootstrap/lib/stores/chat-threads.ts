@@ -8,6 +8,7 @@ import type {
   CreateThreadOptions,
 } from "../types/threads";
 import { getDefaultChatThreadPersistence } from "../persistence/chat-threads-indexeddb";
+import { normalizeMessagesMetadata } from "../utils/message-normalization";
 
 type ChatThreadsMode = "persistent" | "ephemeral";
 
@@ -51,6 +52,14 @@ interface ChatThreadsState {
   renameThread: (id: string, title: string, opts?: { manual?: boolean; allowAutoReplace?: boolean }) => void;
   deleteThread: (id: string) => Promise<void>;
   updateThreadMetadata: (id: string, patch: Record<string, unknown>) => void;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function ensureThreadMetadata(metadata: unknown): Record<string, unknown> {
+  return isRecord(metadata) ? { ...metadata } : {};
 }
 
 function toMeta(t: ChatThread): ChatThreadMeta {
@@ -180,15 +189,18 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
     const now = Date.now();
     const id = opts?.id ?? uuidv4();
     const scopeKey = opts?.scopeKey ?? get().scopeKey;
+    const normalizedMessages = normalizeMessagesMetadata(
+      opts?.initialMessages ?? []
+    ).messages;
     const thread: ChatThread = {
       id,
       parentId: opts?.parentId,
       scopeKey,
       title: opts?.title,
-      messages: opts?.initialMessages ?? [],
+      messages: normalizedMessages,
       createdAt: now,
       updatedAt: now,
-      metadata: opts?.metadata,
+      metadata: ensureThreadMetadata(opts?.metadata),
     };
 
     set((state) => ({
@@ -206,6 +218,8 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
   },
 
   updateThreadMessages: (id: string, messages: UIMessage[]) => {
+    const { messages: normalizedMessages } =
+      normalizeMessagesMetadata(messages);
     const existing = get().threads.get(id);
     const now = Date.now();
     if (!existing) {
@@ -216,13 +230,21 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
       p.load?.(id)
         .then((t) => {
           const thread: ChatThread = t
-            ? { ...t, messages, updatedAt: now }
+            ? {
+                ...t,
+                messages: normalizedMessages,
+                updatedAt: now,
+                metadata: ensureThreadMetadata(
+                  (t as { metadata?: unknown }).metadata
+                ),
+              }
             : {
                 id,
-                messages,
+                messages: normalizedMessages,
                 createdAt: now,
                 updatedAt: now,
-              } as unknown as ChatThread;
+                metadata: {},
+              };
           set((state) => ({
             threads: new Map(state.threads).set(id, thread),
             metas: new Map(state.metas).set(id, toMeta(thread)),
@@ -233,7 +255,12 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
       return;
     }
 
-    const updated: ChatThread = { ...existing, messages, updatedAt: now };
+    const updated: ChatThread = {
+      ...existing,
+      messages: normalizedMessages,
+      updatedAt: now,
+      metadata: ensureThreadMetadata(existing.metadata),
+    };
     set((state) => ({
       threads: new Map(state.threads).set(id, updated),
       metas: new Map(state.metas).set(id, toMeta(updated)),
@@ -246,7 +273,7 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
     const now = Date.now();
     const loaded = get().threads.get(id);
     if (loaded) {
-      const prevMeta = (loaded.metadata || {}) as Record<string, unknown>;
+      const prevMeta = ensureThreadMetadata(loaded.metadata);
       const isManualLock = prevMeta.manualTitle === true;
       // If this is an auto rename and user previously set manual title, skip
       if (!opts?.manual && isManualLock) return;
@@ -287,13 +314,15 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
     // Try to patch persisted record without loading messages
     const p = get().persistence;
     if (p?.load) {
-      p.load(id)
-        .then((t) => {
-          if (!t) return;
-          const prevMeta = (t.metadata || {}) as Record<string, unknown>;
-          const isManualLock = prevMeta.manualTitle === true;
-          if (!opts?.manual && isManualLock) return;
-          if (!opts?.manual && t.title && prevMeta.autoTitled !== true && !opts?.allowAutoReplace) return;
+          p.load(id)
+            .then((t) => {
+              if (!t) return;
+              const prevMeta = ensureThreadMetadata(
+                (t as { metadata?: unknown }).metadata
+              );
+              const isManualLock = prevMeta.manualTitle === true;
+              if (!opts?.manual && isManualLock) return;
+              if (!opts?.manual && t.title && prevMeta.autoTitled !== true && !opts?.allowAutoReplace) return;
           const nextMeta: Record<string, unknown> = { ...prevMeta };
           if (opts?.manual) {
             nextMeta.manualTitle = true;
@@ -352,7 +381,7 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
   updateThreadMetadata: (id: string, patch: Record<string, unknown>) => {
     const existing = get().threads.get(id);
     if (existing) {
-      const nextMeta = { ...(existing.metadata || {}), ...patch };
+      const nextMeta = { ...ensureThreadMetadata(existing.metadata), ...patch };
       const updated: ChatThread = { ...existing, metadata: nextMeta };
       set((state) => ({
         threads: new Map(state.threads).set(id, updated),
@@ -366,7 +395,13 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
       p.load(id)
         .then((t) => {
           if (!t) return;
-          const updated: ChatThread = { ...t, metadata: { ...(t.metadata || {}), ...patch } };
+          const updated: ChatThread = {
+            ...t,
+            metadata: {
+              ...ensureThreadMetadata((t as { metadata?: unknown }).metadata),
+              ...patch,
+            },
+          };
           set((state) => ({ threads: new Map(state.threads).set(id, updated) }));
           p.save(updated).catch(() => {});
         })

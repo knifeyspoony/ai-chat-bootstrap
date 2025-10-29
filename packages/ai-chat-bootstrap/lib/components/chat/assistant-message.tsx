@@ -1,15 +1,15 @@
 import type { UIMessage } from "ai";
 import isEqual from "fast-deep-equal";
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Message,
   MessageAvatar,
   MessageContent,
 } from "../../components/ai-elements/message";
-import type { ResponseProps } from "../ai-elements/response";
 import { useAIBranchesStore } from "../../stores";
 import type { AssistantActionsConfig } from "../../types/actions";
 import { cn } from "../../utils";
+import { formatMessageTimestamp } from "../../utils/message-timestamps";
 import {
   Branch,
   BranchMessages,
@@ -18,6 +18,7 @@ import {
   BranchPrevious,
   BranchSelector,
 } from "../ai-elements/branch";
+import type { ResponseProps } from "../ai-elements/response";
 import { AssistantActionsRenderer } from "./assistant-actions-renderer";
 import { buildAssistantBranchEntries } from "./assistant-branches";
 import { reorderBranchEntriesForSelection } from "./assistant-message-helpers";
@@ -41,6 +42,7 @@ interface AssistantMessageProps {
     pinned: boolean;
     toggle: () => void;
   };
+  showTimestamp?: boolean;
   branching?: {
     enabled: boolean;
     selectBranch?: (
@@ -64,6 +66,7 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
   isLatestAssistant,
   actionsConfig,
   pinState,
+  showTimestamp = false,
   branching,
   responseProps,
 }) => {
@@ -240,6 +243,14 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
   const effectiveMessage = effectiveBranchEntry?.message ?? message;
   const showBranchSelector = branchingEnabled && branchCount > 1;
 
+  // Client-side only timestamp rendering to avoid hydration mismatch
+  const [timestampLabel, setTimestampLabel] = useState<string | null>(null);
+  useEffect(() => {
+    if (showTimestamp) {
+      setTimestampLabel(formatMessageTimestamp(effectiveMessage));
+    }
+  }, [showTimestamp, effectiveMessage]);
+
   const hasSharedActions = Boolean(actions);
   const hasLatestActions = Boolean(latestActions);
   const hasConfigActions = Boolean(actionsConfig);
@@ -391,14 +402,19 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
             messageClassName
           )}
         >
-          <div className={cn("flex min-w-0 flex-col gap-0", "pt-4")}>
+          <div className={cn("flex min-w-0 flex-col gap-2", "pt-4")}>
             {messageBody}
+            {timestampLabel ? (
+              <span className="px-1 text-[10px] text-muted-foreground">
+                {timestampLabel}
+              </span>
+            ) : null}
           </div>
           <MessageAvatar
             data-acb-part="message-avatar"
             name="Assistant"
             src={assistantAvatar}
-            className="shrink-0 self-end"
+            className="shrink-0 mt-4"
           />
         </Message>
         {renderControlsRow(true)}
@@ -419,12 +435,19 @@ const AssistantMessageImpl: React.FC<AssistantMessageProps> = ({
           messageClassName
         )}
       >
-        <div className="flex min-w-0 flex-col gap-0 pt-4">{messageBody}</div>
+        <div className="flex min-w-0 flex-col gap-2 pt-4">
+          {messageBody}
+          {timestampLabel ? (
+            <span className="px-1 text-[10px] text-muted-foreground">
+              {timestampLabel}
+            </span>
+          ) : null}
+        </div>
         <MessageAvatar
           data-acb-part="message-avatar"
           name="Assistant"
           src={assistantAvatar}
-          className="shrink-0 self-end"
+          className="shrink-0 mt-4"
         />
       </Message>
       {showAnyActions ? renderControlsRow(false) : null}
@@ -440,6 +463,7 @@ export const AssistantMessage = React.memo(
       prev.message === next.message &&
       prev.isStreaming === next.isStreaming &&
       prev.isLatestAssistant === next.isLatestAssistant &&
+      prev.showTimestamp === next.showTimestamp &&
       prev.pinState?.pinned === next.pinState?.pinned &&
       prev.responseProps === next.responseProps
     )
@@ -457,6 +481,7 @@ export const AssistantMessage = React.memo(
       prev.actions === next.actions &&
       prev.latestActions === next.latestActions &&
       prev.actionsConfig === next.actionsConfig &&
+      prev.showTimestamp === next.showTimestamp &&
       prev.pinState?.pinned === next.pinState?.pinned &&
       prev.responseProps === next.responseProps &&
       isEqual(prev.message.parts, next.message.parts) &&

@@ -109,10 +109,6 @@ export function ChatDebugSheet({ open, onOpenChange }: ChatDebugSheetProps) {
     [contextItems, focusItems, tools, mcpServers]
   );
 
-  if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
-    return null;
-  }
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent

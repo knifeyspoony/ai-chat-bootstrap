@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import Link from "next/link";
+import React, { useMemo } from "react";
 // UI Components from local shadcn/ui setup
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,37 +12,33 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
-
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 // AI Components from the library
 import type { AssistantAction } from "ai-chat-bootstrap";
 import { ChatPopout } from "ai-chat-bootstrap";
 
 // Custom hook with all AI logic
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useDemoAI } from "@/hooks/use-demo-ai";
 import { useEphemeralChatThreads } from "@/hooks/use-ephemeral-chat-threads";
 import {
+  ArrowRight,
   BookOpen,
-  CalculatorIcon,
-  CheckCircle2,
-  Circle,
-  Database as DatabaseIcon,
+  Compass,
   EyeIcon,
   Focus,
-  MinusIcon,
-  PlusIcon,
+  GitBranch,
+  Layers,
+  MessageSquare,
+  Network,
+  Server,
   Sparkles,
-  User as UserIcon,
   Zap,
 } from "lucide-react";
 
@@ -51,33 +48,86 @@ const DEMO_MODELS = [
   { id: "gpt-5", label: "GPT-5" },
 ];
 
+const DEMO_PAGES: Array<{
+  href: string;
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  {
+    href: "/core",
+    title: "Core Features",
+    description:
+      "See focus items, AI context, and suggestions working together.",
+    icon: Focus,
+  },
+  {
+    href: "/basic",
+    title: "Starter Chat",
+    description: "See the drop-in component with a minimal API route.",
+    icon: MessageSquare,
+  },
+  {
+    href: "/transport",
+    title: "Custom Transport Hook",
+    description: "Inject custom headers or data into the chat transport layer.",
+    icon: Network,
+  },
+  {
+    href: "/threads",
+    title: "Threaded Sessions",
+    description: "Persist multi-conversation workspaces.",
+    icon: GitBranch,
+  },
+  {
+    href: "/compression",
+    title: "Compression",
+    description: "Explore auto-compression techniques for chat messages.",
+    icon: Layers,
+  },
+  {
+    href: "/mcp",
+    title: "MCP Integrations",
+    description: "Call remote toolchains using the Model Context Protocol.",
+    icon: Server,
+  },
+];
+
+const FEATURE_CALLOUTS: Array<{
+  title: string;
+  description: string;
+  meta: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  {
+    title: "Focus-aware context",
+    description:
+      "Share structured app state automatically as users interact with your UI.",
+    meta: "Toggle any widget to stream fresh context into the assistant.",
+    icon: Focus,
+  },
+  {
+    title: "Frontend tools & commands",
+    description:
+      "Expose safe, typed actions that the assistant can execute instantly.",
+    meta: "Register tools with one hook and return rich results.",
+    icon: Zap,
+  },
+  {
+    title: "Drop-in chat surfaces",
+    description:
+      "Use the headless primitives or the styled popout to ship chat fast.",
+    meta: "Blend with your design system via CSS or the Tailwind plugin.",
+    icon: Sparkles,
+  },
+];
+
 export default function Home() {
   // Demo state
   useEphemeralChatThreads();
-  const [counter, setCounter] = useState(0);
-  const [calculation, setCalculation] = useState<string | null>(null);
-  const [selectedSystemPrompt, setSelectedSystemPrompt] =
-    useState<string>("default");
-  const [chatMode, setChatMode] = useState<"overlay" | "inline">("inline");
-
-  // AI integration - all AI logic is handled by the custom hook
-  const {
-    focusedIds,
-    toolsCount,
-    handleFocusToggle,
-    getFocus,
-    userProfile,
-    dbSettings,
-    mcpStatus,
-  } = useDemoAI({
-    counter,
-    setCounter,
-    calculation,
-    setCalculation,
-    selectedSystemPrompt,
-    setSelectedSystemPrompt,
-    setChatMode,
-  });
+  const chatMode = "overlay" as const;
+  const systemPrompt =
+    "You are the AI Chat Bootstrap guide. Keep answers friendly, concise, and point people toward the right demo or documentation link when helpful.";
 
   // Create sample messages to demonstrate all message types
   const sampleMessages = useMemo(
@@ -89,7 +139,7 @@ export default function Home() {
         parts: [
           {
             type: "text" as const,
-            text: "Hello! Can you help me understand what this demo showcases?",
+            text: "What is AI Chat Bootstrap and why would I use it?",
           },
         ],
       },
@@ -100,97 +150,51 @@ export default function Home() {
         parts: [
           {
             type: "text" as const,
-            text: "Welcome to the AI Chat Bootstrap Demo! 🎉\n\nThis demo showcases:\n- **Real-time context sharing** - Click widgets to focus them\n- **Tool integration** - AI can interact with the counter, calculator, and other widgets\n- **Dynamic focus management** - The AI knows about focused elements\n- **Multiple message types** - Text, reasoning, files, sources, and tool calls\n\nTry clicking on some widgets below and then ask me about them!",
+            text: "Great to have you here!\n\nAI Chat Bootstrap helps teams ship production-ready assistants fast.\n\n**What ships with the library**\n- Drop-in chat surfaces powered by the Vercel AI SDK\n- Hooks for focus-aware context and typed frontend tools\n- Styling via CSS tokens or a Tailwind preset + plugin\n\nUse the navigation above to explore focused demos, or keep chatting if you have specific questions.",
           },
         ],
       },
-      // User message requesting calculation
+      // User asking about theming
       {
         id: "msg-3",
         role: "user" as const,
         parts: [
           {
             type: "text" as const,
-            text: "Can you calculate 25 * 4 for me?",
+            text: "Can I match the components to my own design system?",
           },
         ],
       },
-      // Assistant response with tool usage
       {
         id: "msg-4",
         role: "assistant" as const,
         parts: [
           {
-            type: "tool-calculate" as const,
-            toolCallId: "call_demo_1",
-            state: "output-available" as const,
-            input: {
-              operation: "multiply",
-              a: 25,
-              b: 4,
-            },
-            output: {
-              operation: "multiply",
-              a: 25,
-              b: 4,
-              result: 100,
-              message: "25 multiply 4 = 100",
-            },
-          },
-          {
             type: "text" as const,
-            text: "I've calculated that for you! 25 × 4 = **100**. You can see the result displayed in the calculator widget above.",
+            text: "Absolutely. Choose whichever styling path fits your stack:\n\n1. **CSS bundles** – import `tokens.css` and `ai-chat.css` for the quickest drop-in.\n2. **Tailwind preset + plugin** – compose the primitives into your design system while keeping utility classes consistent.\n\nBoth approaches expose CSS variables so you can override colors, typography, and spacing without forking the build.",
           },
         ],
       },
-      // User asking about reasoning
+      // User asking about deeper resources
       {
         id: "msg-5",
         role: "user" as const,
         parts: [
           {
             type: "text" as const,
-            text: "How do you decide which tool to use?",
+            text: "Where should I look if I want a deeper walkthrough or more advanced demos?",
           },
         ],
       },
-      // Assistant with reasoning and text
       {
         id: "msg-6",
         role: "assistant" as const,
         parts: [
           {
-            type: "reasoning" as const,
-            text: "Let me think about this. The user is asking about my decision-making process for tool selection. I should explain:\n1. I analyze the user's request to identify what action they want\n2. I check what tools are available and their descriptions\n3. I match the request to the most appropriate tool\n4. For calculations, I use the calculate tool\n5. For counter operations, I use increment/decrement tools\n6. For system changes, I use the change_system_prompt tool",
-            state: "done" as const,
-          },
-          {
-            type: "text" as const,
-            text: 'Great question! My tool selection process involves several steps:\n\n1. **Request Analysis**: I parse your message to understand what you need\n2. **Available Tools**: I check what tools are registered and their capabilities\n3. **Best Match**: I select the tool whose description best matches your request\n4. **Context Awareness**: I consider focused widgets and current app state\n\nFor example:\n- Math questions → `calculate` tool\n- "Increment counter" → `increment_counter` tool\n- "Change AI personality" → `change_system_prompt` tool\n\nThe reasoning you see above shows my thought process for this response!',
-          },
-        ],
-      },
-      // User asking about file support
-      {
-        id: "msg-7",
-        role: "user" as const,
-        parts: [
-          {
-            type: "text" as const,
-            text: "Can you share some documentation about this library?",
-          },
-        ],
-      },
-      // Assistant with source and file references
-      {
-        id: "msg-8",
-        role: "assistant" as const,
-        parts: [
-          {
             type: "source-url" as const,
             sourceId: "doc-1",
-            url: "https://ai-sdk.dev/docs/reference",
-            title: "AI SDK Documentation",
+            url: "https://github.com/knifeyspoony/ai-chat-bootstrap",
+            title: "AI Chat Bootstrap Repository",
           },
           {
             type: "source-document" as const,
@@ -207,32 +211,7 @@ export default function Home() {
           },
           {
             type: "text" as const,
-            text: "I've referenced some key documentation sources:\n\n📚 **External Documentation**: The official AI SDK docs provide comprehensive API reference\n📄 **Project README**: Contains setup instructions and usage examples  \n📦 **Package Info**: Shows the library metadata and dependencies\n\nThis demo showcases how the chat interface can display different content types including external URLs, document references, and file attachments. The AI can reference multiple sources in a single response!",
-          },
-        ],
-      },
-      // User message with step-based interaction
-      {
-        id: "msg-9",
-        role: "user" as const,
-        parts: [
-          {
-            type: "text" as const,
-            text: "Walk me through setting up this library step by step",
-          },
-        ],
-      },
-      // Assistant with step indicators
-      {
-        id: "msg-10",
-        role: "assistant" as const,
-        parts: [
-          {
-            type: "step-start" as const,
-          },
-          {
-            type: "text" as const,
-            text: "## Setting up AI Chat Bootstrap Library\n\nHere's a complete step-by-step guide:\n\n### Step 1: Installation\n```bash\npnpm add ai-chat-bootstrap @ai-sdk/react ai\n```\n\n### Step 2: Import Styles\n```css\n@import 'ai-chat-bootstrap/tokens.css';\n@import 'ai-chat-bootstrap/ai-chat.css';\n```\n\n### Step 3: Basic Usage (New Simplified API!)\n```tsx\nimport { ChatPopout } from 'ai-chat-bootstrap'\n\nfunction App() {\n  return (\n    <ChatPopout \n      api=\"/api/chat\"\n      systemPrompt=\"You are a helpful assistant\"\n      header={{ title: \"AI Assistant\" }}\n      ui={{ placeholder: \"Ask me anything...\" }}\n    />\n  )\n}\n```\n\n### Step 4: Add Context & Tools\n```tsx\nimport { useAIContext, useAIFrontendTool } from 'ai-chat-bootstrap'\n\nfunction MyComponent() {\n  const [counter, setCounter] = useState(0)\n  \n  // Structured context: description + value + priority\n  useAIContext({ description: 'Counter', value: { value: counter }, priority: 50 })\n  \n  useAIFrontendTool({\n    name: 'increment',\n    description: 'Increment counter',\n    execute: async () => {\n      setCounter(c => c + 1)\n      return { newValue: counter + 1 }\n    }\n  })\n  \n  return <div>Counter: {counter}</div>\n}\n```\n\n### Step 5: Advanced Configuration\n```tsx\n<ChatPopout \n  api=\"/api/chat\"\n  systemPrompt=\"You are a helpful assistant\"\n  models={[{ id: 'gpt-4o', label: 'GPT-4o' }]}\n  enableChainOfThought={true}\n  mcp={{ enabled: true }}\n  suggestions={{ enabled: true, count: 3 }}\n  threads={{ enabled: true }}\n/>\n```\n\nThat's it! **No hook management needed** - the component handles everything internally for optimal performance! 🚀",
+            text: "Start with the docs and repo linked above for installation and API details. For a guided walkthrough of focus items, shared context, and suggestions, open the **Core Features** demo from the navigation. Each of the other demos showcases a specific integration pattern—transport customization, threaded history, compression, and MCP toolchains—so you can model the pieces you need.",
           },
         ],
       },
@@ -241,393 +220,6 @@ export default function Home() {
   );
 
   // System prompt options
-  const systemPrompts = {
-    default: undefined,
-    helpful:
-      "You are a friendly and enthusiastic AI assistant. Be encouraging and positive in your responses while helping users explore this demo.",
-    technical:
-      "You are a technical AI assistant focused on demonstrating the integration between AI and React applications. Explain technical concepts clearly and suggest advanced usage patterns.",
-    creative:
-      "You are a creative AI assistant. When users interact with the demo, suggest interesting and creative ways to use the tools and features. Be imaginative and inspiring.",
-  };
-
-  // Chat configuration for the new simplified API
-
-  // FocusableCard component
-  const FocusableCard = ({
-    id,
-    title,
-    description,
-    icon: Icon,
-    children,
-    color = "blue",
-    focusRef,
-  }: {
-    id: string;
-    title: string;
-    description: string;
-    icon: React.ComponentType<{ className?: string }>;
-    children: React.ReactNode;
-    color?: string;
-    focusRef?: React.RefObject<HTMLDivElement>;
-  }) => {
-    const focused = !!getFocus(id);
-    const colorClasses = {
-      primary: focused
-        ? "ring-2 ring-primary shadow-lg bg-primary/10"
-        : "hover:bg-primary/5",
-      secondary: focused
-        ? "ring-2 ring-secondary shadow-lg bg-secondary/50"
-        : "hover:bg-secondary/20",
-      accent: focused
-        ? "ring-2 ring-accent shadow-lg bg-accent/50"
-        : "hover:bg-accent/20",
-      muted: focused
-        ? "ring-2 ring-muted-foreground shadow-lg bg-muted"
-        : "hover:bg-muted/50",
-    };
-
-    return (
-      <Card
-        className={`transition-all duration-300 cursor-pointer border-2 ${
-          colorClasses[color as keyof typeof colorClasses]
-        } ${
-          focused
-            ? "border-primary"
-            : "border-border hover:border-muted-foreground/50"
-        }`}
-        onClick={() => handleFocusToggle(id)}
-      >
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Icon className="h-5 w-5" />
-              {title}
-            </div>
-            {focused ? (
-              <CheckCircle2 className="h-5 w-5 text-primary" />
-            ) : (
-              <Circle className="h-5 w-5 text-muted-foreground" />
-            )}
-          </CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </CardHeader>
-        <CardContent ref={focusRef}>{children}</CardContent>
-      </Card>
-    );
-  };
-
-  const pageContent = (
-    <>
-      {/* Header */}
-      <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Sparkles className="h-6 w-6 text-primary" />
-            <h1 className="text-lg font-semibold">AI Chat Bootstrap Demo</h1>
-          </div>
-          <ThemeToggle />
-        </div>
-      </header>
-
-      {/* Hero Section */}
-      <div className="text-center mb-16 pt-12">
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <Zap className="h-8 w-8 text-primary" />
-          <h2 className="text-5xl font-bold text-foreground">
-            Interactive Demo
-          </h2>
-          <Zap className="h-8 w-8 text-primary" />
-        </div>
-        <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-          Experience seamless AI-app integration with real-time context sharing,
-          intelligent tool execution, and dynamic focus management.
-          <br />
-          <span className="font-medium">
-            Click elements below to focus them, then chat with AI!
-          </span>
-        </p>
-      </div>
-
-      {/* Controls Section */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-12 p-6 bg-card rounded-2xl border">
-        <div className="flex items-center gap-3">
-          <span className="font-medium">AI Personality:</span>
-          <Select
-            value={selectedSystemPrompt}
-            onValueChange={setSelectedSystemPrompt}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="default">Default</SelectItem>
-              <SelectItem value="helpful">Helpful</SelectItem>
-              <SelectItem value="technical">Technical</SelectItem>
-              <SelectItem value="creative">Creative</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <span className="font-medium">Chat Mode:</span>
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                "text-sm",
-                chatMode === "overlay"
-                  ? "text-primary font-medium"
-                  : "text-muted-foreground"
-              )}
-            >
-              Overlay
-            </span>
-            <Switch
-              checked={chatMode === "inline"}
-              onCheckedChange={(checked) =>
-                setChatMode(checked ? "inline" : "overlay")
-              }
-            />
-            <span
-              className={cn(
-                "text-sm",
-                chatMode === "inline"
-                  ? "text-primary font-medium"
-                  : "text-muted-foreground"
-              )}
-            >
-              Inline
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Interactive Elements Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        {/* Counter Widget */}
-        <FocusableCard
-          id="counter-widget"
-          title="Counter"
-          description="Interactive number counter"
-          icon={CalculatorIcon}
-          color="primary"
-        >
-          <div className="space-y-4">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-primary mb-2">
-                {counter}
-              </div>
-              <Badge variant="secondary" className="text-xs">
-                Current Value
-              </Badge>
-            </div>
-            <div className="flex gap-2 justify-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCounter((c) => c - 1);
-                }}
-              >
-                <MinusIcon className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCounter((c) => c + 1);
-                }}
-              >
-                <PlusIcon className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </FocusableCard>
-        {/* Calculator Widget */}
-        <FocusableCard
-          id="calculator-widget"
-          title="Calculator"
-          description="Math operations display"
-          icon={CalculatorIcon}
-          color="secondary"
-        >
-          <div className="space-y-4">
-            <div className="text-center min-h-[80px] flex items-center justify-center">
-              {calculation ? (
-                <div>
-                  <div className="text-2xl font-bold text-primary mb-2">
-                    {calculation}
-                  </div>
-                  <Badge variant="secondary" className="text-xs">
-                    Latest Result
-                  </Badge>
-                </div>
-              ) : (
-                <div className="text-muted-foreground text-center">
-                  <CalculatorIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Ask AI to calculate</p>
-                </div>
-              )}
-            </div>
-            {calculation && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCalculation(null);
-                }}
-                className="w-full"
-              >
-                Clear
-              </Button>
-            )}
-          </div>
-        </FocusableCard>
-
-        {/* Settings Widget */}
-        <FocusableCard
-          id="settings-widget"
-          title="Settings"
-          description="App configuration"
-          icon={EyeIcon}
-          color="accent"
-        >
-          <div className="space-y-3">
-            <div className="text-sm space-y-2">
-              <div>
-                <span className="font-medium">AI Mode:</span>
-                <Badge variant="outline" className="ml-2 capitalize">
-                  {selectedSystemPrompt}
-                </Badge>
-              </div>
-              <div>
-                <span className="font-medium">Focus:</span>
-                <Badge variant="outline" className="ml-2">
-                  {focusedIds.length} focused
-                </Badge>
-              </div>
-              <div>
-                <span className="font-medium">Tools:</span>
-                <Badge variant="outline" className="ml-2">
-                  {toolsCount} registered
-                </Badge>
-              </div>
-              <div>
-                <span className="font-medium">MCP:</span>
-                <Badge variant="outline" className="ml-2">
-                  {mcpStatus.isLoading
-                    ? "loading"
-                    : `${mcpStatus.tools.length} remote`}
-                </Badge>
-              </div>
-            </div>
-            {mcpStatus.error && (
-              <p className="text-xs text-destructive mt-2">
-                MCP tools unavailable: {mcpStatus.error}
-              </p>
-            )}
-          </div>
-        </FocusableCard>
-
-        {/* Database Settings */}
-        <FocusableCard
-          id="db-settings"
-          title="Database Settings"
-          description="Primary database configuration"
-          icon={DatabaseIcon}
-          color="muted"
-        >
-          <div className="space-y-3">
-            <div className="text-xs space-y-1 font-mono bg-muted p-3 rounded-lg">
-              <div>
-                engine:{" "}
-                <span className="text-primary">{dbSettings.engine}</span>
-              </div>
-              <div>
-                host: <span className="text-primary">{dbSettings.host}</span>
-              </div>
-              <div>
-                port: <span className="text-primary">{dbSettings.port}</span>
-              </div>
-              <div>
-                database:{" "}
-                <span className="text-primary">{dbSettings.database}</span>
-              </div>
-              <div>
-                ssl:{" "}
-                <span className="text-primary">{String(dbSettings.ssl)}</span>
-              </div>
-            </div>
-          </div>
-        </FocusableCard>
-
-        {/* User Profile */}
-        <FocusableCard
-          id="user-profile"
-          title="User Profile"
-          description="Current signed-in user"
-          icon={UserIcon}
-          color="accent"
-        >
-          <div className="space-y-3">
-            <div className="text-xs space-y-1 font-mono bg-muted p-3 rounded-lg">
-              <div>
-                name: <span className="text-primary">{userProfile.name}</span>
-              </div>
-              <div>
-                email: <span className="text-primary">{userProfile.email}</span>
-              </div>
-              <div>
-                role: <span className="text-primary">{userProfile.role}</span>
-              </div>
-              <div>
-                plan: <span className="text-primary">{userProfile.plan}</span>
-              </div>
-            </div>
-          </div>
-        </FocusableCard>
-
-        {/* Context Panel */}
-        <FocusableCard
-          id="context-panel"
-          title="Live Context"
-          description="Real-time app state"
-          icon={Focus}
-          color="muted"
-        >
-          <div className="space-y-3">
-            <div className="text-xs space-y-1 font-mono bg-muted p-3 rounded-lg">
-              <div>
-                counter: <span className="text-primary">{counter}</span>
-              </div>
-              <div>
-                calculation:{" "}
-                <span className="text-primary">{calculation || "null"}</span>
-              </div>
-              <div>
-                focused:{" "}
-                <span className="text-primary">[{focusedIds.join(", ")}]</span>
-              </div>
-              <div>
-                ai_mode:{" "}
-                <span className="text-primary">
-                  &quot;{selectedSystemPrompt}&quot;
-                </span>
-              </div>
-            </div>
-            <Badge variant="outline" className="w-full justify-center text-xs">
-              <span className="w-2 h-2 bg-primary rounded-full mr-2"></span>
-              Live Sync
-            </Badge>
-          </div>
-        </FocusableCard>
-      </div>
-    </>
-  );
-
   const handleOpenDocs = React.useCallback(() => {
     window.open(
       "https://ai-sdk.dev/elements/components/actions",
@@ -635,6 +227,177 @@ export default function Home() {
       "noopener,noreferrer"
     );
   }, []);
+
+  // Chat configuration for the new simplified API
+
+  const DemoNavigator = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Compass className="h-4 w-4" />
+          Explore demos
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        <DropdownMenuLabel>Jump to a scenario</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {DEMO_PAGES.map((page) => (
+          <DropdownMenuItem key={page.href} asChild>
+            <Link href={page.href} className="flex items-start gap-3 py-1.5">
+              <page.icon className="mt-1 h-4 w-4 text-primary" />
+              <span className="flex flex-col">
+                <span className="font-medium text-foreground">
+                  {page.title}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {page.description}
+                </span>
+              </span>
+            </Link>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const pageContent = (
+    <>
+      <header className="sticky top-0 z-40 w-full border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
+              <Sparkles className="h-5 w-5" />
+            </span>
+            <div>
+              <h1 className="text-lg font-semibold">AI Chat Bootstrap Demo</h1>
+              <p className="text-xs text-muted-foreground">
+                A state-aware assistant playground
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <DemoNavigator />
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto max-w-7xl space-y-16 px-4 py-12">
+        <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/10 via-background to-background px-8 py-12 shadow-sm">
+          <div
+            className="absolute inset-y-0 right-0 hidden w-1/3 translate-x-10 rounded-full bg-primary/20 blur-3xl sm:block"
+            aria-hidden="true"
+          />
+          <div className="relative grid gap-10 lg:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="space-y-6">
+              <Badge className="w-fit border border-primary/30 bg-primary/10 text-primary">
+                Demo hub
+              </Badge>
+              <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">
+                Build state-aware AI chat surfaces faster
+              </h2>
+              <p className="text-lg leading-relaxed text-muted-foreground">
+                Wire the assistant, register frontend tools, and stream context
+                without bespoke plumbing. Everything on this page ships in the{" "}
+                <span className="font-mono text-sm text-primary">
+                  ai-chat-bootstrap
+                </span>{" "}
+                package.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Button size="lg" className="gap-2" onClick={handleOpenDocs}>
+                  <BookOpen className="h-5 w-5" />
+                  Read the docs
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="lg" asChild className="gap-2">
+                  <Link href="/core">
+                    <MessageSquare className="h-5 w-5" />
+                    View core demo
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-6">
+          <div className="space-y-2">
+            <h3 className="text-2xl font-semibold">What&apos;s in the box</h3>
+            <p className="text-muted-foreground">
+              Ship a production-ready assistant with three foundational building
+              blocks.
+            </p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {FEATURE_CALLOUTS.map((feature) => (
+              <Card key={feature.title} className="border bg-card/70 shadow-sm">
+                <CardHeader className="flex items-start gap-3">
+                  <span className="rounded-lg border border-primary/30 bg-primary/10 p-2 text-primary">
+                    <feature.icon className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <CardTitle className="text-lg">{feature.title}</CardTitle>
+                    <CardDescription>{feature.description}</CardDescription>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    {feature.meta}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h3 className="text-2xl font-semibold">
+                Explore focused scenarios
+              </h3>
+              <p className="text-muted-foreground">
+                Jump to dedicated demos that stress-test specific integrations.
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2"
+              onClick={handleOpenDocs}
+            >
+              <BookOpen className="h-4 w-4" />
+              Library reference
+            </Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {DEMO_PAGES.map((demo) => (
+              <Link
+                key={demo.href}
+                href={demo.href}
+                className="group block h-full"
+              >
+                <Card className="h-full border-dashed transition group-hover:border-primary group-hover:shadow-md">
+                  <CardHeader className="flex flex-row items-center gap-3">
+                    <div className="rounded-lg border border-primary/30 bg-primary/10 p-2 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                      <demo.icon className="h-5 w-5" />
+                    </div>
+                    <CardTitle className="text-lg">{demo.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed text-muted-foreground transition group-hover:text-foreground">
+                      {demo.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </section>
+      </main>
+    </>
+  );
 
   const customAssistantActions: AssistantAction[] = React.useMemo(
     () => [
@@ -685,30 +448,12 @@ export default function Home() {
   );
 
   return (
-    <div
-      className={cn(
-        "min-h-screen bg-background",
-        chatMode === "inline" ? "flex h-screen" : ""
-      )}
-    >
-      {chatMode === "inline" ? (
-        <ScrollArea className="flex-1">
-          <div className="px-4 py-2">{pageContent}</div>
-        </ScrollArea>
-      ) : (
-        <div className="container mx-auto px-4 py-12 max-w-7xl">
-          {pageContent}
-        </div>
-      )}
-
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto max-w-7xl px-4 py-12">{pageContent}</div>
       {/* Chat Interface */}
       <ChatPopout
         transport={{ api: "/api/chat" }}
-        messages={{
-          systemPrompt:
-            systemPrompts[selectedSystemPrompt as keyof typeof systemPrompts],
-          initial: sampleMessages,
-        }}
+        messages={{ systemPrompt, initial: sampleMessages }}
         features={{
           chainOfThought: true,
           branching: true,
@@ -720,22 +465,22 @@ export default function Home() {
         models={{ available: DEMO_MODELS, initial: DEMO_MODELS[0].id }}
         header={{
           title: "AI Assistant",
-          subtitle: `${selectedSystemPrompt} mode • ${focusedIds.length} focused • ${chatMode}`,
+          subtitle: "Overview demo | inline layout",
         }}
         ui={{
           placeholder:
-            "Try: 'Show user profile', 'Calculate 25 * 4', or type '/' for UI/AI commands...",
+            "Ask about install steps, styling, or which demo covers a feature.",
         }}
         popout={{
           position: "right",
-          mode: chatMode as "overlay" | "inline",
+          mode: chatMode,
           width: { default: 450, min: 400, max: 600 },
         }}
         suggestions={{
           enabled: true,
           count: 4,
           prompt:
-            "Generate contextual suggestions based on the focused widgets, tools available, and current conversation. Suggest specific actions the user can take with the counter, calculator, database settings, user profile, or other interactive elements.",
+            "Recommend next steps such as reading documentation, opening another demo, or trying an integration idea with the library.",
         }}
         commands={{
           enabled: true,

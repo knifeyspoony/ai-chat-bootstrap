@@ -1,16 +1,14 @@
-const isDevEnvironment = () => {
-  if (typeof process === "undefined") {
-    return false;
-  }
-  const env = process.env?.NODE_ENV;
-  return env !== "production";
-};
-
 /**
- * Logs detailed errors during development without impacting production bundles.
+ * Logs detailed errors when enabled via devTools configuration.
+ * No longer relies on NODE_ENV - respects explicit devTools.showErrorMessages flag.
  */
-export function logDevError(context: string, error: unknown) {
-  if (!isDevEnvironment()) {
+export function logDevError(
+  context: string,
+  error: unknown,
+  show: boolean = false
+) {
+  // If show is true, log the error
+  if (!show) {
     return;
   }
 
@@ -23,5 +21,3 @@ export function logDevError(context: string, error: unknown) {
 
   console.error(`${prefix}:`, error);
 }
-
-export { isDevEnvironment };

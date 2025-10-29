@@ -425,7 +425,7 @@ If you need additional variant surfaces, open an issue or PR—extending CVA con
 **Optional:**
 
 - `header`: title, subtitle, avatar, badge, actions, className
-- `ui`: placeholder, className, classes (`header`, `messages`, `message`, `input`, `assistantActions`), emptyState
+- `ui`: placeholder, className, classes (`header`, `messages`, `message`, `input`, `assistantActions`), `showTimestamps`, emptyState, `style`, `assistantAvatar`, `userAvatar`
 - `suggestions`: enabled, prompt, count, api override, strategy, debounce
 - `commands`: enabled
 - `assistantActions`: enable built-in buttons (`copy`, `regenerate`, `debug`, `feedback`) or supply a `custom` array of `AssistantAction`s for bespoke controls
@@ -465,6 +465,36 @@ Use `transport.prepareSendMessagesRequest` to annotate the request before it is 
 ```
 
 The demo app includes a working example at `packages/ai-chat-bootstrap-demo/src/app/transport/page.tsx`.
+
+### Custom thread persistence
+
+Thread state is managed by `useChatThreadsStore`, which defaults to an IndexedDB implementation. The package now exports the `ChatThreadPersistence` interface, the built-in `createIndexedDBChatThreadPersistence`, and helpers like `normalizeMessagesMetadata` for zero-config message hygiene. Implementing your own provider (SQLite, filesystem, server-side API, etc.) is as simple as wiring those hooks up before you render the chat:
+
+```ts
+import {
+  ChatThreadPersistence,
+  normalizeMessagesMetadata,
+  useChatThreadsStore,
+} from "ai-chat-bootstrap";
+
+const sqlitePersistence: ChatThreadPersistence = {
+  async loadAll(scopeKey) {
+    return db.getThreads(scopeKey);
+  },
+  async save(thread) {
+    const { messages } = normalizeMessagesMetadata(thread.messages);
+    await db.saveThread({ ...thread, messages });
+  },
+  async delete(id) {
+    await db.deleteThread(id);
+  },
+};
+
+// Run during app start-up
+useChatThreadsStore.getState().initializePersistent(sqlitePersistence);
+```
+
+Always pass messages through `normalizeMessagesMetadata` (or `ensureMessageMetadata`) before persisting so downstream consumers receive the required metadata bag (timestamps, compression markers, etc.).
 
 ### ChatPopout
 

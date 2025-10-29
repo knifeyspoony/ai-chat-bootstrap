@@ -1,10 +1,10 @@
 import { useChat } from "@ai-sdk/react";
+import type { PrepareSendMessagesRequest } from "ai";
 import {
   DefaultChatTransport,
   lastAssistantMessageIsCompleteWithToolCalls,
   UIMessage,
 } from "ai";
-import type { PrepareSendMessagesRequest } from "ai";
 import isEqual from "fast-deep-equal";
 import React, {
   useCallback,
@@ -47,12 +47,13 @@ import {
   withCompressionPinnedState,
   type CompressionMessagePinnedState,
 } from "../utils/compression/message-metadata";
-import { fetchMCPServerTools } from "../utils/mcp-utils";
 import {
   buildPersistedCompressionState,
   clonePersistedCompressionState,
 } from "../utils/compression/persistence";
 import { logDevError } from "../utils/dev-logger";
+import { fetchMCPServerTools } from "../utils/mcp-utils";
+import { normalizeMessagesMetadata } from "../utils/message-normalization";
 import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
 import { useAIChatBranching } from "./use-ai-chat-branching";
 import { useAIChatCompression } from "./use-ai-chat-compression";
@@ -85,6 +86,21 @@ function hasMeaningfulUsageChange(
   if (prevBudget !== nextBudget) return true;
 
   return false;
+}
+
+export interface DevToolsConfig {
+  /**
+   * Master switch to enable all dev tools features.
+   * When enabled, turns on error logging and debug UI components.
+   * Defaults to false (production-safe).
+   */
+  enabled?: boolean;
+  /**
+   * Show detailed error messages in the console.
+   * Overrides the enabled setting if explicitly set.
+   * Defaults to the value of `enabled`.
+   */
+  showErrorMessages?: boolean;
 }
 
 export interface ThreadTitleOptions {
@@ -137,6 +153,7 @@ export interface UseAIChatOptions {
   };
   compression?: CompressionConfig;
   suggestions?: SuggestionsOptions;
+  devTools?: DevToolsConfig;
 }
 
 const isSerializedToolArray = (value: unknown): value is SerializedTool[] =>
@@ -182,6 +199,7 @@ export function useAIChat({
   models: modelsGroup,
   compression: compressionOptions,
   suggestions: suggestionsOptions,
+  devTools,
 }: UseAIChatOptions = {}) {
   const transportOptions = transport ?? {};
   const api = transportOptions.api ?? "/api/chat";
@@ -209,6 +227,10 @@ export function useAIChat({
   const suggestionsConfig = suggestionsOptions;
   const suggestionsEnabled = suggestionsConfig?.enabled ?? false;
   const suggestionCount = suggestionsConfig?.count ?? 3;
+
+  // Compute devTools flags - enabled is false by default (production-safe)
+  const devToolsEnabled = devTools?.enabled ?? false;
+  const showErrorMessages = devTools?.showErrorMessages ?? devToolsEnabled;
 
   const { models, selectedModelId } = useAIModelsStore(
     useShallow((state) => ({
@@ -444,7 +466,8 @@ export function useAIChat({
     } catch (error) {
       logDevError(
         "[acb][useAIChat] failed to configure MCP servers from props",
-        error
+        error,
+        showErrorMessages
       );
     }
   }, [
@@ -454,6 +477,7 @@ export function useAIChat({
     setMcpDefaultApi,
     setMcpEnabled,
     setMcpConfigurations,
+    showErrorMessages,
   ]);
 
   // Auto-fetch tools for servers configured via mcp.servers prop
@@ -506,7 +530,9 @@ export function useAIChat({
           })
           .catch((error) => {
             const message =
-              error instanceof Error ? error.message : "Failed to load MCP tools";
+              error instanceof Error
+                ? error.message
+                : "Failed to load MCP tools";
             setServerError(server.id, message);
           });
       }
@@ -523,6 +549,11 @@ export function useAIChat({
 
   // Direct reference to the zustand store object (not a hook call) for imperative ops
   const threadStore = useChatThreadsStore; // NOTE: used in effects below (getState())
+
+  const [isRestoringThread, setIsRestoringThread] = useState(false);
+  const updateIsRestoringThread = useCallback((next: boolean) => {
+    setIsRestoringThread((prev) => (prev === next ? prev : next));
+  }, []);
 
   // Configure persistence mode based on threads enabled flag.
   useEffect(() => {
@@ -544,10 +575,11 @@ export function useAIChat({
     } catch (error) {
       logDevError(
         "[acb][useAIChat] failed to configure chat thread persistence mode",
-        error
+        error,
+        showErrorMessages
       );
     }
-  }, [threadStore, threadsEnabled]);
+  }, [threadStore, threadsEnabled, showErrorMessages]);
 
   // Apply scopeKey (if provided) and load threads for that scope the first time or when scope changes.
   useEffect(() => {
@@ -560,32 +592,53 @@ export function useAIChat({
         state.loadThreadMetas(scopeKey).catch((error) => {
           logDevError(
             `[acb][useAIChat] failed to load thread metadata for scope "${scopeKey}"`,
-            error
+            error,
+            showErrorMessages
           );
         });
       } else if (!state.isLoaded) {
         state.loadThreadMetas(scopeKey).catch((error) => {
           logDevError(
             `[acb][useAIChat] failed to load thread metadata for scope "${scopeKey}"`,
-            error
+            error,
+            showErrorMessages
           );
         });
       }
     } catch (error) {
       logDevError(
         "[acb][useAIChat] failed to resolve thread scope metadata",
-        error
+        error,
+        showErrorMessages
       );
     }
-  }, [scopeKey, threadStore]);
+  }, [scopeKey, threadStore, showErrorMessages]);
 
   // When no threadId provided, choose most recently updated in scope or create a new one.
   useEffect(() => {
     if (threadId) return; // caller controls id
-    try {
-      const state = threadStore.getState();
-      const scope = scopeKey;
-      async function pickOrCreateLatest() {
+    let cancelled = false;
+
+    const scope = scopeKey;
+
+    async function pickOrCreateLatest() {
+      let started = false;
+      const startRestoring = () => {
+        if (cancelled || started) return;
+        started = true;
+        updateIsRestoringThread(true);
+      };
+      const stopRestoring = () => {
+        if (!started) return;
+        started = false;
+        if (!cancelled) {
+          updateIsRestoringThread(false);
+        }
+      };
+
+      try {
+        const state = threadStore.getState();
+
         if (!state.isLoaded) {
           try {
             await state.loadThreadMetas(scope);
@@ -594,17 +647,31 @@ export function useAIChat({
               `[acb][useAIChat] failed to load thread metadata before selecting default thread (scope "${
                 scope ?? "(default)"
               }")`,
-              error
+              error,
+              showErrorMessages
             );
           }
         }
+
         // Prefer existing active if present
-        if (state.activeThreadId) {
-          const id = state.activeThreadId;
-          const t =
-            state.getThreadIfLoaded?.(id) || (await state.loadThread(id));
-          if (t) {
-            const storeMsgs = t.messages as UIMessage[];
+        const activeId = state.activeThreadId;
+        if (activeId) {
+          const loaded = state.getThreadIfLoaded?.(activeId);
+          if (loaded) {
+            const storeMsgs = loaded.messages as UIMessage[];
+            const differs =
+              chatHook.messages.length !== storeMsgs.length ||
+              chatHook.messages.some((m, i) => storeMsgs[i]?.id !== m.id);
+            if (differs) chatHook.setMessages(storeMsgs);
+            return;
+          }
+
+          startRestoring();
+          const thread =
+            state.getThreadIfLoaded?.(activeId) ||
+            (await state.loadThread(activeId));
+          if (thread) {
+            const storeMsgs = thread.messages as UIMessage[];
             const differs =
               chatHook.messages.length !== storeMsgs.length ||
               chatHook.messages.some((m, i) => storeMsgs[i]?.id !== m.id);
@@ -612,15 +679,17 @@ export function useAIChat({
             return;
           }
         }
+
         const metas = state.listThreads(scope);
         if (metas.length > 0) {
+          startRestoring();
           const latest = metas[0]; // sorted by updatedAt desc in store
           state.setActiveThread(latest.id);
-          const t =
+          const thread =
             state.getThreadIfLoaded?.(latest.id) ||
             (await state.loadThread(latest.id));
-          if (t) {
-            const storeMsgs = t.messages as UIMessage[];
+          if (thread) {
+            const storeMsgs = thread.messages as UIMessage[];
             const differs =
               chatHook.messages.length !== storeMsgs.length ||
               chatHook.messages.some((m, i) => storeMsgs[i]?.id !== m.id);
@@ -628,23 +697,36 @@ export function useAIChat({
             return;
           }
         }
-        // No threads exist: create one for this scope
-        const created = state.createThread({ scopeKey: scope });
-        state.setActiveThread(created.id);
-        if (chatHook.messages.length > 0) {
-          state.updateThreadMessages(
-            created.id,
-            chatHook.messages as UIMessage[]
+
+        if (!state.activeThreadId) {
+          const created = state.createThread({ scopeKey: scope });
+          state.setActiveThread(created.id);
+          if (chatHook.messages.length > 0) {
+            state.updateThreadMessages(
+              created.id,
+              chatHook.messages as UIMessage[]
+            );
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          logDevError(
+            "[acb][useAIChat] failed to select or create a default thread",
+            error,
+            showErrorMessages
           );
         }
+      } finally {
+        stopRestoring();
       }
-      pickOrCreateLatest();
-    } catch (error) {
-      logDevError(
-        "[acb][useAIChat] failed to select or create a default thread",
-        error
-      );
     }
+
+    pickOrCreateLatest();
+
+    return () => {
+      cancelled = true;
+      updateIsRestoringThread(false);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId, scopeKey]);
 
@@ -658,7 +740,8 @@ export function useAIChat({
         } catch (error) {
           logDevError(
             "[acb][useAIChat] failed to read active thread id from store",
-            error
+            error,
+            showErrorMessages
           );
           return undefined;
         }
@@ -671,7 +754,8 @@ export function useAIChat({
       } catch (error) {
         logDevError(
           `[acb][useAIChat] failed to read cached messages for thread "${effectiveId}"`,
-          error
+          error,
+          showErrorMessages
         );
         return undefined;
       }
@@ -683,13 +767,20 @@ export function useAIChat({
   // If still missing, optionally create it (allowing pre-seeding a stable id from app state).
   React.useEffect(() => {
     if (!threadId) return; // only for controlled id
+    let cancelled = false;
     try {
       const state = threadStore.getState();
-      if (state.getThreadIfLoaded?.(threadId)) return; // already loaded
-      // Attempt persistence load
+      if (state.getThreadIfLoaded?.(threadId)) {
+        updateIsRestoringThread(false);
+        return; // already loaded
+      }
+
+      updateIsRestoringThread(true);
+
       state
         .loadThread(threadId)
         .then((loaded) => {
+          if (cancelled) return;
           if (loaded) {
             // Set messages in hook if they differ (covers first mount where existingThreadMessages was undefined)
             const storeMsgs = loaded.messages as UIMessage[];
@@ -725,6 +816,7 @@ export function useAIChat({
           }
         })
         .catch((error) => {
+          if (cancelled) return;
           if (warnOnMissingThread) {
             console.warn(
               `[acb][useAIChat] failed loading threadId "${threadId}" from persistence`
@@ -732,20 +824,33 @@ export function useAIChat({
           }
           logDevError(
             `[acb][useAIChat] failed loading threadId "${threadId}" from persistence`,
-            error
+            error,
+            showErrorMessages
           );
           const s2 = threadStore.getState();
           if (autoCreateThread && !s2.threads.get(threadId)) {
             s2.createThread({ id: threadId, scopeKey });
             s2.setActiveThread(threadId);
           }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            updateIsRestoringThread(false);
+          }
         });
     } catch (error) {
+      updateIsRestoringThread(false);
       logDevError(
         `[acb][useAIChat] failed handling provided threadId "${threadId}"`,
-        error
+        error,
+        showErrorMessages
       );
     }
+
+    return () => {
+      cancelled = true;
+      updateIsRestoringThread(false);
+    };
     // We intentionally exclude dependencies that would retrigger this unnecessarily
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId, autoCreateThread, warnOnMissingThread, scopeKey]);
@@ -924,12 +1029,10 @@ export function useAIChat({
           }
 
           const mergedBody = userResult.body ?? preparedRequest.body;
-          const mergedHeaders =
-            userResult.headers ?? preparedRequest.headers;
+          const mergedHeaders = userResult.headers ?? preparedRequest.headers;
           const mergedCredentials =
             userResult.credentials ?? preparedRequest.credentials;
-          const mergedApi =
-            userResult.api ?? preparedRequest.api ?? api;
+          const mergedApi = userResult.api ?? preparedRequest.api ?? api;
 
           return {
             ...options,
@@ -941,7 +1044,8 @@ export function useAIChat({
         } catch (error) {
           logDevError(
             "[acb][useAIChat] prepareSendMessagesRequest callback failed",
-            error
+            error,
+            showErrorMessages
           );
           return preparedRequest;
         }
@@ -952,6 +1056,7 @@ export function useAIChat({
     chainOfThoughtEnabled,
     buildCompressionRequestPayload,
     userPrepareSendMessagesRequest,
+    showErrorMessages,
   ]);
 
   const [draftInput, setDraftInput] = useState("");
@@ -979,19 +1084,33 @@ export function useAIChat({
         throw error;
       }
     },
-    onFinish: () => {
+    onFinish: ({ message }) => {
       suggestionsFinishRef.current?.();
+      const { messages: normalizedMessages, changed: normalizedChanged } =
+        normalizeMessagesMetadata(chatHook.messages, {
+          shouldStampTimestamp: (candidate) =>
+            candidate === message ||
+            (!!message?.id && candidate.id === message.id),
+          timestampFactory: () => Date.now(),
+        });
+      const messagesSnapshot = normalizedChanged
+        ? normalizedMessages
+        : chatHook.messages;
+
+      if (normalizedChanged) {
+        chatHook.setMessages(normalizedMessages);
+      }
       // Persist updated messages into thread (if any)
       if (threadStore) {
         try {
           const state = threadStore.getState();
           const effectiveId = threadId ?? state.activeThreadId;
           if (effectiveId && state.threads.get(effectiveId)) {
-            state.updateThreadMessages(effectiveId, chatHook.messages);
+            state.updateThreadMessages(effectiveId, messagesSnapshot);
             // Immediate default title after first user message (if no manual title)
             const tNow = state.threads.get(effectiveId);
             if (tNow && !tNow.title) {
-              const firstUserMessage = chatHook.messages.find(
+              const firstUserMessage = messagesSnapshot.find(
                 (m) => m.role === "user"
               );
               const firstUserText = (firstUserMessage?.parts ?? [])
@@ -1044,7 +1163,7 @@ export function useAIChat({
                   const source =
                     storeMsgs.length > 0
                       ? storeMsgs
-                      : (chatHook.messages as UIMessage[]) || [];
+                      : (messagesSnapshot as UIMessage[]) || [];
                   const sample = source.slice(-threadTitleSampleCount);
                   const payload: {
                     messages: UIMessage[];
@@ -1073,7 +1192,8 @@ export function useAIChat({
                     .catch((error) => {
                       logDevError(
                         `[acb][useAIChat] failed to fetch auto title for thread "${effectiveId}"`,
-                        error
+                        error,
+                        showErrorMessages
                       );
                     });
                 }
@@ -1081,14 +1201,16 @@ export function useAIChat({
             } catch (error) {
               logDevError(
                 `[acb][useAIChat] failed to apply auto-title logic for thread "${effectiveId}"`,
-                error
+                error,
+                showErrorMessages
               );
             }
           }
         } catch (error) {
           logDevError(
             "[acb][useAIChat] failed to persist messages after completion",
-            error
+            error,
+            showErrorMessages
           );
         }
       }
@@ -1096,11 +1218,22 @@ export function useAIChat({
     onError: (error) => {
       logDevError(
         "[acb][useAIChat] Chat error occurred",
-        error ?? new Error("Unknown chat error")
+        error ?? new Error("Unknown chat error"),
+        showErrorMessages
       );
       setError("Chat error occurred");
     },
   });
+
+  useEffect(() => {
+    const latest = chatHookRef.current ?? chatHook;
+    const { messages: normalized, changed } = normalizeMessagesMetadata(
+      latest.messages
+    );
+    if (changed) {
+      latest.setMessages(normalized);
+    }
+  }, [chatHook, chatHook.messages]);
 
   const baseCompressionActions = baseCompressionController.actions;
 
@@ -1114,9 +1247,9 @@ export function useAIChat({
     try {
       getLatestChat().clearError();
     } catch (error) {
-      logDevError("[acb][useAIChat] failed to clear chat error state", error);
+      logDevError("[acb][useAIChat] failed to clear chat error state", error, showErrorMessages);
     }
-  }, [getLatestChat, setError]);
+  }, [getLatestChat, setError, showErrorMessages]);
 
   const mutateMessageById = useCallback(
     (
@@ -1506,7 +1639,8 @@ export function useAIChat({
           } catch (error) {
             logDevError(
               `[acb][useAIChat] failed to persist cleared compression messages for thread "${effectiveThreadId}"`,
-              error
+              error,
+              showErrorMessages
             );
           }
         }
@@ -1520,7 +1654,8 @@ export function useAIChat({
         } catch (error) {
           logDevError(
             `[acb][useAIChat] failed to clear compression metadata for thread "${effectiveThreadId}"`,
-            error
+            error,
+            showErrorMessages
           );
         }
       }
@@ -1573,7 +1708,8 @@ export function useAIChat({
         } catch (error) {
           logDevError(
             `[acb][useAIChat] failed to persist compression-updated messages for thread "${effectiveThreadId}"`,
-            error
+            error,
+            showErrorMessages
           );
         }
       }
@@ -1589,7 +1725,8 @@ export function useAIChat({
       } catch (error) {
         logDevError(
           `[acb][useAIChat] failed to persist compression metadata for thread "${effectiveThreadId}"`,
-          error
+          error,
+          showErrorMessages
         );
       }
     }
@@ -1607,6 +1744,7 @@ export function useAIChat({
     storeActiveThreadId,
     threadId,
     threadStore,
+    showErrorMessages,
   ]);
 
   // Update ref to latest chatHook for stable callback access
@@ -1631,7 +1769,8 @@ export function useAIChat({
       } catch (error) {
         logDevError(
           `[acb][useAIChat] failed to unload thread "${prev}"`,
-          error
+          error,
+          showErrorMessages
         );
       }
     }
@@ -1653,7 +1792,8 @@ export function useAIChat({
             .catch((error) => {
               logDevError(
                 `[acb][useAIChat] failed to hydrate thread "${effectiveId}"`,
-                error
+                error,
+                showErrorMessages
               );
             });
         } else {
@@ -1670,14 +1810,15 @@ export function useAIChat({
       } catch (error) {
         logDevError(
           `[acb][useAIChat] failed to access thread state for "${effectiveId}"`,
-          error
+          error,
+          showErrorMessages
         );
       }
     } else {
       // no active thread
       chatHook.setMessages([]);
     }
-  }, [threadId, storeActiveThreadId, chatHook, threadStore]);
+  }, [threadId, storeActiveThreadId, chatHook, threadStore, showErrorMessages]);
 
   // Note: Removed chat store sync - causes infinite re-renders
   // The chat hook manages its own state internally
@@ -1696,7 +1837,8 @@ export function useAIChat({
     } catch (error) {
       logDevError(
         `[acb][useAIChat] failed to append tool result for "${toolCall.toolName}"`,
-        error
+        error,
+        showErrorMessages
       );
     }
   }
@@ -1704,7 +1846,11 @@ export function useAIChat({
   const sendMessageWithContext = useCallback(
     (content: string) => {
       resetErrorState();
-      chatHookRef.current?.sendMessage({ text: content });
+      const timestamp = Date.now();
+      chatHookRef.current?.sendMessage({
+        text: content,
+        metadata: { timestamp },
+      });
       if (threadStore) {
         // schedule microtask after message appended by hook
         queueMicrotask(() => {
@@ -1748,7 +1894,8 @@ export function useAIChat({
           } catch (error) {
             logDevError(
               "[acb][useAIChat] failed to persist thread state after sending message",
-              error
+              error,
+              showErrorMessages
             );
           }
         });
@@ -1777,8 +1924,9 @@ export function useAIChat({
       const filteredTools = allTools.filter((tool) => tool.name === toolName);
 
       // Send message with per-call overrides; transport will pick these up in prepareSendMessagesRequest
+      const timestamp = Date.now();
       chatHookRef.current?.sendMessage(
-        { text: content },
+        { text: content, metadata: { timestamp } },
         {
           body: {
             tools: filteredTools,
@@ -1800,13 +1948,14 @@ export function useAIChat({
           } catch (error) {
             logDevError(
               "[acb][useAIChat] failed to persist thread state after command message",
-              error
+              error,
+              showErrorMessages
             );
           }
         });
       }
     },
-    [threadId, resetErrorState, threadStore]
+    [threadId, resetErrorState, threadStore, showErrorMessages]
   );
 
   // Retry last message with error recovery
@@ -1849,7 +1998,8 @@ export function useAIChat({
           } catch (error) {
             logDevError(
               "[acb][useAIChat] failed to read active thread id during persistence",
-              error
+              error,
+              showErrorMessages
             );
             return undefined;
           }
@@ -1892,11 +2042,12 @@ export function useAIChat({
       } catch (error) {
         logDevError(
           `[acb][useAIChat] failed to persist messages for thread "${effectiveId}"`,
-          error
+          error,
+          showErrorMessages
         );
       }
     },
-    [threadId, threadStore, chatHook, chatHookRef]
+    [threadId, threadStore, chatHook, chatHookRef, showErrorMessages]
   );
 
   const branching = useAIChatBranching({
@@ -1998,5 +2149,6 @@ export function useAIChat({
       fetchSuggestions,
       clearSuggestions,
     },
+    isRestoringThread,
   };
 }

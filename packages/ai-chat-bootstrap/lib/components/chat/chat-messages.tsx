@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useImperativeHandle,
   useMemo,
+  useState,
 } from "react";
 import { useStickToBottomContext } from "use-stick-to-bottom";
 import {
@@ -13,12 +14,12 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from "../../components/ai-elements/conversation";
-import { Loader } from "../../components/ai-elements/loader";
 import {
   Message,
   MessageAvatar,
   MessageContent,
 } from "../../components/ai-elements/message";
+import { ChatLoader } from "./chat-loader";
 import { Badge } from "../../components/ui/badge";
 import type { AssistantActionsConfig } from "../../types/actions";
 import type {
@@ -33,6 +34,7 @@ import type { ResponseProps } from "../ai-elements/response";
 import { AssistantMessage } from "./assistant-message";
 import { ChatMessagePart } from "./chat-message-part";
 import { ChatMessagePinToggle } from "./chat-message-pin-toggle";
+import { formatMessageTimestamp } from "../../utils/message-timestamps";
 
 const tokenNumberFormatter =
   typeof Intl !== "undefined"
@@ -117,6 +119,7 @@ function buildCompressionSummary(systemText?: string | null): string | null {
 
 export interface ChatMessagesProps {
   messages: UIMessage[];
+  showTimestamps?: boolean;
   assistantAvatar?: string | React.ReactNode;
   userAvatar?: string | React.ReactNode;
   isLoading?: boolean;
@@ -164,6 +167,7 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
   (
     {
       messages,
+      showTimestamps = false,
       isLoading = false,
       className,
       messageClassName,
@@ -332,16 +336,17 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                       });
                     }
                   };
-                  return (
-                    <AssistantMessage
-                      key={message.id ?? index}
-                      message={message}
-                      isStreaming={isStreamingLast}
-                      assistantAvatar={assistantAvatar}
-                      messageClassName={messageClassName}
-                      isLastMessage={index === filteredMessages.length - 1}
-                      isLatestAssistant={isLatestAssistantMessage}
-                      actionsClassName={assistantActionsClassName}
+                return (
+                  <AssistantMessage
+                    key={message.id ?? index}
+                    message={message}
+                    isStreaming={isStreamingLast}
+                    showTimestamp={showTimestamps}
+                    assistantAvatar={assistantAvatar}
+                    messageClassName={messageClassName}
+                    isLastMessage={index === filteredMessages.length - 1}
+                    isLatestAssistant={isLatestAssistantMessage}
+                    actionsClassName={assistantActionsClassName}
                       actionsConfig={assistantActionsConfig}
                       branching={branching}
                       responseProps={responseProps}
@@ -376,6 +381,7 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                     key={message.id ?? index}
                     message={message}
                     isStreaming={isStreamingLast}
+                    showTimestamp={showTimestamps}
                     assistantAvatar={assistantAvatar}
                     userAvatar={userAvatar}
                     messageClassName={messageClassName}
@@ -391,7 +397,7 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                   />
                 );
               })}
-          {isLoading && !lastMessage && (
+          {isLoading && lastMessage?.role === "user" && (
             <Message
               from="assistant"
               data-acb-part="message"
@@ -402,7 +408,7 @@ const ChatMessagesInner = forwardRef<ChatMessagesHandle, ChatMessagesProps>(
                 data-acb-part="message-content"
                 className="rounded-[var(--acb-chat-message-radius)]"
               >
-                <Loader />
+                <ChatLoader />
               </MessageContent>
               <MessageAvatar
                 data-acb-part="message-avatar"
@@ -446,6 +452,7 @@ ChatMessagesInner.displayName = "ChatMessages";
 interface ChatMessageItemProps {
   message: UIMessage;
   isStreaming: boolean;
+  showTimestamp?: boolean;
   assistantAvatar?: string | React.ReactNode;
   userAvatar?: string | React.ReactNode;
   messageClassName?: string;
@@ -460,6 +467,7 @@ const ChatMessageItem = React.memo(
   function ChatMessageItem({
     message,
     isStreaming,
+    showTimestamp = false,
     assistantAvatar,
     userAvatar,
     messageClassName,
@@ -468,6 +476,14 @@ const ChatMessageItem = React.memo(
   }: ChatMessageItemProps) {
     const isUser = message.role === "user";
     const isSystem = message.role === "system";
+
+    // Client-side only timestamp rendering to avoid hydration mismatch
+    const [timestampLabel, setTimestampLabel] = useState<string | null>(null);
+    useEffect(() => {
+      if (showTimestamp) {
+        setTimestampLabel(formatMessageTimestamp(message));
+      }
+    }, [showTimestamp, message]);
 
     if (isSystem) {
       const firstPart = message.parts?.[0];
@@ -490,9 +506,16 @@ const ChatMessageItem = React.memo(
               messageClassName
             )}
           >
-            <span className="rounded-full bg-[var(--acb-chat-message-system-bg)]/70 px-3 py-1 text-xs text-muted-foreground">
-              {label}
-            </span>
+            <div className="flex flex-col items-center gap-1">
+              <span className="rounded-full bg-[var(--acb-chat-message-system-bg)]/70 px-3 py-1 text-xs text-muted-foreground">
+                {label}
+              </span>
+              {timestampLabel ? (
+                <span className="text-[10px] text-muted-foreground">
+                  {timestampLabel}
+                </span>
+              ) : null}
+            </div>
           </div>
         );
       }
@@ -504,9 +527,16 @@ const ChatMessageItem = React.memo(
             messageClassName
           )}
         >
-          <Badge variant="outline" className="text-xs">
-            {systemText}
-          </Badge>
+          <div className="flex flex-col items-center gap-1">
+            <Badge variant="outline" className="text-xs">
+              {systemText}
+            </Badge>
+            {timestampLabel ? (
+              <span className="text-[10px] text-muted-foreground">
+                {timestampLabel}
+              </span>
+            ) : null}
+          </div>
         </div>
       );
     }
@@ -530,24 +560,36 @@ const ChatMessageItem = React.memo(
       >
         <div
           className={cn(
-            "flex min-w-0 items-stretch gap-2",
+            "flex min-w-0 items-start gap-2",
             isUser ? "flex-row-reverse" : undefined
           )}
         >
-          <MessageContent
-            data-acb-part="message-content"
-            data-acb-pinned={pinState?.pinned ? "" : undefined}
-            className={cn("min-w-0 rounded-[var(--acb-chat-message-radius)]")}
-          >
-            {message.parts?.map((part, partIndex: number) => (
-              <ChatMessagePart
-                key={partIndex}
-                part={part}
-                streaming={isStreaming}
-                responseProps={responseProps}
-              />
-            ))}
-          </MessageContent>
+          <div className="flex min-w-0 flex-col gap-1">
+            <MessageContent
+              data-acb-part="message-content"
+              data-acb-pinned={pinState?.pinned ? "" : undefined}
+              className={cn("min-w-0 rounded-[var(--acb-chat-message-radius)]")}
+            >
+              {message.parts?.map((part, partIndex: number) => (
+                <ChatMessagePart
+                  key={partIndex}
+                  part={part}
+                  streaming={isStreaming}
+                  responseProps={responseProps}
+                />
+              ))}
+            </MessageContent>
+            {timestampLabel ? (
+              <span
+                className={cn(
+                  "px-1 text-[10px] leading-4 text-muted-foreground",
+                  isUser ? "self-end" : "self-start"
+                )}
+              >
+                {timestampLabel}
+              </span>
+            ) : null}
+          </div>
           {showPinToggle && (
             <div
               className={cn(
@@ -581,6 +623,7 @@ const ChatMessageItem = React.memo(
     if (
       prev.message === next.message &&
       prev.isStreaming === next.isStreaming &&
+      prev.showTimestamp === next.showTimestamp &&
       prev.pinState?.pinned === next.pinState?.pinned &&
       prev.responseProps === next.responseProps
     )
@@ -594,9 +637,11 @@ const ChatMessageItem = React.memo(
       prev.assistantAvatar === next.assistantAvatar &&
       prev.userAvatar === next.userAvatar &&
       prev.messageClassName === next.messageClassName &&
+      prev.showTimestamp === next.showTimestamp &&
       prev.pinState?.pinned === next.pinState?.pinned &&
       prev.responseProps === next.responseProps &&
-      isEqual(prev.message.parts, next.message.parts)
+      isEqual(prev.message.parts, next.message.parts) &&
+      isEqual(prev.message.metadata, next.message.metadata)
     );
   }
 );

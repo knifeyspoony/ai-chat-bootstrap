@@ -7,6 +7,8 @@ description: Main chat interface component with message display and input.
 
 `ChatContainer` renders the full chat experience—message list, input surface, model switcher, thread controls, and assistant actions—while managing AI state internally via `useAIChat`.
 
+Set `ui.showTimestamps` to `true` if you want per-message timestamps rendered using the `metadata.timestamp` field (the hook automatically populates this for all messages the client creates).
+
 ## Props
 
 ```ts
@@ -37,7 +39,11 @@ interface ChatContainerProps extends UseAIChatOptions {
       assistantActions?: string;
       toolbar?: string;
     };
+    showTimestamps?: boolean;
     emptyState?: React.ReactNode;
+    style?: React.CSSProperties;
+    assistantAvatar?: string | React.ReactNode;
+    userAvatar?: string | React.ReactNode;
   };
 
   suggestions?: {
@@ -134,6 +140,33 @@ export function MyChat() {
 
 See the demo route at [`packages/ai-chat-bootstrap-demo/src/app/transport/page.tsx`](https://github.com/knifeyspoony/ai-chat-bootstrap/blob/main/packages/ai-chat-bootstrap-demo/src/app/transport/page.tsx) for a full UI that previews the prepared payload.
 
+### Custom thread persistence
+
+`useAIChat` persists conversation history through a pluggable `ChatThreadPersistence` adapter. The package ships IndexedDB helpers (`createIndexedDBChatThreadPersistence`, `getDefaultChatThreadPersistence`) and also exports `normalizeMessagesMetadata` so custom stores can guarantee the required metadata bag. Initialising your own persistence layer is as simple as:
+
+```ts
+import {
+  ChatThreadPersistence,
+  normalizeMessagesMetadata,
+  useChatThreadsStore,
+} from "ai-chat-bootstrap";
+
+const sqlitePersistence: ChatThreadPersistence = {
+  async loadAll(scopeKey) {
+    return db.getThreads(scopeKey);
+  },
+  async save(thread) {
+    const { messages } = normalizeMessagesMetadata(thread.messages);
+    await db.saveThread({ ...thread, messages });
+  },
+  async delete(id) {
+    await db.deleteThread(id);
+  },
+};
+
+useChatThreadsStore.getState().initializePersistent(sqlitePersistence);
+```
+
 ### Header Actions
 
 Supply React nodes via `header.actions` to surface custom controls next to the built-in title/subtitle block:
@@ -175,6 +208,7 @@ Supply React nodes via `header.actions` to surface custom controls next to the b
 - **Assistant Actions**: Built-in copy/regenerate/debug/feedback actions with support for custom buttons.
 - **Suggestions**: Optional AI-generated follow-up suggestions displayed above the input.
 - **Commands**: Slash-command palette that integrates with `useAIChatCommand` and frontend tools.
+- **Timestamps**: Opt-in `ui.showTimestamps` surfaces per-message timestamps sourced from `metadata.timestamp`.
 - **Threads**: Built-in thread picker (`threads.enabled`) that works with scoped persistence.
 - **MCP Support**: When `mcp.enabled` is true, the header surfaces the MCP server manager.
 

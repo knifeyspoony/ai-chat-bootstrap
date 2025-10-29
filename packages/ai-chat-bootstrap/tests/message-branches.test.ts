@@ -19,7 +19,7 @@ describe("message branching utilities", () => {
           text: parts,
         } as UIMessage["parts"][number],
       ],
-      metadata,
+      metadata: metadata ?? {},
     }) satisfies UIMessage;
 
   it("appends branch versions with stable sequencing", () => {

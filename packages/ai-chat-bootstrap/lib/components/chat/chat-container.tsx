@@ -14,6 +14,7 @@ import {
 } from "../../components/chat/chat-messages";
 import { useAIFocus } from "../../hooks";
 import {
+  DevToolsConfig,
   useAIChat,
   type ThreadsOptions,
   type UseAIChatOptions,
@@ -27,20 +28,25 @@ import { logDevError } from "../../utils/dev-logger";
 import { ChatThreadsButton } from "./chat-threads-button";
 import { McpServersButton } from "./mcp-servers-button";
 
-import { SheetPortalProvider } from "../ui/sheet-context";
-import { ChatHeader } from "./chat-header";
+import { Loader } from "../ai-elements/loader";
 import type { ResponseProps } from "../ai-elements/response";
-
-// Lazily load the debug button (development only) so it is tree-shaken away in production
-const LazyChatDebugButton = React.lazy(async () =>
-  import("./chat-debug-button").then((m) => ({ default: m.ChatDebugButton }))
-);
+import { SheetPortalProvider } from "../ui/sheet-context";
+import { ChatDebugButton } from "./chat-debug-button";
+import { ChatHeader } from "./chat-header";
 
 // Lightweight wrapper to lazy load the threads dropdown only when needed
 const ThreadsDropdownWrapper: React.FC<{
   scopeKey?: string;
 }> = ({ scopeKey }) => {
   return <ChatThreadsButton scopeKey={scopeKey} />;
+};
+
+export type ChatContainerDevToolsConfig = DevToolsConfig & {
+  /**
+   * Show debug button in header.
+   * Defaults to the value of `enabled`.
+   */
+  headerDebugButton?: boolean;
 };
 
 export interface ChatContainerProps extends UseAIChatOptions {
@@ -80,6 +86,7 @@ export interface ChatContainerProps extends UseAIChatOptions {
     style?: React.CSSProperties;
     assistantAvatar?: string | React.ReactNode;
     userAvatar?: string | React.ReactNode;
+    showTimestamps?: boolean;
   };
 
   // Commands group
@@ -108,14 +115,13 @@ export interface ChatContainerProps extends UseAIChatOptions {
     custom?: AssistantAction[];
   };
 
-  /** Development tooling configuration */
-  devtools?: {
-    /** Show the header debug button (development only, defaults to false) */
-    headerDebugButton?: boolean;
-  };
+  devTools?: ChatContainerDevToolsConfig;
 }
 
-type ChatContainerUiProps = Omit<ChatContainerProps, keyof UseAIChatOptions>;
+// Omit all the useAIChat options that are already defined in ChatContainerProps, except include our extended version of devTools
+type ChatContainerUiProps = Omit<ChatContainerProps, keyof UseAIChatOptions> & {
+  devTools?: ChatContainerDevToolsConfig;
+};
 
 type ChatAdapter = ReturnType<typeof useAIChat>;
 
@@ -133,12 +139,13 @@ function ChatContainerView(props: ChatContainerViewProps) {
     threads: threadsOptions,
     assistantActions: assistantActionOptions,
     ["data-acb-unstyled"]: unstyledProp,
-    devtools,
+    devTools,
   } = props;
 
   const {
     messages,
     isLoading,
+    isRestoringThread,
     status,
     input,
     setInput,
@@ -171,6 +178,12 @@ function ChatContainerView(props: ChatContainerViewProps) {
   // Defer non-critical updates to prevent input lag
   const deferredMessages = useDeferredValue(messages);
   const deferredIsLoading = useDeferredValue(isLoading);
+  const deferredIsRestoringThread = useDeferredValue(isRestoringThread);
+  const messagesLoading = deferredIsLoading || deferredIsRestoringThread;
+
+  // Compute devTools flags
+  const devToolsEnabled = devTools?.enabled ?? false;
+  const showErrorMessages = devTools?.showErrorMessages ?? devToolsEnabled;
 
   // Note: We do not sync messages to threads here to avoid render loops.
   // The useAIChat hook manages persistence into the threads store.
@@ -188,11 +201,12 @@ function ChatContainerView(props: ChatContainerViewProps) {
       } catch (error) {
         logDevError(
           "[acb][ChatContainer] failed to submit message with context",
-          error
+          error,
+          showErrorMessages
         );
       }
     },
-    [sendMessageWithContext]
+    [sendMessageWithContext, showErrorMessages]
   );
 
   // AI command execution via chat hook
@@ -251,10 +265,10 @@ function ChatContainerView(props: ChatContainerViewProps) {
   // Memoize header actions to prevent recreating on every render
   const headerActions = useMemo(() => {
     const hasThreads = threadsOptions?.enabled;
-    const isProduction =
-      typeof process !== "undefined" && process.env.NODE_ENV === "production";
-    const debugButtonEnabled = devtools?.headerDebugButton ?? false;
-    const hasDebug = !isProduction && debugButtonEnabled;
+    // Use devTools.enabled as master switch, with headerDebugButton as override
+    const devToolsEnabled = devTools?.enabled ?? false;
+    const debugButtonEnabled = devTools?.headerDebugButton ?? devToolsEnabled;
+    const hasDebug = debugButtonEnabled;
     const hasMcp = mcpEnabled;
     const hasCustomActions = header?.actions;
 
@@ -271,13 +285,8 @@ function ChatContainerView(props: ChatContainerViewProps) {
             <ThreadsDropdownWrapper scopeKey={scopeKey} />
           </React.Suspense>
         )}
-        {/* Debug tools are only rendered in non-production */}
-        {hasDebug && (
-          <React.Suspense fallback={null}>
-            {/* Dynamic import to avoid including debug UI in prod bundles */}
-            <LazyChatDebugButton />
-          </React.Suspense>
-        )}
+        {/* Debug button controlled by devTools config - always bundled */}
+        {hasDebug && <ChatDebugButton />}
         {hasCustomActions && header?.actions}
       </>
     );
@@ -286,7 +295,8 @@ function ChatContainerView(props: ChatContainerViewProps) {
     scopeKey,
     mcpEnabled,
     header?.actions,
-    devtools?.headerDebugButton,
+    devTools?.enabled,
+    devTools?.headerDebugButton,
   ]);
 
   // Build assistant actions configuration from built-in and custom actions
@@ -319,6 +329,7 @@ function ChatContainerView(props: ChatContainerViewProps) {
       <div
         ref={chatContainerRef}
         data-acb-part="container"
+        aria-busy={isRestoringThread || undefined}
         className={cn(
           !isUnstyled &&
             "relative flex flex-col h-full overflow-hidden min-w-0 rounded-md border bg-[var(--acb-chat-container-bg)] border-[var(--acb-chat-container-border)]",
@@ -344,23 +355,43 @@ function ChatContainerView(props: ChatContainerViewProps) {
           className={header?.className ?? ui?.classes?.header}
         />
 
-        <ChatMessages
-          ref={messagesRef}
-          messages={deferredMessages}
-          isLoading={deferredIsLoading}
-          className={ui?.classes?.messages}
-          messageClassName={ui?.classes?.message}
-          emptyState={ui?.emptyState}
-          threadId={threadId}
-          useChainOfThought={chainOfThoughtEnabled}
-          assistantActionsClassName={ui?.classes?.assistantActions}
-          assistantActionsConfig={assistantActionsConfig}
-          compression={compression}
-          branching={branching}
-          responseProps={ui?.response}
-          assistantAvatar={ui?.assistantAvatar}
-          userAvatar={ui?.userAvatar}
-        />
+        <div className="relative flex flex-col flex-1 min-h-0">
+          <ChatMessages
+            ref={messagesRef}
+            messages={deferredMessages}
+            showTimestamps={ui?.showTimestamps}
+            isLoading={messagesLoading}
+            className={ui?.classes?.messages}
+            messageClassName={ui?.classes?.message}
+            emptyState={ui?.emptyState}
+            threadId={threadId}
+            useChainOfThought={chainOfThoughtEnabled}
+            assistantActionsClassName={ui?.classes?.assistantActions}
+            assistantActionsConfig={assistantActionsConfig}
+            compression={compression}
+            branching={branching}
+            responseProps={ui?.response}
+            assistantAvatar={ui?.assistantAvatar}
+            userAvatar={ui?.userAvatar}
+          />
+          {isRestoringThread && (
+            <div
+              data-acb-part="thread-loading-overlay"
+              className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 px-6 text-center text-sm backdrop-blur-sm"
+              role="status"
+              aria-live="polite"
+              style={{
+                backgroundColor:
+                  "var(--acb-chat-thread-overlay-bg, rgba(9, 9, 11, 0.55))",
+                color:
+                  "var(--acb-chat-thread-overlay-fg, rgba(255, 255, 255, 0.95))",
+              }}
+            >
+              <Loader />
+              <span>Loading conversation…</span>
+            </div>
+          )}
+        </div>
 
         <div
           data-acb-part="input-wrapper"
@@ -376,10 +407,10 @@ function ChatContainerView(props: ChatContainerViewProps) {
             value={input}
             onChange={setInput}
             placeholder={ui?.placeholder}
-            // Keep input enabled during streaming - users can type their next message
-            disabled={false}
-            // Submit is disabled when actually loading (not just streaming)
-            submitDisabled={isLoading}
+            // Keep input enabled during streaming, but lock while restoring a persisted thread
+            disabled={isRestoringThread}
+            // Submit is disabled while performing network work or restoring a thread snapshot
+            submitDisabled={isLoading || isRestoringThread}
             status={status}
             onStop={stop}
             className={ui?.classes?.input}
@@ -513,12 +544,8 @@ export const ChatContainer = React.memo(ChatContainerImpl, (prev, next) => {
       const prevHeaders = prevServer.transport.headers;
       const nextHeaders = nextServer.transport.headers;
 
-      const prevHeaderKeys = prevHeaders
-        ? Object.keys(prevHeaders).sort()
-        : [];
-      const nextHeaderKeys = nextHeaders
-        ? Object.keys(nextHeaders).sort()
-        : [];
+      const prevHeaderKeys = prevHeaders ? Object.keys(prevHeaders).sort() : [];
+      const nextHeaderKeys = nextHeaders ? Object.keys(nextHeaders).sort() : [];
 
       if (prevHeaderKeys.length !== nextHeaderKeys.length) return false;
 

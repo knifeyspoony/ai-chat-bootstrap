@@ -75,6 +75,9 @@ function buildArtifactMessages(artifacts: CompressionArtifact[]): UIMessage[] {
           text: artifact.summary,
         } as UIMessage["parts"][number],
       ],
+      metadata: {
+        timestamp: artifact.createdAt,
+      },
     } as UIMessage)
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect } from "react";
 import { useChatThreadsStore } from "ai-chat-bootstrap";
 
 /**
@@ -8,16 +8,12 @@ import { useChatThreadsStore } from "ai-chat-bootstrap";
  * starts with a fresh in-memory chat thread.
  */
 export function useEphemeralChatThreads() {
-  useState(() => {
+  useEffect(() => {
     if (typeof window === "undefined") {
-      return false;
+      return;
     }
 
     const store = useChatThreadsStore.getState();
-
-    // Disable persistence to keep demo runs stateless.
     store.initializeEphemeral?.();
-
-    return true;
-  });
+  }, []);
 }

@@ -18,7 +18,8 @@
       "Bash(pnpm ls:*)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(pnpm test:*)"
+      "Bash(pnpm test:*)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []

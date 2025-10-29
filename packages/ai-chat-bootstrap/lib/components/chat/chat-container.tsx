@@ -450,6 +450,7 @@ function ChatContainerImpl(props: ChatContainerProps) {
     models: modelsOptions,
     compression: compressionOptions,
     suggestions: suggestionsOptions,
+    devTools,
     ...uiProps
   } = props;
 
@@ -472,10 +473,16 @@ function ChatContainerImpl(props: ChatContainerProps) {
     models: modelsOptions,
     compression: compressionOptions,
     suggestions: suggestionsOptions,
+    devTools,
   });
 
   return (
-    <ChatContainerView {...uiProps} threads={threadsOptions} chat={chat} />
+    <ChatContainerView
+      {...uiProps}
+      threads={threadsOptions}
+      chat={chat}
+      devTools={devTools}
+    />
   );
 }
 

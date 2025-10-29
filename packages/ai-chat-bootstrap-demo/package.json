@@ -1,6 +1,6 @@
 {
   "name": "ai-chat-bootstrap-demo",
-  "version": "0.5.13",
+  "version": "0.5.14",
   "private": true,
   "description": "Demo application for ai-chat-bootstrap library",
   "scripts": {

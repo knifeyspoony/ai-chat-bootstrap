@@ -19,7 +19,9 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(pnpm test:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(pnpm run lint:types:*)"
     ],
     "deny": [],
     "ask": []

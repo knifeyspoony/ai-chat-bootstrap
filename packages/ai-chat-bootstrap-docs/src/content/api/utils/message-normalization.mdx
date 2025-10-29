@@ -1,0 +1,139 @@
+---
+title: Message Normalization
+description: Utilities for ensuring messages have valid metadata and timestamps.
+---
+
+# Message Normalization
+
+The library exports two utilities for normalizing message metadata, particularly timestamps. These are used internally by `useAIChat` but can also be used when implementing custom thread persistence or message handling.
+
+## ensureMessageMetadata
+
+Ensures a single message has a valid metadata object, optionally stamping a timestamp if one doesn't exist.
+
+### Signature
+
+```ts
+function ensureMessageMetadata(
+  message: UIMessage,
+  options?: EnsureMessageMetadataOptions
+): EnsureMessageMetadataResult;
+
+interface EnsureMessageMetadataOptions {
+  stampTimestamp?: boolean;
+  timestamp?: number;
+}
+
+interface EnsureMessageMetadataResult {
+  message: UIMessage;
+  changed: boolean;
+}
+```
+
+### Parameters
+
+- `message` - The message to normalize
+- `options.stampTimestamp` - If `true`, adds a timestamp to `metadata.timestamp` if one doesn't exist
+- `options.timestamp` - Optional explicit timestamp to use (defaults to `Date.now()`)
+
+### Returns
+
+An object with:
+- `message` - The normalized message (same reference if unchanged)
+- `changed` - `true` if the message was modified
+
+### Example
+
+```ts
+import { ensureMessageMetadata } from "ai-chat-bootstrap";
+
+const { message: normalized, changed } = ensureMessageMetadata(
+  { id: "1", role: "user", parts: [...] },
+  { stampTimestamp: true }
+);
+
+if (changed) {
+  console.log("Added timestamp:", normalized.metadata?.timestamp);
+}
+```
+
+## normalizeMessagesMetadata
+
+Normalizes an array of messages, ensuring each has valid metadata. Useful when implementing custom thread persistence.
+
+### Signature
+
+```ts
+function normalizeMessagesMetadata(
+  messages: UIMessage[],
+  options?: NormalizeMessagesOptions
+): NormalizeMessagesResult;
+
+interface NormalizeMessagesOptions {
+  shouldStampTimestamp?: (message: UIMessage, index: number) => boolean;
+  timestampFactory?: () => number;
+}
+
+interface NormalizeMessagesResult {
+  messages: UIMessage[];
+  changed: boolean;
+}
+```
+
+### Parameters
+
+- `messages` - Array of messages to normalize
+- `options.shouldStampTimestamp` - Optional predicate function to determine which messages should get timestamps
+- `options.timestampFactory` - Optional factory for generating timestamps (defaults to `Date.now()`)
+
+### Returns
+
+An object with:
+- `messages` - The normalized messages array (same reference if unchanged)
+- `changed` - `true` if any message was modified
+
+### Example
+
+```ts
+import { normalizeMessagesMetadata } from "ai-chat-bootstrap";
+
+// Stamp timestamps on all user messages
+const { messages: normalized, changed } = normalizeMessagesMetadata(
+  thread.messages,
+  {
+    shouldStampTimestamp: (msg) => msg.role === "user",
+  }
+);
+
+if (changed) {
+  // Save the normalized messages
+  await persistence.save({ ...thread, messages: normalized });
+}
+```
+
+## Usage with Custom Persistence
+
+When implementing `ChatThreadPersistence`, use `normalizeMessagesMetadata` to ensure all saved messages have valid metadata:
+
+```ts
+import {
+  ChatThreadPersistence,
+  normalizeMessagesMetadata,
+} from "ai-chat-bootstrap";
+
+const customPersistence: ChatThreadPersistence = {
+  async save(thread) {
+    // Normalize before saving
+    const { messages } = normalizeMessagesMetadata(thread.messages);
+    await db.saveThread({ ...thread, messages });
+  },
+  // ... other methods
+};
+```
+
+This ensures consistency when messages are displayed with timestamps (`ui.showTimestamps: true` in `ChatContainer`).
+
+## Related
+
+- [ChatContainer](/api/components/chat-container) - Uses timestamps when `ui.showTimestamps` is enabled
+- [Threading & Persistence](/api/utils/threading) - Custom persistence implementation guide

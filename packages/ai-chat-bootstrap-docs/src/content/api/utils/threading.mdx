@@ -1,0 +1,264 @@
+---
+title: Threading & Persistence
+description: Types and utilities for implementing custom thread persistence.
+---
+
+# Threading & Persistence
+
+The library provides a flexible thread persistence system that allows you to store chat conversations in any backend. By default, it uses IndexedDB for browser-based persistence, but you can implement custom adapters for databases like SQLite, PostgreSQL, or cloud storage.
+
+## Types
+
+### ChatThread
+
+Represents a complete chat thread with all messages and metadata.
+
+```ts
+interface ChatThread {
+  id: string;                      // Unique thread identifier
+  parentId?: string;               // Optional parent for branching
+  scopeKey?: string;               // Partition key (e.g., notebook id)
+  title?: string;                  // Human-readable title
+  messages: UIMessage[];           // Full ordered message history
+  createdAt: number;               // Epoch milliseconds
+  updatedAt: number;               // Epoch milliseconds
+  metadata?: Record<string, unknown>; // Extensible metadata bag
+}
+```
+
+### ChatThreadMeta
+
+Lightweight thread descriptor without messages, useful for thread lists.
+
+```ts
+interface ChatThreadMeta {
+  id: string;
+  parentId?: string;
+  scopeKey?: string;
+  title?: string;
+  createdAt: number;
+  updatedAt: number;
+  messageCount: number;  // Number of messages for preview/UI
+}
+```
+
+### ChatThreadPersistence
+
+Interface for implementing custom thread storage adapters.
+
+```ts
+interface ChatThreadPersistence {
+  // Load all threads in a scope
+  loadAll(scopeKey?: string): Promise<ChatThread[]>;
+
+  // Optional: Load only metadata (more efficient for lists)
+  loadAllMeta?(scopeKey?: string): Promise<ChatThreadMeta[]>;
+
+  // Save a single thread
+  save(thread: ChatThread): Promise<void>;
+
+  // Delete a thread by ID
+  delete(id: string): Promise<void>;
+
+  // Optional: Save multiple threads efficiently
+  bulkSave?(threads: ChatThread[]): Promise<void>;
+
+  // Optional: Load a single thread by ID
+  load?(id: string): Promise<ChatThread | null>;
+}
+```
+
+### CreateThreadOptions
+
+Options for creating new threads.
+
+```ts
+interface CreateThreadOptions {
+  id?: string;                     // Custom ID (auto-generated if omitted)
+  parentId?: string;               // Parent thread for branching
+  scopeKey?: string;               // Partition key
+  title?: string;                  // Initial title
+  initialMessages?: UIMessage[];   // Starting messages
+  metadata?: Record<string, unknown>; // Custom metadata
+}
+```
+
+### CloneThreadOptions
+
+Options for cloning/branching existing threads.
+
+```ts
+interface CloneThreadOptions {
+  newId?: string;                  // ID for the cloned thread
+  parentId?: string;               // Override parent (defaults to source ID)
+  scopeKey?: string;               // Override scope
+  titleSuffix?: string;            // Append to title (e.g., "(branch)")
+  trimLastAssistantIfStreaming?: boolean; // Remove incomplete message
+}
+```
+
+## Built-in Persistence
+
+### createIndexedDBChatThreadPersistence
+
+Creates an IndexedDB-backed persistence adapter.
+
+```ts
+import { createIndexedDBChatThreadPersistence } from "ai-chat-bootstrap";
+
+const persistence = createIndexedDBChatThreadPersistence({
+  dbName: "my-app-threads",
+  version: 1,
+});
+```
+
+### getDefaultChatThreadPersistence
+
+Returns the default IndexedDB persistence instance (lazy-initialized).
+
+```ts
+import { getDefaultChatThreadPersistence } from "ai-chat-bootstrap";
+
+const persistence = getDefaultChatThreadPersistence();
+```
+
+## Custom Persistence Example
+
+Here's a complete example implementing thread persistence with a custom backend:
+
+```ts
+import {
+  ChatThreadPersistence,
+  normalizeMessagesMetadata,
+  useChatThreadsStore,
+} from "ai-chat-bootstrap";
+
+// Example: SQLite persistence (pseudo-code)
+const sqlitePersistence: ChatThreadPersistence = {
+  async loadAll(scopeKey) {
+    const rows = await db.query(
+      "SELECT * FROM threads WHERE scopeKey = ? ORDER BY updatedAt DESC",
+      [scopeKey ?? "default"]
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      parentId: row.parentId,
+      scopeKey: row.scopeKey,
+      title: row.title,
+      messages: JSON.parse(row.messages),
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      metadata: JSON.parse(row.metadata || "{}"),
+    }));
+  },
+
+  async loadAllMeta(scopeKey) {
+    const rows = await db.query(
+      "SELECT id, parentId, scopeKey, title, createdAt, updatedAt, messageCount FROM threads WHERE scopeKey = ?",
+      [scopeKey ?? "default"]
+    );
+    return rows;
+  },
+
+  async save(thread) {
+    // Normalize messages before saving
+    const { messages } = normalizeMessagesMetadata(thread.messages);
+
+    await db.run(
+      `INSERT OR REPLACE INTO threads
+       (id, parentId, scopeKey, title, messages, createdAt, updatedAt, metadata, messageCount)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        thread.id,
+        thread.parentId,
+        thread.scopeKey ?? "default",
+        thread.title,
+        JSON.stringify(messages),
+        thread.createdAt,
+        thread.updatedAt,
+        JSON.stringify(thread.metadata || {}),
+        messages.length,
+      ]
+    );
+  },
+
+  async delete(id) {
+    await db.run("DELETE FROM threads WHERE id = ?", [id]);
+  },
+
+  async load(id) {
+    const row = await db.queryOne(
+      "SELECT * FROM threads WHERE id = ?",
+      [id]
+    );
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      parentId: row.parentId,
+      scopeKey: row.scopeKey,
+      title: row.title,
+      messages: JSON.parse(row.messages),
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      metadata: JSON.parse(row.metadata || "{}"),
+    };
+  },
+};
+
+// Initialize the store with custom persistence
+useChatThreadsStore.getState().initializePersistent(sqlitePersistence);
+```
+
+## Initialization
+
+Initialize your custom persistence adapter before mounting `ChatContainer`:
+
+```tsx
+import { useChatThreadsStore } from "ai-chat-bootstrap";
+import { customPersistence } from "./persistence";
+
+// In your app initialization
+useChatThreadsStore.getState().initializePersistent(customPersistence);
+
+export default function App() {
+  return <ChatContainer threads={{ enabled: true }} />;
+}
+```
+
+## Scoped Threads
+
+Use `scopeKey` to partition threads by workspace, notebook, or project:
+
+```tsx
+<ChatContainer
+  threads={{
+    enabled: true,
+    scopeKey: "notebook-123", // All threads scoped to this notebook
+  }}
+/>
+```
+
+Threads with different scope keys are isolated and won't appear in each other's thread lists.
+
+## Best Practices
+
+1. **Always normalize messages** - Use `normalizeMessagesMetadata` before saving to ensure consistent metadata:
+   ```ts
+   const { messages } = normalizeMessagesMetadata(thread.messages);
+   await persistence.save({ ...thread, messages });
+   ```
+
+2. **Implement `loadAllMeta`** - For better performance with large thread lists, implement the optimized metadata-only loader.
+
+3. **Handle errors gracefully** - Wrap persistence calls in try-catch blocks to handle storage failures.
+
+4. **Use transactions** - When using SQL databases, wrap multiple operations in transactions for consistency.
+
+5. **Index key fields** - Add database indexes on `scopeKey`, `updatedAt`, and `id` for better query performance.
+
+## Related
+
+- [Message Normalization](/api/utils/message-normalization) - Utility functions for normalizing message metadata
+- [ChatContainer](/api/components/chat-container) - Main component that uses thread persistence
+- [useAIChat](/api/hooks/use-ai-chat) - Internal hook that manages thread state

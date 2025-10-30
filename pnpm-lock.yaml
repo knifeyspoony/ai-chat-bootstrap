@@ -283,6 +283,9 @@ importers:
       ai-chat-bootstrap:
         specifier: workspace:*
         version: link:../ai-chat-bootstrap
+      azure-identity:
+        specifier: 0.0.1-security
+        version: 0.0.1-security
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -2854,6 +2857,9 @@ packages:
   axobject-query@4.1.0:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
     engines: {node: '>= 0.4'}
+
+  azure-identity@0.0.1-security:
+    resolution: {integrity: sha512-65wlCi3FEBV/ALi3V6j1OTb06n0MMRp47Asv3iC8OR12uu6IrW4Rjuh/moen1gbKiJfspERro3TddZA8Jlee8Q==}
 
   bail@2.0.2:
     resolution: {integrity: sha512-0xO6mYd7JB2YesxDKplafRpsiOzPt9V02ddPCLbY1xYGPOX24NTyN50qnUxgCPcSoYMhKpAuBTjQoRZCAkUDRw==}
@@ -8665,6 +8671,8 @@ snapshots:
   axe-core@4.10.3: {}
 
   axobject-query@4.1.0: {}
+
+  azure-identity@0.0.1-security: {}
 
   bail@2.0.2: {}
 

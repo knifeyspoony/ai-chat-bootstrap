@@ -1,15 +1,11 @@
-import { createAzure } from "@ai-sdk/azure";
 import {
   createCompressionHandler,
   type CompressionServiceRequest,
 } from "ai-chat-bootstrap/server";
+import { createAzureClient, hasAzureCredentials } from "@/server/azure";
 
 // Configure Azure OpenAI similarly to other demo routes
-const azure = createAzure({
-  resourceName: process.env.AZURE_RESOURCE_NAME ?? "your-resource",
-  apiKey: process.env.AZURE_API_KEY ?? "your-api-key",
-  apiVersion: process.env.AZURE_API_VERSION ?? "preview",
-});
+const azure = createAzureClient();
 
 const FALLBACK_DEPLOYMENT = "gpt-4.1";
 const DEFAULT_COMPRESSION_DEPLOYMENT =
@@ -17,8 +13,7 @@ const DEFAULT_COMPRESSION_DEPLOYMENT =
   process.env.AZURE_DEPLOYMENT_ID ??
   FALLBACK_DEPLOYMENT;
 
-const hasAzureCreds =
-  Boolean(process.env.AZURE_RESOURCE_NAME) && Boolean(process.env.AZURE_API_KEY);
+const hasAzureCreds = hasAzureCredentials();
 
 const handler = createCompressionHandler({
   model: ({ body }) => {

@@ -1,10 +1,15 @@
 import type {
-  ChatThread,
-  ChatThreadMeta,
   ChatThreadPersistence,
+  ChatThreadRecord,
+  ChatThreadSummary,
+  ChatThreadTimeline,
 } from "../types/threads";
 
-// Small promisified helpers around IndexedDB API
+type StoredThread = ChatThreadRecord & {
+  timelineMessages: unknown[];
+  timelineUpdatedAt: number;
+};
+
 function promisifyRequest<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
@@ -13,7 +18,7 @@ function promisifyRequest<T = unknown>(request: IDBRequest<T>): Promise<T> {
 }
 
 const DB_NAME = "acb_chat_threads";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "threads";
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -21,34 +26,23 @@ let dbPromise: Promise<IDBDatabase> | null = null;
 function openDB(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   if (typeof indexedDB === "undefined") {
-    return Promise.reject(new Error("IndexedDB not available"));
+    return Promise.reject(new Error("IndexedDB unavailable"));
   }
   dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
-        store.createIndex("scopeKey", "scopeKey", { unique: false });
-        store.createIndex("updatedAt", "updatedAt", { unique: false });
+      if (db.objectStoreNames.contains(STORE_NAME)) {
+        db.deleteObjectStore(STORE_NAME);
       }
+      const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
+      store.createIndex("scopeKey", "scopeKey", { unique: false });
+      store.createIndex("updatedAt", "updatedAt", { unique: false });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
   return dbPromise;
-}
-
-function toMeta(t: ChatThread): ChatThreadMeta {
-  return {
-    id: t.id,
-    parentId: t.parentId,
-    scopeKey: t.scopeKey,
-    title: t.title,
-    createdAt: t.createdAt,
-    updatedAt: t.updatedAt,
-    messageCount: t.messages?.length ?? 0,
-  };
 }
 
 function awaitTx(tx: IDBTransaction): Promise<void> {
@@ -59,60 +53,108 @@ function awaitTx(tx: IDBTransaction): Promise<void> {
   });
 }
 
+function toSummary(entry: StoredThread): ChatThreadSummary {
+  return {
+    id: entry.id,
+    parentId: entry.parentId,
+    scopeKey: entry.scopeKey,
+    title: entry.title,
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
+    messageCount: entry.messageCount,
+    messageSignature: entry.messageSignature,
+    metadata: entry.metadata,
+  };
+}
+
 export function createIndexedDBChatThreadPersistence(): ChatThreadPersistence {
   return {
-    async loadAll(scopeKey?: string): Promise<ChatThread[]> {
+    async loadSummaries(scopeKey?: string): Promise<ChatThreadSummary[]> {
       const db = await openDB();
       const tx = db.transaction(STORE_NAME, "readonly");
       const store = tx.objectStore(STORE_NAME);
-      let result: ChatThread[] = [];
+      let rows: StoredThread[] = [];
       if (scopeKey) {
         const index = store.index("scopeKey");
-        result = (await promisifyRequest(index.getAll(scopeKey))) as ChatThread[];
+        rows = (await promisifyRequest(
+          index.getAll(scopeKey)
+        )) as StoredThread[];
       } else {
-        result = (await promisifyRequest(store.getAll())) as ChatThread[];
+        rows = (await promisifyRequest(store.getAll())) as StoredThread[];
       }
-      // Sort by updatedAt desc for consistency
-      result.sort((a, b) => b.updatedAt - a.updatedAt);
-      return result;
+      rows.sort((a, b) => b.updatedAt - a.updatedAt);
+      return rows.map(toSummary);
     },
 
-    async loadAllMeta(scopeKey?: string): Promise<ChatThreadMeta[]> {
-      const all = await this.loadAll(scopeKey);
-      return all.map(toMeta);
-    },
-
-    async save(thread: ChatThread): Promise<void> {
-      const db = await openDB();
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      store.put(thread as unknown as Record<string, unknown>);
-      await awaitTx(tx);
-    },
-
-    async bulkSave(threads: ChatThread[]): Promise<void> {
-      const db = await openDB();
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      for (const t of threads) {
-        store.put(t as unknown as Record<string, unknown>);
-      }
-      await awaitTx(tx);
-    },
-
-    async load(id: string): Promise<ChatThread | null> {
+    async loadTimeline(threadId: string): Promise<ChatThreadTimeline | null> {
       const db = await openDB();
       const tx = db.transaction(STORE_NAME, "readonly");
       const store = tx.objectStore(STORE_NAME);
-      const res = (await promisifyRequest(store.get(id))) as ChatThread | undefined;
-      return res ?? null;
+      const entry = (await promisifyRequest(store.get(threadId))) as
+        | StoredThread
+        | undefined;
+      if (!entry) return null;
+      return {
+        threadId,
+        signature: entry.messageSignature,
+        messages: Array.isArray(entry.timelineMessages)
+          ? (entry.timelineMessages as unknown[])
+          : [],
+        updatedAt: entry.timelineUpdatedAt ?? entry.updatedAt,
+      };
     },
 
-    async delete(id: string): Promise<void> {
+    async saveRecord(record: ChatThreadRecord): Promise<void> {
       const db = await openDB();
       const tx = db.transaction(STORE_NAME, "readwrite");
       const store = tx.objectStore(STORE_NAME);
-      store.delete(id);
+      const existing = (await promisifyRequest(
+        store.get(record.id)
+      )) as StoredThread | undefined;
+      const next: StoredThread = {
+        ...record,
+        timelineMessages: existing?.timelineMessages ?? [],
+        timelineUpdatedAt: existing?.timelineUpdatedAt ?? record.updatedAt,
+      };
+      store.put(next as unknown as Record<string, unknown>);
+      await awaitTx(tx);
+    },
+
+    async saveTimeline(timeline: ChatThreadTimeline): Promise<void> {
+      const db = await openDB();
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      const existing = (await promisifyRequest(
+        store.get(timeline.threadId)
+      )) as StoredThread | undefined;
+      const base: StoredThread =
+        existing ??
+        ({
+          id: timeline.threadId,
+          createdAt: timeline.updatedAt,
+          updatedAt: timeline.updatedAt,
+          messageCount: timeline.messages.length,
+          messageSignature: timeline.signature,
+          metadata: {},
+          timelineMessages: [],
+          timelineUpdatedAt: timeline.updatedAt,
+        } as StoredThread);
+      const next: StoredThread = {
+        ...base,
+        messageCount: timeline.messages.length,
+        messageSignature: timeline.signature,
+        updatedAt: Math.max(base.updatedAt, timeline.updatedAt),
+        timelineMessages: timeline.messages as unknown[],
+        timelineUpdatedAt: timeline.updatedAt,
+      };
+      store.put(next as unknown as Record<string, unknown>);
+      await awaitTx(tx);
+    },
+
+    async deleteThread(threadId: string): Promise<void> {
+      const db = await openDB();
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      tx.objectStore(STORE_NAME).delete(threadId);
       await awaitTx(tx);
     },
   };

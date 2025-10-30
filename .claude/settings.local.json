@@ -21,7 +21,12 @@
       "Bash(pnpm test:*)",
       "Bash(git log:*)",
       "Bash(git show:*)",
-      "Bash(pnpm run lint:types:*)"
+      "Bash(pnpm run lint:types:*)",
+      "Bash(npm run dev:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs:*)",
+      "Bash(node:*)",
+      "Bash(echo:*)"
     ],
     "deny": [],
     "ask": []

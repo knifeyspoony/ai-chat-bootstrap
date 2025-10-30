@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import React, { useMemo, useState } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,12 +12,11 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { useDemoAI } from "@/hooks/use-demo-ai";
+import { useEphemeralChatThreads } from "@/hooks/use-ephemeral-chat-threads";
 import { cn } from "@/lib/utils";
 import type { AssistantAction } from "ai-chat-bootstrap";
 import { ChatPopout } from "ai-chat-bootstrap";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { useDemoAI } from "@/hooks/use-demo-ai";
-import { useEphemeralChatThreads } from "@/hooks/use-ephemeral-chat-threads";
 import {
   ArrowLeft,
   Braces,
@@ -30,6 +28,8 @@ import {
   PlusIcon,
   Sparkles,
 } from "lucide-react";
+import Link from "next/link";
+import React, { useMemo, useState } from "react";
 
 const DEMO_MODELS = [
   { id: "gpt-4o", label: "GPT-4o" },
@@ -136,8 +136,9 @@ export default function CoreDemo() {
 
   const [counter, setCounter] = useState(2);
   const [calculation, setCalculation] = useState<string | null>(null);
-  const [selectedSystemPrompt, setSelectedSystemPrompt] =
-    useState<"default" | "helpful" | "technical" | "creative">("helpful");
+  const [selectedSystemPrompt, setSelectedSystemPrompt] = useState<
+    "default" | "helpful" | "technical" | "creative"
+  >("helpful");
   const [chatMode, setChatMode] = useState<"overlay" | "inline">("inline");
 
   const {
@@ -211,8 +212,8 @@ export default function CoreDemo() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <ScrollArea className="flex-1">
+    <div className="flex h-screen overflow-hidden bg-background">
+      <ScrollArea className="flex-1 h-full">
         <div className="mx-auto flex max-w-6xl flex-col gap-12 px-4 py-10">
           <header className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -238,7 +239,7 @@ export default function CoreDemo() {
                   Guided demo
                 </Badge>
                 <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-                  See the core AI plumbing in one view
+                  Core AI Plumbing
                 </h1>
                 <p className="text-lg text-muted-foreground">
                   This sandbox mirrors the opinionated integration path: focus
@@ -379,7 +380,7 @@ export default function CoreDemo() {
                     </div>
                     <Separator className="my-3" />
                     <pre className="text-xs text-muted-foreground whitespace-pre-wrap">
-{`counter: ${counter}
+                      {`counter: ${counter}
 calculation: ${calculation ?? "null"}
 systemPrompt: ${selectedSystemPrompt}`}
                     </pre>
@@ -447,7 +448,11 @@ systemPrompt: ${selectedSystemPrompt}`}
                     <Sparkles className="h-4 w-4" />
                     Reset state
                   </Button>
-                  <Button variant="ghost" className="w-full justify-start gap-2" asChild>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-2"
+                    asChild
+                  >
                     <Link href="/">
                       <ArrowLeft className="h-4 w-4" />
                       Back to overview
@@ -463,20 +468,19 @@ systemPrompt: ${selectedSystemPrompt}`}
       <ChatPopout
         transport={{ api: "/api/chat" }}
         messages={{
-          systemPrompt:
-            {
-              default: undefined,
-              helpful:
-                "You are a friendly AI assistant helping highlight core features of the AI Chat Bootstrap demo.",
-              technical:
-                "You are a technical assistant explaining how focus items and shared context interact.",
-              creative:
-                "You are an imaginative assistant spotlighting creative ways to wire the core features.",
-            }[selectedSystemPrompt],
+          systemPrompt: {
+            default: undefined,
+            helpful:
+              "You are a friendly AI assistant helping highlight core features of the AI Chat Bootstrap demo.",
+            technical:
+              "You are a technical assistant explaining how focus items and shared context interact.",
+            creative:
+              "You are an imaginative assistant spotlighting creative ways to wire the core features.",
+          }[selectedSystemPrompt],
           initial: sampleMessages,
         }}
         features={{ chainOfThought: true }}
-        mcp={{ enabled: true, api: "/api/mcp" }}
+        mcp={{ enabled: true, api: "/api/mcp-discovery" }}
         models={{ available: DEMO_MODELS, initial: DEMO_MODELS[0].id }}
         header={{
           title: "Core Assistant",
@@ -499,6 +503,10 @@ systemPrompt: ${selectedSystemPrompt}`}
           custom: assistantActions,
         }}
         commands={{ enabled: true }}
+        devTools={{
+          enabled: true,
+          showErrorMessages: true,
+        }}
       />
     </div>
   );

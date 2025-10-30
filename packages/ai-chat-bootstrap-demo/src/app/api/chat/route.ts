@@ -1,15 +1,11 @@
-import { createAzure } from "@ai-sdk/azure";
 import {
   createAIChatHandler,
   type ChatRequest,
 } from "ai-chat-bootstrap/server";
+import { createAzureClient } from "@/server/azure";
 
 // Configure Azure OpenAI (users will need to set these env vars)
-const azure = createAzure({
-  resourceName: process.env.AZURE_RESOURCE_NAME ?? "your-resource",
-  apiKey: process.env.AZURE_API_KEY ?? "your-api-key",
-  apiVersion: process.env.AZURE_API_VERSION ?? "preview",
-});
+const azure = createAzureClient();
 const FALLBACK_DEPLOYMENT = "gpt-4.1";
 const handler = createAIChatHandler({
   model: ({ body }) => {

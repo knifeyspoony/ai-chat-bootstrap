@@ -1,13 +1,9 @@
-import { createAzure } from "@ai-sdk/azure";
 import type { UIMessage } from "ai";
 import { createThreadTitleHandler } from "ai-chat-bootstrap/server";
+import { createAzureClient, hasAzureCredentials } from "@/server/azure";
 
 // Reuse Azure config like the chat route
-const azure = createAzure({
-  resourceName: process.env.AZURE_RESOURCE_NAME ?? "your-resource",
-  apiKey: process.env.AZURE_API_KEY ?? "your-api-key",
-  apiVersion: process.env.AZURE_API_VERSION ?? "preview",
-});
+const azure = createAzureClient();
 
 const model = azure(process.env.AZURE_DEPLOYMENT_ID ?? "gpt-4.1");
 
@@ -56,9 +52,7 @@ Return only the final title.
 `.trim();
 
 const hasAzureCreds =
-  !!process.env.AZURE_RESOURCE_NAME &&
-  !!process.env.AZURE_API_KEY &&
-  !!process.env.AZURE_DEPLOYMENT_ID;
+  hasAzureCredentials() && !!process.env.AZURE_DEPLOYMENT_ID;
 
 export const POST = createThreadTitleHandler({
   model: hasAzureCreds ? model : undefined,

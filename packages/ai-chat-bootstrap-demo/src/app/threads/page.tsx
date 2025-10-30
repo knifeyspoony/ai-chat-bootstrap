@@ -1,10 +1,12 @@
 "use client";
 
+import type { UIMessage } from "ai";
 import { ChatContainer, useChatThreadsStore } from "ai-chat-bootstrap";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Database, MessageSquare, Clock } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 const DEMO_MODELS = [
   { id: "gpt-4o", label: "GPT-4o" },
@@ -23,16 +25,62 @@ export default function ThreadsDemo() {
   }, []);
 
   // Subscribe to thread store to show live status
-  const mode = useChatThreadsStore((state) => state.mode);
-  const persistence = useChatThreadsStore((state) => state.persistence);
-  const activeThreadId = useChatThreadsStore((state) => state.activeThreadId);
-  const threads = useChatThreadsStore((state) => state.threads);
-  const metas = useChatThreadsStore((state) => state.metas);
-
-  const activeThread = activeThreadId ? threads.get(activeThreadId) : undefined;
-  const allThreadMetas = Array.from(metas.values()).filter(
-    (meta) => meta.scopeKey === scopeKey
+  const {
+    mode,
+    persistence,
+    activeThreadId,
+    storeScopeKey,
+    records,
+    timelines,
+  } = useChatThreadsStore(
+    useShallow((state) => ({
+      mode: state.mode,
+      persistence: state.persistence,
+      activeThreadId: state.activeThreadId,
+      storeScopeKey: state.scopeKey,
+      records: state.records,
+      timelines: state.timelines,
+    }))
   );
+
+  const summaries = useMemo(() => {
+    const key = scopeKey ?? storeScopeKey;
+    const list = Array.from(records.values()).filter((record) =>
+      key ? record.scopeKey === key : true
+    );
+    return list
+      .slice()
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [records, scopeKey, storeScopeKey]);
+
+  const activeThread = useMemo(() => {
+    if (!activeThreadId) return null;
+    const record = records.get(activeThreadId);
+    if (!record) return null;
+    const storedTimeline = timelines.get(activeThreadId);
+    const timeline = storedTimeline
+      ? {
+          threadId: activeThreadId,
+          signature: storedTimeline.state.signature,
+          messages: storedTimeline.state.order.map((id) =>
+            storedTimeline.state.byId.get(id)
+          ).filter((message): message is UIMessage => Boolean(message)),
+          updatedAt: storedTimeline.updatedAt,
+        }
+      : undefined;
+
+    return { record, timeline };
+  }, [activeThreadId, records, timelines]);
+
+  useEffect(() => {
+    if (!activeThreadId) return;
+    const store = useChatThreadsStore.getState();
+    if (store.getTimeline(activeThreadId)) return;
+    useChatThreadsStore
+      .getState()
+      .ensureTimeline(activeThreadId)
+      .catch(() => {});
+  }, [activeThreadId]);
 
   return (
     <div className="h-screen flex">
@@ -89,17 +137,25 @@ export default function ThreadsDemo() {
               <CardContent className="space-y-2">
                 <div className="space-y-1">
                   <div className="text-sm font-medium">
-                    {activeThread.title || "Untitled"}
+                    {activeThread.record.title || "Untitled"}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {activeThread.messages.length} message
-                    {activeThread.messages.length !== 1 ? "s" : ""}
+                    {activeThread.timeline
+                      ? activeThread.timeline.messages.length
+                      : activeThread.record.messageCount}{" "}
+                    message
+                    {(activeThread.timeline
+                      ? activeThread.timeline.messages.length
+                      : activeThread.record.messageCount) !== 1
+                      ? "s"
+                      : ""}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
                   <Clock className="h-3 w-3" />
                   <span>
-                    Updated: {new Date(activeThread.updatedAt).toLocaleTimeString()}
+                    Updated:{" "}
+                    {new Date(activeThread.record.updatedAt).toLocaleTimeString()}
                   </span>
                 </div>
               </CardContent>
@@ -110,19 +166,19 @@ export default function ThreadsDemo() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium">
-                All Threads ({mounted ? allThreadMetas.length : 0})
+                All Threads ({mounted ? summaries.length : 0})
               </CardTitle>
             </CardHeader>
             <CardContent>
               {!mounted ? (
                 <p className="text-sm text-muted-foreground">Loading...</p>
-              ) : allThreadMetas.length === 0 ? (
+              ) : summaries.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No threads yet. Send a message to create one!
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {allThreadMetas
+                  {summaries
                     .sort((a, b) => b.updatedAt - a.updatedAt)
                     .slice(0, 5)
                     .map((meta) => (
@@ -142,9 +198,9 @@ export default function ThreadsDemo() {
                         </div>
                       </div>
                     ))}
-                  {allThreadMetas.length > 5 && (
+                  {summaries.length > 5 && (
                     <p className="text-xs text-muted-foreground text-center pt-1">
-                      +{allThreadMetas.length - 5} more
+                      +{summaries.length - 5} more
                     </p>
                   )}
                 </div>

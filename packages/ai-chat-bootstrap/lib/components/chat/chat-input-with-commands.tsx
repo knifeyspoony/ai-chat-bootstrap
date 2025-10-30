@@ -112,12 +112,10 @@ const ChatInputWithCommandsImpl = ({
   const [savedDraft, setSavedDraft] = useState<string>("");
 
   // Source user messages from the active thread in the zustand store to avoid stale props.
-  const threadMessages = useChatThreadsStore((s) => {
-    const id = s.activeThreadId;
-    const msgs = id
-      ? (s.threads.get(id)?.messages as UIMessage[] | undefined)
-      : undefined;
-    return msgs ?? EMPTY_UI_MESSAGES;
+  const threadMessages = useChatThreadsStore((state) => {
+    const id = state.activeThreadId;
+    const timeline = id ? state.getTimeline(id) : undefined;
+    return (timeline?.messages as UIMessage[]) ?? EMPTY_UI_MESSAGES;
   });
 
   // Build user text history (chronological). Empty when no messages.

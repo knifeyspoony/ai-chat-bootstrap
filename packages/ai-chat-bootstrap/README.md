@@ -468,24 +468,43 @@ The demo app includes a working example at `packages/ai-chat-bootstrap-demo/src/
 
 ### Custom thread persistence
 
-Thread state is managed by `useChatThreadsStore`, which defaults to an IndexedDB implementation. The package now exports the `ChatThreadPersistence` interface, the built-in `createIndexedDBChatThreadPersistence`, and helpers like `normalizeMessagesMetadata` for zero-config message hygiene. Implementing your own provider (SQLite, filesystem, server-side API, etc.) is as simple as wiring those hooks up before you render the chat:
+Thread state is managed by `useChatThreadsStore`, which defaults to an IndexedDB implementation. The package exports the `ChatThreadPersistence` interface, the built-in `createIndexedDBChatThreadPersistence`, and helpers like `normalizeMessagesMetadata` for zero-config hygiene. Implementing your own provider (SQLite, filesystem, server-side API, etc.) is as simple as wiring those hooks up before you render the chat:
 
 ```ts
 import {
   ChatThreadPersistence,
+  ChatThreadTimeline,
   normalizeMessagesMetadata,
   useChatThreadsStore,
 } from "ai-chat-bootstrap";
 
 const sqlitePersistence: ChatThreadPersistence = {
-  async loadAll(scopeKey) {
-    return db.getThreads(scopeKey);
+  async loadSummaries(scopeKey) {
+    return db.getThreadRecords(scopeKey);
   },
-  async save(thread) {
-    const { messages } = normalizeMessagesMetadata(thread.messages);
-    await db.saveThread({ ...thread, messages });
+  async loadTimeline(threadId) {
+    const row = await db.getThreadMessages(threadId);
+    if (!row) return null;
+    return {
+      threadId,
+      signature: row.signature,
+      messages: row.messages,
+      updatedAt: row.updatedAt,
+    } satisfies ChatThreadTimeline;
   },
-  async delete(id) {
+  async saveRecord(record) {
+    await db.saveThreadRecord(record);
+  },
+  async saveTimeline(timeline) {
+    const { messages } = normalizeMessagesMetadata(timeline.messages);
+    await db.saveThreadMessages({
+      threadId: timeline.threadId,
+      signature: timeline.signature,
+      messages,
+      updatedAt: timeline.updatedAt,
+    });
+  },
+  async deleteThread(id) {
     await db.deleteThread(id);
   },
 };

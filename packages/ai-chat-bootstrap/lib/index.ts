@@ -47,7 +47,9 @@ export type {
 
 export type {
   ChatThread,
-  ChatThreadMeta,
+  ChatThreadRecord,
+  ChatThreadSummary,
+  ChatThreadTimeline,
   ChatThreadPersistence,
   CreateThreadOptions,
   CloneThreadOptions,

@@ -30,7 +30,7 @@ export default function McpTestPage() {
           models={{ available: DEMO_MODELS, initial: DEMO_MODELS[0].id }}
           mcp={{
             enabled: true,
-            api: "/api/mcp",
+            api: "/api/mcp-discovery",
             servers: [
               {
                 id: "demo-mcp-server",

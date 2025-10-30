@@ -9,36 +9,49 @@ The library provides a flexible thread persistence system that allows you to sto
 
 ## Types
 
-### ChatThread
+### ChatThreadRecord
 
-Represents a complete chat thread with all messages and metadata.
-
-```ts
-interface ChatThread {
-  id: string;                      // Unique thread identifier
-  parentId?: string;               // Optional parent for branching
-  scopeKey?: string;               // Partition key (e.g., notebook id)
-  title?: string;                  // Human-readable title
-  messages: UIMessage[];           // Full ordered message history
-  createdAt: number;               // Epoch milliseconds
-  updatedAt: number;               // Epoch milliseconds
-  metadata?: Record<string, unknown>; // Extensible metadata bag
-}
-```
-
-### ChatThreadMeta
-
-Lightweight thread descriptor without messages, useful for thread lists.
+Metadata for a thread that can be loaded independently from its messages. This is what powers thread lists, sorting, and rename logic.
 
 ```ts
-interface ChatThreadMeta {
+interface ChatThreadRecord {
   id: string;
   parentId?: string;
   scopeKey?: string;
   title?: string;
   createdAt: number;
   updatedAt: number;
-  messageCount: number;  // Number of messages for preview/UI
+  messageCount: number;
+  messageSignature: string;
+  metadata?: Record<string, unknown>;
+}
+```
+
+### ChatThreadSummary
+
+Alias of `ChatThreadRecord`. The store returns summaries when listing threads for a scope.
+
+### ChatThreadTimeline
+
+Snapshot of a thread’s ordered messages.
+
+```ts
+interface ChatThreadTimeline {
+  threadId: string;
+  signature: string;
+  messages: UIMessage[];
+  updatedAt: number;
+}
+```
+
+### ChatThread
+
+Combined convenience shape containing a record and an optional timeline when the messages are loaded.
+
+```ts
+interface ChatThread {
+  record: ChatThreadRecord;
+  timeline?: ChatThreadTimeline;
 }
 ```
 
@@ -48,23 +61,11 @@ Interface for implementing custom thread storage adapters.
 
 ```ts
 interface ChatThreadPersistence {
-  // Load all threads in a scope
-  loadAll(scopeKey?: string): Promise<ChatThread[]>;
-
-  // Optional: Load only metadata (more efficient for lists)
-  loadAllMeta?(scopeKey?: string): Promise<ChatThreadMeta[]>;
-
-  // Save a single thread
-  save(thread: ChatThread): Promise<void>;
-
-  // Delete a thread by ID
-  delete(id: string): Promise<void>;
-
-  // Optional: Save multiple threads efficiently
-  bulkSave?(threads: ChatThread[]): Promise<void>;
-
-  // Optional: Load a single thread by ID
-  load?(id: string): Promise<ChatThread | null>;
+  loadSummaries(scopeKey?: string): Promise<ChatThreadSummary[]>;
+  loadTimeline(threadId: string): Promise<ChatThreadTimeline | null>;
+  saveRecord(record: ChatThreadRecord): Promise<void>;
+  saveTimeline(timeline: ChatThreadTimeline): Promise<void>;
+  deleteThread(threadId: string): Promise<void>;
 }
 ```
 
@@ -135,74 +136,73 @@ import {
 
 // Example: SQLite persistence (pseudo-code)
 const sqlitePersistence: ChatThreadPersistence = {
-  async loadAll(scopeKey) {
+  async loadSummaries(scopeKey) {
     const rows = await db.query(
-      "SELECT * FROM threads WHERE scopeKey = ? ORDER BY updatedAt DESC",
+      `SELECT id, parentId, scopeKey, title, createdAt, updatedAt, messageCount, messageSignature, metadata
+       FROM threads
+       WHERE scopeKey = ?
+       ORDER BY updatedAt DESC`,
       [scopeKey ?? "default"]
     );
     return rows.map((row) => ({
-      id: row.id,
-      parentId: row.parentId,
-      scopeKey: row.scopeKey,
-      title: row.title,
-      messages: JSON.parse(row.messages),
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      metadata: JSON.parse(row.metadata || "{}"),
+      ...row,
+      metadata: JSON.parse(row.metadata ?? "{}"),
     }));
   },
 
-  async loadAllMeta(scopeKey) {
-    const rows = await db.query(
-      "SELECT id, parentId, scopeKey, title, createdAt, updatedAt, messageCount FROM threads WHERE scopeKey = ?",
-      [scopeKey ?? "default"]
+  async loadTimeline(threadId) {
+    const row = await db.queryOne(
+      `SELECT signature, messages, updatedAt
+       FROM thread_messages
+       WHERE threadId = ?`,
+      [threadId]
     );
-    return rows;
+    if (!row) return null;
+    return {
+      threadId,
+      signature: row.signature,
+      messages: JSON.parse(row.messages),
+      updatedAt: row.updatedAt,
+    };
   },
 
-  async save(thread) {
-    // Normalize messages before saving
-    const { messages } = normalizeMessagesMetadata(thread.messages);
-
+  async saveRecord(record) {
     await db.run(
       `INSERT OR REPLACE INTO threads
-       (id, parentId, scopeKey, title, messages, createdAt, updatedAt, metadata, messageCount)
+       (id, parentId, scopeKey, title, createdAt, updatedAt, messageCount, messageSignature, metadata)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        thread.id,
-        thread.parentId,
-        thread.scopeKey ?? "default",
-        thread.title,
-        JSON.stringify(messages),
-        thread.createdAt,
-        thread.updatedAt,
-        JSON.stringify(thread.metadata || {}),
-        messages.length,
+        record.id,
+        record.parentId,
+        record.scopeKey ?? "default",
+        record.title,
+        record.createdAt,
+        record.updatedAt,
+        record.messageCount,
+        record.messageSignature,
+        JSON.stringify(record.metadata ?? {}),
       ]
     );
   },
 
-  async delete(id) {
-    await db.run("DELETE FROM threads WHERE id = ?", [id]);
+  async saveTimeline(timeline) {
+    const { messages } = normalizeMessagesMetadata(timeline.messages);
+    await db.run(
+      `INSERT OR REPLACE INTO thread_messages
+       (threadId, signature, messages, updatedAt)
+       VALUES (?, ?, ?, ?)`,
+      [
+        timeline.threadId,
+        timeline.signature,
+        JSON.stringify(messages),
+        timeline.updatedAt,
+      ]
+    );
   },
 
-  async load(id) {
-    const row = await db.queryOne(
-      "SELECT * FROM threads WHERE id = ?",
-      [id]
-    );
-    if (!row) return null;
-
-    return {
-      id: row.id,
-      parentId: row.parentId,
-      scopeKey: row.scopeKey,
-      title: row.title,
-      messages: JSON.parse(row.messages),
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      metadata: JSON.parse(row.metadata || "{}"),
-    };
+  async deleteThread(id) {
+    await db.run("DELETE FROM threads WHERE id = ?", [id]);
+    await db.run("DELETE FROM thread_messages WHERE threadId = ?", [id]);
   },
 };
 
@@ -243,13 +243,13 @@ Threads with different scope keys are isolated and won't appear in each other's 
 
 ## Best Practices
 
-1. **Always normalize messages** - Use `normalizeMessagesMetadata` before saving to ensure consistent metadata:
+1. **Always normalize messages** - Use `normalizeMessagesMetadata` before saving timelines to ensure consistent metadata:
    ```ts
-   const { messages } = normalizeMessagesMetadata(thread.messages);
-   await persistence.save({ ...thread, messages });
+   const { messages } = normalizeMessagesMetadata(timeline.messages);
+   await persistence.saveTimeline({ ...timeline, messages });
    ```
 
-2. **Implement `loadAllMeta`** - For better performance with large thread lists, implement the optimized metadata-only loader.
+2. **Implement `loadSummaries` efficiently** - Return only the record fields needed to render thread lists. Avoid fetching full messages during summary loads.
 
 3. **Handle errors gracefully** - Wrap persistence calls in try-catch blocks to handle storage failures.
 

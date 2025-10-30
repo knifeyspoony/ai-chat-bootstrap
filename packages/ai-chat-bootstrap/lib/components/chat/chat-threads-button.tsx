@@ -53,26 +53,26 @@ export function ChatThreadsButton({
 }: ChatThreadsButtonProps) {
   const activeThreadId = useChatThreadsStore((s) => s.activeThreadId);
   const storeScopeKey = useChatThreadsStore((s) => s.scopeKey);
-  const metas = useChatThreadsStore((s) => s.metas);
+  const records = useChatThreadsStore((s) => s.records);
   const setActiveThread = useChatThreadsStore((s) => s.setActiveThread);
   const createThread = useChatThreadsStore((s) => s.createThread);
   const renameThread = useChatThreadsStore((s) => s.renameThread);
-  const isLoaded = useChatThreadsStore((s) => s.isLoaded);
-  const loadThreadMetas = useChatThreadsStore((s) => s.loadThreadMetas);
+  const isSummariesLoaded = useChatThreadsStore((s) => s.isSummariesLoaded);
+  const loadSummaries = useChatThreadsStore((s) => s.loadSummaries);
 
   const threads = React.useMemo(() => {
     const key = scopeKey ?? storeScopeKey;
-    const all = Array.from(metas.values());
+    const all = Array.from(records.values());
     const filtered = key ? all.filter((meta) => meta.scopeKey === key) : all;
     return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [metas, scopeKey, storeScopeKey]);
+  }, [records, scopeKey, storeScopeKey]);
 
   React.useEffect(() => {
-    if (!isLoaded) {
+    if (!isSummariesLoaded) {
       const key = scopeKey ?? storeScopeKey;
-      loadThreadMetas(key).catch(() => {});
+      loadSummaries(key).catch(() => {});
     }
-  }, [isLoaded, loadThreadMetas, scopeKey, storeScopeKey]);
+  }, [isSummariesLoaded, loadSummaries, scopeKey, storeScopeKey]);
 
   const handleNew = () => {
     const t = createThread({ scopeKey });
@@ -101,11 +101,10 @@ export function ChatThreadsButton({
     if (!renameState) return;
     const next = renameState.title.trim();
     if (next) {
-      // Attempt a lightweight rename: if thread not loaded, load then rename
       const store = useChatThreadsStore.getState();
-      if (!store.getThreadIfLoaded(renameState.id)) {
+      if (!store.getRecord(renameState.id)) {
         store
-          .loadThread(renameState.id)
+          .ensureTimeline(renameState.id)
           .then(() =>
             store.renameThread(renameState.id, next, { manual: true })
           )

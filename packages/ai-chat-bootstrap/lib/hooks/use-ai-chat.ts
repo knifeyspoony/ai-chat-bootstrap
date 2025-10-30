@@ -28,6 +28,7 @@ import {
 import { useChatStore } from "../stores/";
 import type { SerializedMCPServer } from "../stores/mcp";
 import type { SerializedTool } from "../stores/tools";
+import type { ChatThreadTimeline } from "../types/threads";
 // Planning types and schemas removed - using flow capture instead
 import type { ChatModelOption, ChatRequest, Suggestion } from "../types/chat";
 import {
@@ -54,7 +55,6 @@ import {
 import { logDevError } from "../utils/dev-logger";
 import { fetchMCPServerTools } from "../utils/mcp-utils";
 import { normalizeMessagesMetadata } from "../utils/message-normalization";
-import { computeMessagesSignature } from "../utils/message-signature";
 import { buildEnrichedSystemPrompt } from "../utils/prompt-utils";
 import { useAIChatBranching } from "./use-ai-chat-branching";
 import { useAIChatCompression } from "./use-ai-chat-compression";
@@ -590,17 +590,11 @@ export function useAIChat({
       const scopeChanged = state.scopeKey !== scopeKey;
       if (scopeChanged) {
         state.setScopeKey(scopeKey);
-        state.loadThreadMetas(scopeKey).catch((error) => {
+      }
+      if (!state.isSummariesLoaded || scopeChanged) {
+        state.loadSummaries(scopeKey).catch((error) => {
           logDevError(
-            `[acb][useAIChat] failed to load thread metadata for scope "${scopeKey}"`,
-            error,
-            showErrorMessages
-          );
-        });
-      } else if (!state.isLoaded) {
-        state.loadThreadMetas(scopeKey).catch((error) => {
-          logDevError(
-            `[acb][useAIChat] failed to load thread metadata for scope "${scopeKey}"`,
+            `[acb][useAIChat] failed to load thread summaries for scope "${scopeKey}"`,
             error,
             showErrorMessages
           );
@@ -640,12 +634,12 @@ export function useAIChat({
       try {
         const state = threadStore.getState();
 
-        if (!state.isLoaded) {
+        if (!state.isSummariesLoaded) {
           try {
-            await state.loadThreadMetas(scope);
+            await state.loadSummaries(scope);
           } catch (error) {
             logDevError(
-              `[acb][useAIChat] failed to load thread metadata before selecting default thread (scope "${
+              `[acb][useAIChat] failed to load thread summaries before selecting default thread (scope "${
                 scope ?? "(default)"
               }")`,
               error,
@@ -657,9 +651,9 @@ export function useAIChat({
         // Prefer existing active if present
         const activeId = state.activeThreadId;
         if (activeId) {
-          const loaded = state.getThreadIfLoaded?.(activeId);
-          if (loaded) {
-            const storeMsgs = loaded.messages as UIMessage[];
+          const existingTimeline = state.getTimeline(activeId);
+          if (existingTimeline) {
+            const storeMsgs = existingTimeline.messages as UIMessage[];
             const differs =
               chatHook.messages.length !== storeMsgs.length ||
               chatHook.messages.some((m, i) => storeMsgs[i]?.id !== m.id);
@@ -668,11 +662,9 @@ export function useAIChat({
           }
 
           startRestoring();
-          const thread =
-            state.getThreadIfLoaded?.(activeId) ||
-            (await state.loadThread(activeId));
-          if (thread) {
-            const storeMsgs = thread.messages as UIMessage[];
+          const timeline = await state.ensureTimeline(activeId);
+          if (timeline) {
+            const storeMsgs = timeline.messages as UIMessage[];
             const differs =
               chatHook.messages.length !== storeMsgs.length ||
               chatHook.messages.some((m, i) => storeMsgs[i]?.id !== m.id);
@@ -681,16 +673,16 @@ export function useAIChat({
           }
         }
 
-        const metas = state.listThreads(scope);
-        if (metas.length > 0) {
+        const summaries = state.listSummaries(scope);
+        if (summaries.length > 0) {
           startRestoring();
-          const latest = metas[0]; // sorted by updatedAt desc in store
+          const latest = summaries[0]; // sorted by updatedAt desc in store
           state.setActiveThread(latest.id);
-          const thread =
-            state.getThreadIfLoaded?.(latest.id) ||
-            (await state.loadThread(latest.id));
-          if (thread) {
-            const storeMsgs = thread.messages as UIMessage[];
+          const timeline =
+            state.getTimeline(latest.id) ||
+            (await state.ensureTimeline(latest.id));
+          if (timeline) {
+            const storeMsgs = timeline.messages as UIMessage[];
             const differs =
               chatHook.messages.length !== storeMsgs.length ||
               chatHook.messages.some((m, i) => storeMsgs[i]?.id !== m.id);
@@ -700,11 +692,11 @@ export function useAIChat({
         }
 
         if (!state.activeThreadId) {
-          const created = state.createThread({ scopeKey: scope });
-          state.setActiveThread(created.id);
+          const record = state.createThread({ scopeKey: scope });
+          state.setActiveThread(record.id);
           if (chatHook.messages.length > 0) {
             state.updateThreadMessages(
-              created.id,
+              record.id,
               chatHook.messages as UIMessage[]
             );
           }
@@ -750,8 +742,8 @@ export function useAIChat({
     if (effectiveId) {
       try {
         const state = useChatThreadsStore.getState();
-        const t = state.getThreadIfLoaded?.(effectiveId);
-        return t?.messages;
+        const timeline = state.getTimeline(effectiveId);
+        return timeline?.messages;
       } catch (error) {
         logDevError(
           `[acb][useAIChat] failed to read cached messages for thread "${effectiveId}"`,
@@ -771,7 +763,7 @@ export function useAIChat({
     let cancelled = false;
     try {
       const state = threadStore.getState();
-      if (state.getThreadIfLoaded?.(threadId)) {
+      if (state.getTimeline(threadId)) {
         updateIsRestoringThread(false);
         return; // already loaded
       }
@@ -779,12 +771,12 @@ export function useAIChat({
       updateIsRestoringThread(true);
 
       state
-        .loadThread(threadId)
-        .then((loaded) => {
+        .ensureTimeline(threadId)
+        .then((timeline) => {
           if (cancelled) return;
-          if (loaded) {
+          if (timeline) {
             // Set messages in hook if they differ (covers first mount where existingThreadMessages was undefined)
-            const storeMsgs = loaded.messages as UIMessage[];
+            const storeMsgs = timeline.messages as UIMessage[];
             const differs =
               chatHook.messages.length !== storeMsgs.length ||
               chatHook.messages.some((m, i) => storeMsgs[i]?.id !== m.id);
@@ -829,9 +821,9 @@ export function useAIChat({
             showErrorMessages
           );
           const s2 = threadStore.getState();
-          if (autoCreateThread && !s2.threads.get(threadId)) {
-            s2.createThread({ id: threadId, scopeKey });
-            s2.setActiveThread(threadId);
+          if (autoCreateThread && !s2.getRecord(threadId)) {
+            const record = s2.createThread({ id: threadId, scopeKey });
+            s2.setActiveThread(record.id);
           }
         })
         .finally(() => {
@@ -1086,9 +1078,13 @@ export function useAIChat({
       }
     },
     onFinish: ({ message }) => {
+      const latestMessages = messagesSnapshotRef.current.length > 0
+        ? messagesSnapshotRef.current
+        : (chatHookRef.current?.messages ?? chatHook.messages);
+
       suggestionsFinishRef.current?.();
       const { messages: normalizedMessages, changed: normalizedChanged } =
-        normalizeMessagesMetadata(chatHook.messages, {
+        normalizeMessagesMetadata(latestMessages, {
           shouldStampTimestamp: (candidate) =>
             candidate === message ||
             (!!message?.id && candidate.id === message.id),
@@ -1096,7 +1092,7 @@ export function useAIChat({
         });
       const messagesSnapshot = normalizedChanged
         ? normalizedMessages
-        : chatHook.messages;
+        : latestMessages;
 
       if (normalizedChanged) {
         chatHook.setMessages(normalizedMessages);
@@ -1104,13 +1100,13 @@ export function useAIChat({
       // Persist updated messages into thread (if any)
       if (threadStore) {
         try {
-          const state = threadStore.getState();
-          const effectiveId = threadId ?? state.activeThreadId;
-          if (effectiveId && state.threads.get(effectiveId)) {
+            const state = threadStore.getState();
+            const effectiveId = threadId ?? state.activeThreadId;
+          if (effectiveId) {
             state.updateThreadMessages(effectiveId, messagesSnapshot);
+            const record = state.getRecord(effectiveId);
             // Immediate default title after first user message (if no manual title)
-            const tNow = state.threads.get(effectiveId);
-            if (tNow && !tNow.title) {
+            if (record && !record.title) {
               const firstUserMessage = messagesSnapshot.find(
                 (m) => m.role === "user"
               );
@@ -1134,7 +1130,7 @@ export function useAIChat({
                   .replace(/\s+/g, " ")
                   .trim();
                 if (preview) {
-                  state.renameThread(effectiveId, preview, {
+                  refreshedState.renameThread(effectiveId, preview, {
                     allowAutoReplace: true,
                   });
                 }
@@ -1143,8 +1139,11 @@ export function useAIChat({
 
             // AI upgrade on assistant completion with cooldown
             try {
-              const current = state.threads.get(effectiveId);
-              const meta = (current?.metadata || {}) as Record<string, unknown>;
+              const currentRecord = refreshedState.getRecord(effectiveId);
+              const meta = (currentRecord?.metadata || {}) as Record<
+                string,
+                unknown
+              >;
               const manual = meta.manualTitle === true;
               if (!manual && threadTitleEnabled && threadTitleApi) {
                 const COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
@@ -1155,12 +1154,12 @@ export function useAIChat({
                 const now = Date.now();
                 if (now - last >= COOLDOWN_MS) {
                   // mark attempt time immediately to avoid duplicate triggers
-                  state.updateThreadMetadata?.(effectiveId, {
+                  refreshedState.updateThreadMetadata?.(effectiveId, {
                     lastAutoTitleAt: now,
                   });
                   // Send in the last n messages as context (prefer store snapshot just persisted)
-                  const storeMsgs = (state.threads.get(effectiveId)?.messages ||
-                    []) as UIMessage[];
+                  const storeMsgs =
+                    refreshedState.getTimeline(effectiveId)?.messages ?? [];
                   const source =
                     storeMsgs.length > 0
                       ? storeMsgs
@@ -1172,8 +1171,8 @@ export function useAIChat({
                   } = {
                     messages: sample,
                     previousTitle:
-                      typeof current?.title === "string"
-                        ? current.title
+                      typeof currentRecord?.title === "string"
+                        ? currentRecord.title
                         : undefined,
                   };
                   fetch(threadTitleApi, {
@@ -1185,7 +1184,7 @@ export function useAIChat({
                       if (!r.ok) return;
                       const data: { title?: string } = await r.json();
                       if (data.title) {
-                        state.renameThread(effectiveId, data.title, {
+                        refreshedState.renameThread(effectiveId, data.title, {
                           allowAutoReplace: true,
                         });
                       }
@@ -1227,14 +1226,18 @@ export function useAIChat({
   });
 
   useEffect(() => {
-    const latest = chatHookRef.current ?? chatHook;
+    const latest = chatHookRef.current;
+    if (!latest) return;
     const { messages: normalized, changed } = normalizeMessagesMetadata(
       latest.messages
     );
     if (changed) {
+      if (showErrorMessages) {
+        console.log('[acb][useAIChat] Normalizing message metadata');
+      }
       latest.setMessages(normalized);
     }
-  }, [chatHook, chatHook.messages]);
+  }, [chatHook.messages, showErrorMessages]);
 
   const baseCompressionActions = baseCompressionController.actions;
 
@@ -1248,7 +1251,11 @@ export function useAIChat({
     try {
       getLatestChat().clearError();
     } catch (error) {
-      logDevError("[acb][useAIChat] failed to clear chat error state", error, showErrorMessages);
+      logDevError(
+        "[acb][useAIChat] failed to clear chat error state",
+        error,
+        showErrorMessages
+      );
     }
   }, [getLatestChat, setError, showErrorMessages]);
 
@@ -1475,11 +1482,11 @@ export function useAIChat({
     if (!effectiveThreadId) return;
 
     const state = threadStore.getState();
-    const thread = state.getThreadIfLoaded?.(effectiveThreadId);
-    if (!thread) return;
+    const record = state.getRecord(effectiveThreadId);
+    if (!record) return;
 
-    const rawPersisted = thread.metadata
-      ? (thread.metadata[COMPRESSION_THREAD_METADATA_KEY] as
+    const rawPersisted = record.metadata
+      ? (record.metadata[COMPRESSION_THREAD_METADATA_KEY] as
           | PersistedCompressionState
           | null
           | undefined)
@@ -1748,6 +1755,14 @@ export function useAIChat({
     showErrorMessages,
   ]);
 
+  // Capture messages snapshot BEFORE they might get cleared
+  const messagesSnapshotRef = useRef<UIMessage[]>([]);
+  useEffect(() => {
+    if (chatHook.messages.length > 0) {
+      messagesSnapshotRef.current = chatHook.messages;
+    }
+  }, [chatHook.messages]);
+
   // Update ref to latest chatHook for stable callback access
   useEffect(() => {
     chatHookRef.current = chatHook;
@@ -1755,18 +1770,43 @@ export function useAIChat({
 
   // Keep track of last thread id AND per-thread input drafts
   const lastThreadIdRef = useRef<string | undefined>(undefined);
+  const isSyncingThreadRef = useRef(false);
   useEffect(() => {
     if (!threadStore) return;
     const effectiveId = threadId ?? storeActiveThreadId;
     if (effectiveId === lastThreadIdRef.current) return;
+
+    // Prevent concurrent thread switches
+    if (isSyncingThreadRef.current) {
+      if (showErrorMessages) {
+        console.warn('[acb][useAIChat] Skipping thread switch - already syncing');
+      }
+      return;
+    }
+
+    isSyncingThreadRef.current = true;
     const prev = lastThreadIdRef.current;
-    lastThreadIdRef.current = effectiveId;
+
+    // DON'T update lastThreadIdRef yet - do it after messages are cleared
+    // Otherwise persistence will run with old messages + new thread ID
+
+    // Only reset signature tracking when switching between real threads
+    // Don't reset when initializing (prev was undefined) or staying on same thread
+    if (prev && prev !== effectiveId) {
+      lastSavedSignatureRef.current = undefined;
+    }
+
+    if (showErrorMessages) {
+      console.log(`[acb][useAIChat] Thread switch: ${prev?.slice(0,8)} → ${effectiveId?.slice(0,8)}`);
+      console.log(`  Current chatHook.messages.length=${chatHook.messages.length}`);
+    }
+
     // Unload previous (optional optimization)
     if (prev) {
       try {
         const st = threadStore.getState();
         // Keep it loaded if we might come back? For now, unload to save memory.
-        st.unloadThread?.(prev);
+        st.unloadTimeline(prev);
       } catch (error) {
         logDevError(
           `[acb][useAIChat] failed to unload thread "${prev}"`,
@@ -1779,16 +1819,58 @@ export function useAIChat({
       // Ensure loaded
       try {
         const st = threadStore.getState();
-        if (!st.getThreadIfLoaded?.(effectiveId)) {
-          st.loadThread(effectiveId)
-            .then((t) => {
-              if (!t) return;
-              const storeMsgs = t.messages as UIMessage[];
-              const existing = chatHook.messages;
+        const existingTimeline = st.getTimeline(effectiveId);
+        if (!existingTimeline) {
+          st.ensureTimeline(effectiveId)
+            .then((timeline) => {
+              // Verify we're still on this thread (user might have switched again)
+              if (lastThreadIdRef.current !== effectiveId) {
+                if (showErrorMessages) {
+                  console.log(`[acb][useAIChat] Skipping load - thread changed during async load`);
+                }
+                isSyncingThreadRef.current = false;
+                return;
+              }
+              if (!timeline) {
+                if (showErrorMessages) {
+                  console.log(`[acb][useAIChat] No timeline from ensureTimeline - new thread with no messages`);
+                }
+                // New thread with no persisted messages - clear the chat
+                const latest = chatHookRef.current;
+                if (latest && latest.messages.length > 0) {
+                  if (showErrorMessages) {
+                    console.log(`[acb][useAIChat] Clearing ${latest.messages.length} messages for new thread`);
+                  }
+                  latest.setMessages([]);
+                }
+                // Now it's safe to update the ref
+                lastThreadIdRef.current = effectiveId;
+                isSyncingThreadRef.current = false;
+                return;
+              }
+              const storeMsgs = timeline.messages as UIMessage[];
+              const latest = chatHookRef.current;
+              if (!latest) {
+                isSyncingThreadRef.current = false;
+                return;
+              }
+              const existing = latest.messages;
               const differs =
                 existing.length !== storeMsgs.length ||
                 existing.some((m, i) => storeMsgs[i]?.id !== m.id);
-              if (differs) chatHook.setMessages(storeMsgs);
+              if (differs) {
+                if (showErrorMessages) {
+                  console.log(`[acb][useAIChat] Loading ${storeMsgs.length} messages for thread ${effectiveId?.slice(0,8)}`);
+                }
+                latest.setMessages(storeMsgs);
+              } else {
+                if (showErrorMessages) {
+                  console.log(`[acb][useAIChat] Messages already match (${existing.length} msgs)`);
+                }
+              }
+              // Now it's safe to update the ref
+              lastThreadIdRef.current = effectiveId;
+              isSyncingThreadRef.current = false;
             })
             .catch((error) => {
               logDevError(
@@ -1796,17 +1878,32 @@ export function useAIChat({
                 error,
                 showErrorMessages
               );
+              isSyncingThreadRef.current = false;
             });
         } else {
-          const t = st.getThreadIfLoaded(effectiveId);
-          if (t) {
-            const storeMsgs = t.messages as UIMessage[];
-            const existing = chatHook.messages;
-            const differs =
-              existing.length !== storeMsgs.length ||
-              existing.some((m, i) => storeMsgs[i]?.id !== m.id);
-            if (differs) chatHook.setMessages(storeMsgs);
+          const storeMsgs = existingTimeline.messages as UIMessage[];
+          const latest = chatHookRef.current;
+          if (!latest) {
+            isSyncingThreadRef.current = false;
+            return;
           }
+          const existing = latest.messages;
+          const differs =
+            existing.length !== storeMsgs.length ||
+            existing.some((m, i) => storeMsgs[i]?.id !== m.id);
+          if (differs) {
+            if (showErrorMessages) {
+              console.log(`[acb][useAIChat] Loading ${storeMsgs.length} messages for thread ${effectiveId?.slice(0,8)}`);
+            }
+            latest.setMessages(storeMsgs);
+          } else {
+            if (showErrorMessages) {
+              console.log(`[acb][useAIChat] Messages already match (${existing.length} msgs)`);
+            }
+          }
+          // Now it's safe to update the ref
+          lastThreadIdRef.current = effectiveId;
+          isSyncingThreadRef.current = false;
         }
       } catch (error) {
         logDevError(
@@ -1814,12 +1911,20 @@ export function useAIChat({
           error,
           showErrorMessages
         );
+        isSyncingThreadRef.current = false;
       }
     } else {
-      // no active thread
-      chatHook.setMessages([]);
+      // no active thread - only clear if we actually had messages before
+      const latest = chatHookRef.current;
+      if (latest && latest.messages.length > 0) {
+        if (showErrorMessages) {
+          console.log(`[acb][useAIChat] Clearing messages - no active thread`);
+        }
+        latest.setMessages([]);
+      }
+      isSyncingThreadRef.current = false;
     }
-  }, [threadId, storeActiveThreadId, chatHook, threadStore, showErrorMessages]);
+  }, [threadId, storeActiveThreadId, threadStore, showErrorMessages]);
 
   // Note: Removed chat store sync - causes infinite re-renders
   // The chat hook manages its own state internally
@@ -1848,28 +1953,37 @@ export function useAIChat({
     (content: string) => {
       resetErrorState();
       const timestamp = Date.now();
+
+      // Capture message count BEFORE sending
+      const beforeCount = chatHookRef.current?.messages.length || 0;
+
       chatHookRef.current?.sendMessage({
         text: content,
         metadata: { timestamp },
       });
       if (threadStore) {
-        // schedule microtask after message appended by hook
-        queueMicrotask(() => {
+        // Wait for React to process the message addition
+        // queueMicrotask is too early - use setTimeout to wait for state updates
+        setTimeout(() => {
           try {
             const state = threadStore.getState();
             const effectiveId = threadId ?? state.activeThreadId;
-            if (effectiveId && state.threads.get(effectiveId)) {
-              state.updateThreadMessages(
-                effectiveId,
-                chatHookRef.current?.messages as UIMessage[]
-              );
-              // Persist immediately after user sends message (don't wait for idle)
-              // This ensures user messages are saved even if API fails or page crashes
-              persistMessagesIfChanged("send");
+            if (effectiveId) {
+              const afterCount = chatHookRef.current?.messages.length || 0;
+
+              // Force persist if count increased (new message added)
+              if (afterCount > beforeCount) {
+                // Directly update store with new messages
+                state.updateThreadMessages(effectiveId, chatHookRef.current?.messages as UIMessage[]);
+              }
               // Initial placeholder title: first user message preview if untitled
-              const t = state.threads.get(effectiveId);
-              if (t && (!t.title || hasAutoTitledFlag(t.metadata))) {
-                if (!t.title) {
+              const refreshed = threadStore.getState();
+              const record = refreshed.getRecord(effectiveId);
+              if (
+                record &&
+                (!record.title || hasAutoTitledFlag(record.metadata))
+              ) {
+                if (!record.title) {
                   const raw = String(content ?? "").trim();
                   if (raw) {
                     const PREVIEW_LEN = 24; // keep in sync with UI truncation
@@ -1884,7 +1998,7 @@ export function useAIChat({
                       .replace(/\s+/g, " ")
                       .trim();
                     if (preview) {
-                      state.renameThread(effectiveId, preview, {
+                      refreshed.renameThread(effectiveId, preview, {
                         allowAutoReplace: true,
                       });
                     }
@@ -1940,7 +2054,7 @@ export function useAIChat({
           try {
             const state = threadStore.getState();
             const effectiveId = threadId ?? state.activeThreadId;
-            if (effectiveId && state.threads.get(effectiveId)) {
+            if (effectiveId) {
               state.updateThreadMessages(
                 effectiveId,
                 chatHookRef.current?.messages as UIMessage[]
@@ -1979,9 +2093,17 @@ export function useAIChat({
   // --- Internal autosave logic ---
   const lastSavedSignatureRef = useRef<string | undefined>(undefined);
 
+  function computeSignature(msgs: UIMessage[]): string {
+    // Use length + last 5 ids for cheap change detection
+    const tailIds = msgs
+      .slice(-5)
+      .map((m) => m.id)
+      .join("|");
+    return `${msgs.length}:${tailIds}`;
+  }
+
   const persistMessagesIfChanged = useCallback(
     (reason?: string) => {
-      void reason;
       const effectiveId =
         threadId ??
         (() => {
@@ -1996,18 +2118,54 @@ export function useAIChat({
             return undefined;
           }
         })();
+
       if (!effectiveId) return;
+
+      // Don't persist during thread switches to avoid race conditions
+      if (isSyncingThreadRef.current) return;
+
+      // Verify we're persisting for the correct thread
+      // Allow if lastThreadIdRef is undefined (initial load) AND we have an effectiveId
+      if (lastThreadIdRef.current !== undefined && effectiveId !== lastThreadIdRef.current) {
+        if (showErrorMessages) {
+          console.warn(`[acb][useAIChat] Skipping persistence - thread mismatch`);
+        }
+        return;
+      }
+
+      // If this is first persistence for this thread, set the ref now
+      if (lastThreadIdRef.current === undefined && effectiveId) {
+        lastThreadIdRef.current = effectiveId;
+      }
+
       try {
         const store = threadStore.getState();
-        const thread = store.threads.get(effectiveId);
-        if (!thread) return;
-
-        const storeMessages = (thread.messages ?? []) as UIMessage[];
+        const timeline = store.getTimeline(effectiveId);
+        const storeMessages = (timeline?.messages ?? []) as UIMessage[];
         const helper = chatHookRef.current ?? chatHook;
         const candidateMessages = (helper?.messages ?? []) as UIMessage[];
+        const existingRecord = store.getRecord(effectiveId);
 
-        const storeSignature = computeMessagesSignature(storeMessages);
-        const candidateSignature = computeMessagesSignature(candidateMessages);
+        // Never persist empty messages if we had messages before
+        if (candidateMessages.length === 0 && storeMessages.length > 0) {
+          if (showErrorMessages) {
+            console.warn('[acb][useAIChat] Skipping persistence: candidate empty but store has messages');
+          }
+          return;
+        }
+
+        // Never persist if BOTH sources are empty and this thread already exists with messages
+        if (candidateMessages.length === 0 && storeMessages.length === 0) {
+          if (existingRecord && existingRecord.messageCount > 0) {
+            if (showErrorMessages) {
+              console.warn(`[acb][useAIChat] Skipping persistence: both sources empty but record has ${existingRecord.messageCount} messages`);
+            }
+            return;
+          }
+        }
+
+        const storeSignature = computeSignature(storeMessages);
+        const candidateSignature = computeSignature(candidateMessages);
 
         let msgs: UIMessage[];
         let signature: string;
@@ -2027,7 +2185,9 @@ export function useAIChat({
           signature = storeSignature;
         }
 
-        if (signature === lastSavedSignatureRef.current) return;
+        if (signature === lastSavedSignatureRef.current) {
+          return; // Already saved
+        }
 
         store.updateThreadMessages(effectiveId, msgs);
         lastSavedSignatureRef.current = signature;
@@ -2039,7 +2199,9 @@ export function useAIChat({
         );
       }
     },
-    [threadId, threadStore, chatHook, chatHookRef, showErrorMessages]
+    [threadId, threadStore, showErrorMessages]
+    // Note: chatHook intentionally excluded - we use chatHookRef instead
+    // Including chatHook would cause this to recreate on every render (e.g., when typing in input)
   );
 
   const branching = useAIChatBranching({
@@ -2080,14 +2242,17 @@ export function useAIChat({
   useEffect(() => {
     const effectiveId = threadId ?? storeActiveThreadId;
     if (!effectiveId) return;
-    if (chatHook.status === "streaming" || chatHook.status === "submitted")
-      return;
+    if (chatHook.status === "streaming" || chatHook.status === "submitted") {
+      return; // Skip during active chat operations
+    }
     persistMessagesIfChanged("idle");
   }, [
     threadId,
     storeActiveThreadId,
     chatHook.status,
-    chatHook.messages,
+    // Note: chatHook.messages intentionally excluded to prevent race conditions
+    // during rapid state transitions when assistant finishes. persistMessagesIfChanged
+    // gets latest messages via chatHookRef.current which is always up-to-date.
     persistMessagesIfChanged,
   ]);
 

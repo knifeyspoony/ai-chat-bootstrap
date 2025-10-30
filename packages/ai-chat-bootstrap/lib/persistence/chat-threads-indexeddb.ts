@@ -1,3 +1,4 @@
+import type { UIMessage } from "ai";
 import type {
   ChatThreadPersistence,
   ChatThreadRecord,
@@ -98,7 +99,7 @@ export function createIndexedDBChatThreadPersistence(): ChatThreadPersistence {
         threadId,
         signature: entry.messageSignature,
         messages: Array.isArray(entry.timelineMessages)
-          ? (entry.timelineMessages as unknown[])
+          ? (entry.timelineMessages as UIMessage[])
           : [],
         updatedAt: entry.timelineUpdatedAt ?? entry.updatedAt,
       };

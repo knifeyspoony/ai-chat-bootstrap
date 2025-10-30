@@ -26,7 +26,9 @@
       "Bash(lsof:*)",
       "Bash(xargs:*)",
       "Bash(node:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(pnpm --filter ai-chat-bootstrap lint:*)",
+      "Bash(pnpm --filter ai-chat-bootstrap typecheck:*)"
     ],
     "deny": [],
     "ask": []

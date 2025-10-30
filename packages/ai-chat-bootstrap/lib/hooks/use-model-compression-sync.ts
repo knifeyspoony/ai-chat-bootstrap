@@ -420,6 +420,7 @@ export function useModelCompressionSync({
         return `${idPart}:${rolePart}:${partCount}`;
       })
       .join("|");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compressionConfig.enabled, getChatMessages, threadMessagesSignature]);
 
   useEffect(() => {
@@ -441,8 +442,12 @@ export function useModelCompressionSync({
 
     const snapshot = store.getSnapshot();
 
-    // Use resolvedCompressionOptions which has maxTokenBudget derived from model
-    const effectiveConfig = resolvedCompressionOptions ?? compressionConfig;
+    // Use compressionConfig but with maxTokenBudget from resolvedCompressionOptions if available
+    const effectiveConfig: NormalizedCompressionConfig = {
+      ...compressionConfig,
+      maxTokenBudget: resolvedCompressionOptions?.maxTokenBudget ?? compressionConfig.maxTokenBudget,
+      compressionThreshold: resolvedCompressionOptions?.compressionThreshold ?? compressionConfig.compressionThreshold,
+    };
 
     const result = buildCompressionPayload({
       baseMessages,
@@ -467,6 +472,7 @@ export function useModelCompressionSync({
     });
   }, [
     resolvedCompressionOptions,
+    compressionConfig,
     compressionUsageSignature,
     threadMessagesSignature,
     compressionController.pinnedMessages,

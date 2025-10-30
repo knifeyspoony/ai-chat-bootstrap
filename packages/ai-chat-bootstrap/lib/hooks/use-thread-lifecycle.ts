@@ -9,12 +9,6 @@ type ChatHelpers = {
   setMessages: (messages: UIMessage[]) => void;
 };
 
-const hasAutoTitledFlag = (metadata?: Record<string, unknown>): boolean => {
-  if (!metadata) return false;
-  const flag = (metadata as { autoTitled?: unknown }).autoTitled;
-  return flag === true;
-};
-
 export interface ThreadTitleOptions {
   enabled?: boolean;
   api?: string;
@@ -29,7 +23,7 @@ export interface UseThreadLifecycleOptions {
   warnOnMissing: boolean;
   titleOptions?: ThreadTitleOptions;
   initialMessages?: UIMessage[];
-  chatHook: ChatHelpers;
+  chatHook?: ChatHelpers;
   chatHookRef: React.MutableRefObject<ChatHelpers | null>;
   showErrorMessages?: boolean;
 }
@@ -49,7 +43,6 @@ export function useThreadLifecycle({
   warnOnMissing,
   titleOptions,
   initialMessages,
-  chatHook,
   chatHookRef,
   showErrorMessages = false,
 }: UseThreadLifecycleOptions) {
@@ -237,6 +230,8 @@ export function useThreadLifecycle({
       cancelled = true;
       updateIsRestoringThread(false);
     };
+    // chatHookRef is intentionally not in deps - refs are stable and don't trigger re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId, scopeKey, threadStore, showErrorMessages, updateIsRestoringThread]);
 
   // Load initial thread messages synchronously if already present
@@ -355,6 +350,8 @@ export function useThreadLifecycle({
       cancelled = true;
       updateIsRestoringThread(false);
     };
+    // chatHookRef is intentionally not in deps - refs are stable and don't trigger re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId, autoCreate, warnOnMissing, scopeKey, threadStore, showErrorMessages, updateIsRestoringThread, initialMessages]);
 
   // Thread switching logic
@@ -525,6 +522,8 @@ export function useThreadLifecycle({
       }
       isSyncingThreadRef.current = false;
     }
+    // chatHookRef is intentionally not in deps - refs are stable and don't trigger re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId, storeActiveThreadId, threadStore, showErrorMessages]);
 
   // Message persistence with deduplication
@@ -537,16 +536,17 @@ export function useThreadLifecycle({
   }
 
   const persistMessagesIfChanged = useCallback(
-    (reason?: string) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    (_reason?: string) => {
       const effectiveId =
         threadId ??
         (() => {
           try {
             return threadStore.getState().activeThreadId;
-          } catch (error) {
+          } catch (_error) {
             logDevError(
               "[acb][useThreadLifecycle] failed to read active thread id during persistence",
-              error,
+              _error,
               showErrorMessages
             );
             return undefined;
@@ -635,6 +635,8 @@ export function useThreadLifecycle({
         );
       }
     },
+    // chatHookRef is intentionally not in deps - refs are stable and don't trigger re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [threadId, threadStore, showErrorMessages]
   );
 
@@ -798,6 +800,8 @@ export function useThreadLifecycle({
         }
       }
     },
+    // chatHookRef is intentionally not in deps - refs are stable and don't trigger re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [threadId, threadStore, generateThreadTitle, showErrorMessages]
   );
 

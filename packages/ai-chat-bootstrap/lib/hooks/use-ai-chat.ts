@@ -16,9 +16,6 @@ import {
   useAIContextStore,
   useAIFocusStore,
   useAIToolsStore,
-  useAIModelsStore,
-  useChatThreadsStore,
-  useAICompressionStore,
 } from "../stores";
 import { useChatStore } from "../stores/";
 import type { Suggestion } from "../types/chat";
@@ -196,7 +193,6 @@ export function useAIChat(options: import("./use-ai-chat-types").UseAIChatOption
     warnOnMissing: warnOnMissingThread,
     titleOptions: threadsGroup.title,
     initialMessages,
-    chatHook: null as any, // Will be accessed via chatHookRef
     chatHookRef,
     showErrorMessages,
   });
@@ -307,6 +303,9 @@ export function useAIChat(options: import("./use-ai-chat-types").UseAIChatOption
         pinnedAt,
       });
     },
+    // baseCompressionController itself is intentionally not in deps - only its actions
+    // The full controller is a stable reference and including it would cause unnecessary re-runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [messageOps, baseCompressionController.actions]
   );
 

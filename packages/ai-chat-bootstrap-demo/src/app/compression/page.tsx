@@ -5,8 +5,8 @@ import { useMemo } from "react";
 
 const LOW_BUDGET_MODEL = [
   {
-    id: "gpt-4o",
-    label: "GPT-4o",
+    id: "gpt-4.1",
+    label: "GPT-4.1",
     description: "2,048 token context window",
     contextWindowTokens: 2048,
     contextCompressionThreshold: 0.7,

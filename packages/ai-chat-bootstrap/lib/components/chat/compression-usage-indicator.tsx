@@ -76,6 +76,7 @@ export const CompressionUsageIndicator: React.FC<
   const remaining = usage?.remainingTokens;
   const totalTokens = usage?.totalTokens;
   const overBudget = Boolean(compression?.overBudget);
+
   const latestError = useMemo(() => {
     const events = compression?.events;
     if (!Array.isArray(events) || events.length === 0) return null;

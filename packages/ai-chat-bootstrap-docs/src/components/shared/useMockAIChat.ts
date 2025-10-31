@@ -27,6 +27,8 @@ type MockChatBase = ComponentProps<typeof MockChatContainer>["chat"];
 // Mock useAIChat hook for demo purposes
 type MockChat = MockChatBase & {
   setIsLoading: Dispatch<SetStateAction<boolean>>;
+  isRestoringThread: boolean;
+  setIsRestoringThread: Dispatch<SetStateAction<boolean>>;
 };
 
 export function useMockAIChat(options: MockChatOptions = {}): MockChat {
@@ -40,6 +42,7 @@ export function useMockAIChat(options: MockChatOptions = {}): MockChat {
   const [messages, setMessages] = useState<UIMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isRestoringThread, setIsRestoringThread] = useState(false);
   const [error, setError] = useState<Error | undefined>(undefined);
 
   const sendMessageWithContext = (text: string) => {
@@ -209,5 +212,7 @@ export function useMockAIChat(options: MockChatOptions = {}): MockChat {
 
     // Utility functions for tests
     setIsLoading,
+    isRestoringThread,
+    setIsRestoringThread,
   } as MockChat;
 }

@@ -388,170 +388,140 @@ export function useThreadLifecycle({
   const lastThreadIdRef = useRef<string | undefined>(undefined);
   const isSyncingThreadRef = useRef(false);
   const lastSavedSignatureRef = useRef<string | undefined>(undefined);
+  const pendingThreadResetRef = useRef(false);
+  const threadSyncTokenRef = useRef(0);
 
   useEffect(() => {
     if (!threadStore) return;
     const effectiveId = threadId ?? storeActiveThreadId;
-    if (effectiveId === lastThreadIdRef.current) return;
+    const previousHydratedId = lastThreadIdRef.current;
+    const token = ++threadSyncTokenRef.current;
 
-    if (isSyncingThreadRef.current) {
-      if (showErrorMessages) {
-        console.warn(
-          "[acb][useThreadLifecycle] Skipping thread switch - already syncing"
-        );
-      }
-      return;
-    }
-
-    isSyncingThreadRef.current = true;
-    const prev = lastThreadIdRef.current;
-
-    // Reset signature tracking when switching threads
-    if (prev && prev !== effectiveId) {
+    if (previousHydratedId && previousHydratedId !== effectiveId) {
       lastSavedSignatureRef.current = undefined;
     }
 
-    if (showErrorMessages) {
-      console.log(
-        `[acb][useThreadLifecycle] Thread switch: ${prev?.slice(0, 8)} → ${effectiveId?.slice(0, 8)}`
+    const logDebug = (message: string) => {
+      if (showErrorMessages) {
+        console.log(message);
+      }
+    };
+
+    const syncMessages = (messages: UIMessage[], pendingReset: boolean) => {
+      if (threadSyncTokenRef.current !== token) return;
+      updateIsRestoringThread(pendingReset);
+      const latest = chatHookRef.current;
+      if (latest) {
+        const existing = latest.messages;
+        const differs =
+          existing.length !== messages.length ||
+          existing.some((m, index) => messages[index]?.id !== m.id);
+        if (differs) {
+          logDebug(
+            `[acb][useThreadLifecycle] Rendering ${messages.length} message(s) for thread ${effectiveId?.slice(0, 8)}`
+          );
+          latest.setMessages(messages);
+        }
+      }
+      lastThreadIdRef.current = effectiveId;
+      pendingThreadResetRef.current = pendingReset;
+    };
+
+    const finishSync = () => {
+      if (threadSyncTokenRef.current === token) {
+        isSyncingThreadRef.current = false;
+        updateIsRestoringThread(false);
+      }
+    };
+
+    let state: ReturnType<typeof threadStore.getState>;
+    try {
+      state = threadStore.getState();
+    } catch (error) {
+      logDevError(
+        "[acb][useThreadLifecycle] failed to access chat thread store",
+        error,
+        showErrorMessages
       );
-      console.log(
+      finishSync();
+      return;
+    }
+
+    if (previousHydratedId && previousHydratedId !== effectiveId) {
+      try {
+        state.unloadTimeline(previousHydratedId);
+      } catch (error) {
+        logDevError(
+          `[acb][useThreadLifecycle] failed to unload thread "${previousHydratedId}"`,
+          error,
+          showErrorMessages
+        );
+      }
+    }
+
+    if (!effectiveId) {
+      const latest = chatHookRef.current;
+      if (latest && latest.messages.length > 0) {
+        logDebug("[acb][useThreadLifecycle] Clearing messages - no active thread");
+        latest.setMessages([]);
+      }
+      lastThreadIdRef.current = undefined;
+      pendingThreadResetRef.current = false;
+      finishSync();
+      return;
+    }
+
+    updateIsRestoringThread(true);
+
+    if (showErrorMessages) {
+      logDebug(
+        `[acb][useThreadLifecycle] Thread switch: ${previousHydratedId?.slice(0, 8)} → ${effectiveId.slice(0, 8)}`
+      );
+      logDebug(
         `  Current chatHook.messages.length=${chatHookRef.current?.messages?.length ?? 0}`
       );
     }
 
-    // Unload previous thread
-    if (prev) {
-      try {
-        const st = threadStore.getState();
-        st.unloadTimeline(prev);
-      } catch (error) {
-        logDevError(
-          `[acb][useThreadLifecycle] failed to unload thread "${prev}"`,
-          error,
-          showErrorMessages
-        );
-      }
+    const existingTimeline = state.getTimeline(effectiveId);
+    if (existingTimeline) {
+      const storeMessages = (existingTimeline.messages ?? []) as UIMessage[];
+      syncMessages(storeMessages, false);
+      finishSync();
+      return;
     }
 
-    if (effectiveId) {
-      try {
-        const st = threadStore.getState();
-        const existingTimeline = st.getTimeline(effectiveId);
-        if (!existingTimeline) {
-          st.ensureTimeline(effectiveId)
-            .then((timeline) => {
-              if (lastThreadIdRef.current !== effectiveId) {
-                if (showErrorMessages) {
-                  console.log(
-                    `[acb][useThreadLifecycle] Skipping load - thread changed during async load`
-                  );
-                }
-                isSyncingThreadRef.current = false;
-                return;
-              }
-              if (!timeline) {
-                if (showErrorMessages) {
-                  console.log(
-                    `[acb][useThreadLifecycle] No timeline from ensureTimeline - new thread with no messages`
-                  );
-                }
-                const latest = chatHookRef.current;
-                if (latest && latest.messages.length > 0) {
-                  if (showErrorMessages) {
-                    console.log(
-                      `[acb][useThreadLifecycle] Clearing ${latest.messages.length} messages for new thread`
-                    );
-                  }
-                  latest.setMessages([]);
-                }
-                lastThreadIdRef.current = effectiveId;
-                isSyncingThreadRef.current = false;
-                return;
-              }
-              const storeMsgs = timeline.messages as UIMessage[];
-              const latest = chatHookRef.current;
-              if (!latest) {
-                isSyncingThreadRef.current = false;
-                return;
-              }
-              const existing = latest.messages;
-              const differs =
-                existing.length !== storeMsgs.length ||
-                existing.some((m, i) => storeMsgs[i]?.id !== m.id);
-              if (differs) {
-                if (showErrorMessages) {
-                  console.log(
-                    `[acb][useThreadLifecycle] Loading ${storeMsgs.length} messages for thread ${effectiveId?.slice(0, 8)}`
-                  );
-                }
-                latest.setMessages(storeMsgs);
-              } else {
-                if (showErrorMessages) {
-                  console.log(
-                    `[acb][useThreadLifecycle] Messages already match (${existing.length} msgs)`
-                  );
-                }
-              }
-              lastThreadIdRef.current = effectiveId;
-              isSyncingThreadRef.current = false;
-            })
-            .catch((error) => {
-              logDevError(
-                `[acb][useThreadLifecycle] failed to hydrate thread "${effectiveId}"`,
-                error,
-                showErrorMessages
-              );
-              isSyncingThreadRef.current = false;
-            });
-        } else {
-          const storeMsgs = existingTimeline.messages as UIMessage[];
-          const latest = chatHookRef.current;
-          if (!latest) {
-            isSyncingThreadRef.current = false;
-            return;
-          }
-          const existing = latest.messages;
-          const differs =
-            existing.length !== storeMsgs.length ||
-            existing.some((m, i) => storeMsgs[i]?.id !== m.id);
-          if (differs) {
-            if (showErrorMessages) {
-              console.log(
-                `[acb][useThreadLifecycle] Loading ${storeMsgs.length} messages for thread ${effectiveId?.slice(0, 8)}`
-              );
-            }
-            latest.setMessages(storeMsgs);
-          } else {
-            if (showErrorMessages) {
-              console.log(
-                `[acb][useThreadLifecycle] Messages already match (${existing.length} msgs)`
-              );
-            }
-          }
-          lastThreadIdRef.current = effectiveId;
-          isSyncingThreadRef.current = false;
+    isSyncingThreadRef.current = true;
+    pendingThreadResetRef.current = true;
+
+    // Immediately clear while hydrating to avoid showing the previous thread's messages
+    syncMessages([], true);
+
+    state
+      .ensureTimeline(effectiveId)
+      .then((timeline) => {
+        if (threadSyncTokenRef.current !== token) return;
+        if (!timeline) {
+          logDebug(
+            `[acb][useThreadLifecycle] No timeline from ensureTimeline for thread ${effectiveId.slice(0, 8)}`
+          );
+          syncMessages([], false);
+          return;
         }
-      } catch (error) {
+        const storeMessages = (timeline.messages ?? []) as UIMessage[];
+        syncMessages(storeMessages, false);
+      })
+      .catch((error) => {
+        if (threadSyncTokenRef.current !== token) return;
         logDevError(
-          `[acb][useThreadLifecycle] failed to access thread state for "${effectiveId}"`,
+          `[acb][useThreadLifecycle] failed to hydrate thread "${effectiveId}"`,
           error,
           showErrorMessages
         );
-        isSyncingThreadRef.current = false;
-      }
-    } else {
-      const latest = chatHookRef.current;
-      if (latest && latest.messages.length > 0) {
-        if (showErrorMessages) {
-          console.log(
-            `[acb][useThreadLifecycle] Clearing messages - no active thread`
-          );
-        }
-        latest.setMessages([]);
-      }
-      isSyncingThreadRef.current = false;
-    }
+        syncMessages([], false);
+      })
+      .finally(() => {
+        finishSync();
+      });
     // chatHookRef is intentionally not in deps - refs are stable and don't trigger re-renders
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId, storeActiveThreadId, threadStore, showErrorMessages]);
@@ -611,6 +581,32 @@ export function useThreadLifecycle({
         const candidateMessages = (helper?.messages ?? []) as UIMessage[];
         const existingRecord = store.getRecord(effectiveId);
 
+        if (pendingThreadResetRef.current) {
+          const canInspect =
+            helper !== null &&
+            helper !== undefined &&
+            Array.isArray(candidateMessages);
+          if (!canInspect) {
+            // Without a chat instance we cannot safely persist; allow future attempts.
+            return;
+          }
+          const inSync =
+            storeMessages.length === candidateMessages.length &&
+            storeMessages.every(
+              (storeMessage, index) =>
+                storeMessage?.id === candidateMessages[index]?.id
+            );
+          if (!inSync) {
+            if (showErrorMessages) {
+              console.log(
+                "[acb][useThreadLifecycle] Skipping persistence while thread messages are syncing"
+              );
+            }
+            return;
+          }
+          pendingThreadResetRef.current = false;
+        }
+
         if (candidateMessages.length === 0 && storeMessages.length > 0) {
           if (showErrorMessages) {
             console.warn(
@@ -657,6 +653,7 @@ export function useThreadLifecycle({
 
         store.updateThreadMessages(effectiveId, msgs);
         lastSavedSignatureRef.current = signature;
+        pendingThreadResetRef.current = false;
       } catch (error) {
         logDevError(
           `[acb][useThreadLifecycle] failed to persist messages for thread "${effectiveId}"`,

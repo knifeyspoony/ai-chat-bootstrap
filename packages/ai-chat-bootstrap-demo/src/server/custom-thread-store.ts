@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import type {
   ChatThreadRecord,
@@ -11,12 +12,13 @@ type StoredThread = {
   timeline?: ChatThreadTimeline | null;
 };
 
-const DATA_DIR = path.join(
-  process.cwd(),
-  "packages",
-  "ai-chat-bootstrap-demo",
-  ".server-persistence"
-);
+const DATA_DIR = (() => {
+  const override = process.env.ACB_SERVER_THREADS_DIR;
+  if (override && override.trim().length > 0) {
+    return path.resolve(override);
+  }
+  return path.join(os.tmpdir(), "ai-chat-bootstrap-demo-threads");
+})();
 
 const DATA_FILE = path.join(DATA_DIR, "threads.json");
 

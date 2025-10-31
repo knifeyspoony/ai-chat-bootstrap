@@ -1,9 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useShallow } from "zustand/react/shallow";
-import type { ChatThreadRecord } from "ai-chat-bootstrap";
-import { ChatContainer, useChatThreadsStore } from "ai-chat-bootstrap";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -11,15 +9,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { createServerThreadPersistence } from "@/lib/server-thread-persistence";
+import type { ChatThreadRecord } from "ai-chat-bootstrap";
+import {
+  ChatContainer,
+  useAIFrontendTool,
+  useChatThreadsStore,
+} from "ai-chat-bootstrap";
 import {
   Database,
   DownloadCloud,
+  Gauge,
   RefreshCcw,
   ShieldCheck,
 } from "lucide-react";
-import { createServerThreadPersistence } from "@/lib/server-thread-persistence";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { z } from "zod";
+import { useShallow } from "zustand/react/shallow";
 
 const DEMO_MODELS = [
   { id: "gpt-4o", label: "GPT-4o" },
@@ -31,10 +37,11 @@ const SCOPE_KEY = "server-thread-demo";
 export default function ServerPersistenceDemo() {
   const [adapter] = useState(() => createServerThreadPersistence());
   const [mounted, setMounted] = useState(false);
-  const [serverSummaries, setServerSummaries] = useState<
-    ChatThreadRecord[]
-  >([]);
+  const [serverSummaries, setServerSummaries] = useState<ChatThreadRecord[]>(
+    []
+  );
   const [isLoadingSummaries, setIsLoadingSummaries] = useState(false);
+  const [counter, setCounter] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -80,6 +87,25 @@ export default function ServerPersistenceDemo() {
   useEffect(() => {
     void refreshServerSummaries();
   }, [refreshServerSummaries]);
+
+  useAIFrontendTool({
+    name: "increment_counter",
+    description:
+      "Increment the shared counter to demonstrate frontend tool execution in a server-persisted thread.",
+    parameters: z.object({}),
+    toolIcon: Gauge,
+    execute: async () => {
+      let nextValue = 0;
+      setCounter((prev) => {
+        nextValue = prev + 1;
+        return nextValue;
+      });
+      return {
+        message: `Counter increased to ${nextValue}`,
+        newValue: nextValue,
+      };
+    },
+  });
 
   const storeSnapshot = useChatThreadsStore(
     useShallow((state) => ({
@@ -174,9 +200,7 @@ export default function ServerPersistenceDemo() {
                     <div className="text-muted-foreground flex items-center gap-2">
                       <span>{record.messageCount} msgs</span>
                       <span>•</span>
-                      <span className="font-mono">
-                        {record.id.slice(0, 6)}
-                      </span>
+                      <span className="font-mono">{record.id.slice(0, 6)}</span>
                     </div>
                   </div>
                 ))
@@ -193,6 +217,28 @@ export default function ServerPersistenceDemo() {
               <RefreshCcw className="h-4 w-4 mr-2" />
               {isLoadingSummaries ? "Refreshing..." : "Refresh"}
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Gauge className="h-4 w-4" />
+              Tool Counter
+            </CardTitle>
+            <CardDescription>
+              Updated automatically by the <code>increment_counter</code> tool.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Current value</span>
+              <span className="font-semibold">{counter}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Ask the assistant to bump the counter—the tool result is saved
+              with the active thread.
+            </p>
           </CardContent>
         </Card>
 
@@ -224,14 +270,18 @@ export default function ServerPersistenceDemo() {
 
       <main className="flex-1 min-w-0">
         <ChatContainer
-          models={DEMO_MODELS}
+          messages={{
+            systemPrompt:
+              "You are demonstrating server-persisted threads with frontend tools. When the user wants to adjust the counter, call the increment_counter tool and report the updated value.",
+          }}
+          models={{ available: DEMO_MODELS }}
           threads={{
             enabled: true,
             scopeKey: SCOPE_KEY,
             warnOnMissing: true,
           }}
-          composer={{ placeholder: "Send a message to write to the server" }}
-          debug={{ showMessages: true }}
+          commands={{ enabled: true }}
+          devTools={{ showErrorMessages: true }}
         />
       </main>
     </div>

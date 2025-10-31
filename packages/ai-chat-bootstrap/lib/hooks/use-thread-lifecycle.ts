@@ -168,11 +168,12 @@ export function useThreadLifecycle({
       };
 
       try {
-        const state = threadStore.getState();
+        let state = threadStore.getState();
 
         if (!state.isSummariesLoaded) {
           try {
             await state.loadSummaries(scope);
+            state = threadStore.getState();
           } catch (error) {
             logDevError(
               `[acb][useThreadLifecycle] failed to load thread summaries before selecting default thread (scope "${
@@ -185,9 +186,9 @@ export function useThreadLifecycle({
         }
 
         // Prefer existing active if present
-        const activeId = state.activeThreadId;
+        let activeId = state.activeThreadId;
         if (activeId) {
-          const existingTimeline = state.getTimeline(activeId);
+          const existingTimeline = threadStore.getState().getTimeline(activeId);
           if (existingTimeline) {
             const storeMsgs = existingTimeline.messages as UIMessage[];
             const currentMessages = chatHookRef.current?.messages ?? [];
@@ -199,7 +200,7 @@ export function useThreadLifecycle({
           }
 
           startRestoring();
-          const timeline = await state.ensureTimeline(activeId);
+          const timeline = await threadStore.getState().ensureTimeline(activeId);
           if (timeline) {
             const storeMsgs = timeline.messages as UIMessage[];
             const currentMessages = chatHookRef.current?.messages ?? [];
@@ -209,16 +210,32 @@ export function useThreadLifecycle({
             if (differs) chatHookRef.current?.setMessages(storeMsgs);
             return;
           }
+          // If ensureTimeline failed to resolve, refresh state before falling back
+          state = threadStore.getState();
+          activeId = state.activeThreadId;
+          if (activeId) {
+            const existingAfterEnsure = state.getTimeline(activeId);
+            if (existingAfterEnsure) {
+              const storeMsgs = existingAfterEnsure.messages as UIMessage[];
+              const currentMessages = chatHookRef.current?.messages ?? [];
+              const differs =
+                currentMessages.length !== storeMsgs.length ||
+                currentMessages.some((m, i) => storeMsgs[i]?.id !== m.id);
+              if (differs) chatHookRef.current?.setMessages(storeMsgs);
+              return;
+            }
+          }
         }
 
-        const summaries = state.listSummaries(scope);
+        const summaries = threadStore.getState().listSummaries(scope);
         if (summaries.length > 0) {
           startRestoring();
           const latest = summaries[0];
-          state.setActiveThread(latest.id);
+          threadStore.getState().setActiveThread(latest.id);
+          const refreshed = threadStore.getState();
           const timeline =
-            state.getTimeline(latest.id) ||
-            (await state.ensureTimeline(latest.id));
+            refreshed.getTimeline(latest.id) ||
+            (await refreshed.ensureTimeline(latest.id));
           if (timeline) {
             const storeMsgs = timeline.messages as UIMessage[];
             const currentMessages = chatHookRef.current?.messages ?? [];
@@ -230,12 +247,13 @@ export function useThreadLifecycle({
           }
         }
 
-        if (!state.activeThreadId) {
-          const record = state.createThread({ scopeKey: scope });
-          state.setActiveThread(record.id);
+        const finalState = threadStore.getState();
+        if (!finalState.activeThreadId) {
+          const record = finalState.createThread({ scopeKey: scope });
+          finalState.setActiveThread(record.id);
           const currentMessages = chatHookRef.current?.messages ?? [];
           if (currentMessages.length > 0) {
-            state.updateThreadMessages(
+            finalState.updateThreadMessages(
               record.id,
               currentMessages
             );

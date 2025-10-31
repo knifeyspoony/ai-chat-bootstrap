@@ -3,6 +3,7 @@ import type { UIMessage } from "ai";
 import { useChatThreadsStore } from "../stores";
 import { normalizeMessagesMetadata } from "../utils/message-normalization";
 import { logDevError } from "../utils/dev-logger";
+import { getDefaultChatThreadPersistence } from "../persistence/chat-threads-indexeddb";
 
 type ChatHelpers = {
   messages: UIMessage[];
@@ -55,6 +56,7 @@ export function useThreadLifecycle({
   const updateIsRestoringThread = useCallback((next: boolean) => {
     setIsRestoringThread((prev) => (prev === next ? prev : next));
   }, []);
+  const missingPersistenceLoggedRef = useRef(false);
 
   const threadTitleEnabled =
     titleOptions?.enabled ?? Boolean(titleOptions?.api);
@@ -68,6 +70,7 @@ export function useThreadLifecycle({
       const store = threadStore.getState();
 
       if (!threadsEnabled) {
+        missingPersistenceLoggedRef.current = false;
         if (store.mode !== "ephemeral") {
           store.initializeEphemeral?.();
         } else if (store.persistence) {
@@ -76,8 +79,35 @@ export function useThreadLifecycle({
         return;
       }
 
-      if (store.mode !== "persistent" || !store.persistence) {
-        store.initializePersistent?.();
+      if (store.persistence) {
+        missingPersistenceLoggedRef.current = false;
+        if (store.mode !== "persistent") {
+          store.setPersistence?.(store.persistence);
+        }
+        return;
+      }
+
+      const adapter = getDefaultChatThreadPersistence();
+      if (adapter) {
+        missingPersistenceLoggedRef.current = false;
+        store.initializePersistent?.(adapter);
+        return;
+      }
+
+      if (!missingPersistenceLoggedRef.current) {
+        missingPersistenceLoggedRef.current = true;
+        const message =
+          "[acb][useThreadLifecycle] threadsEnabled is true but no persistence adapter is available; falling back to ephemeral mode.";
+        console.error(message);
+        logDevError(
+          "[acb][useThreadLifecycle] missing persistence adapter",
+          new Error(message),
+          showErrorMessages
+        );
+      }
+
+      if (store.mode !== "ephemeral") {
+        store.initializeEphemeral?.();
       }
     } catch (error) {
       logDevError(

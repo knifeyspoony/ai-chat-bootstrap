@@ -1,5 +1,5 @@
 import type { UIMessage } from 'ai';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useChatThreadsStore } from '../lib/stores/chat-threads';
 import type {
   ChatThreadPersistence,
@@ -146,5 +146,74 @@ describe('useChatThreadsStore', () => {
     const t = useChatThreadsStore.getState().createThread({ title: 'E' });
     useChatThreadsStore.getState().updateThreadMessages(t.id, []);
     expect(savedRecords.length).toBe(0);
+  });
+
+  it('loadSummaries removes stale records and hydrates fallback timeline', async () => {
+    const store = useChatThreadsStore.getState();
+
+    const stale = store.createThread({ id: 'stale', scopeKey: 'scopeA', title: 'Old' });
+    store.setActiveThread(stale.id);
+    store.updateThreadMessages(stale.id, [
+      {
+        id: 'stale-msg',
+        role: 'user',
+        parts: [{ type: 'text', text: 'legacy' }],
+      } as unknown as UIMessage,
+    ]);
+
+    const loadSummaries = vi.fn(async () => [
+      {
+        id: 'fresh',
+        scopeKey: 'scopeA',
+        title: 'Fresh',
+        createdAt: Date.now() - 10,
+        updatedAt: Date.now(),
+        messageCount: 2,
+        messageSignature: 'sig-new',
+        metadata: {},
+        parentId: undefined,
+      } satisfies ChatThreadRecord,
+    ]);
+
+    const loadTimeline = vi.fn(async () => ({
+      threadId: 'fresh',
+      signature: 'sig-new',
+      updatedAt: Date.now(),
+      messages: [
+        {
+          id: 'a',
+          role: 'assistant',
+          parts: [{ type: 'text', text: 'latest' }],
+        } as unknown as UIMessage,
+      ],
+    } satisfies ChatThreadTimeline));
+
+    const mockPersistence: ChatThreadPersistence = {
+      loadSummaries,
+      loadTimeline,
+      async saveRecord() {
+        /* no-op */
+      },
+      async saveTimeline() {
+        /* no-op */
+      },
+      async deleteThread() {
+        /* no-op */
+      },
+    };
+
+    store.setScopeKey('scopeA');
+    store.setPersistence(mockPersistence);
+
+    await store.loadSummaries('scopeA');
+    await Promise.resolve();
+
+    const nextState = useChatThreadsStore.getState();
+    expect(loadSummaries).toHaveBeenCalledTimes(1);
+    expect(loadTimeline).toHaveBeenCalledWith('fresh');
+    expect(nextState.records.has('stale')).toBe(false);
+    expect(nextState.timelines.has('stale')).toBe(false);
+    expect(nextState.activeThreadId).toBe('fresh');
+    expect(nextState.timelines.get('fresh')?.snapshot.messages[0]?.id).toBe('a');
   });
 });

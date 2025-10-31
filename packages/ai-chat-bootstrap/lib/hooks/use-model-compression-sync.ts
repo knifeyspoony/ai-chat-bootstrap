@@ -26,6 +26,10 @@ import { logDevError } from "../utils/dev-logger";
 
 const EMPTY_MODEL_OPTIONS: ChatModelOption[] = [];
 
+function isMetadataObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function hasMeaningfulUsageChange(
   previous: CompressionUsage | null,
   next: CompressionUsage
@@ -513,9 +517,20 @@ export function useModelCompressionSync({
 
       if (effectiveThreadId) {
         try {
-          threadStore.getState().updateThreadMetadata(effectiveThreadId, {
-            [COMPRESSION_THREAD_METADATA_KEY]: null,
-          });
+          const state = threadStore.getState();
+          const record = state.records.get(effectiveThreadId);
+          const metadata = record?.metadata;
+          let existingValue: unknown;
+
+          if (isMetadataObject(metadata)) {
+            existingValue = metadata[COMPRESSION_THREAD_METADATA_KEY];
+          }
+
+          if (existingValue !== null && existingValue !== undefined) {
+            state.updateThreadMetadata(effectiveThreadId, {
+              [COMPRESSION_THREAD_METADATA_KEY]: null,
+            });
+          }
         } catch (error) {
           logDevError(
             `[acb][useModelCompressionSync] failed to clear compression metadata for thread "${effectiveThreadId}"`,

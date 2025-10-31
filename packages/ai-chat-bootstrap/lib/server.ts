@@ -15,6 +15,7 @@ export {
   loadMcpTools,
 } from "./utils/backend-tool-utils";
 export { buildEnrichedSystemPrompt } from "./utils/prompt-utils";
+export { normalizeMessagesMetadata } from "./utils/message-normalization";
 export * from "./utils/token-utils";
 
 // Re-export types & schemas (pure TypeScript / zod, no React)
@@ -34,3 +35,12 @@ export type {
   SuggestionsSchemaType,
 } from "./types/chat";
 export { type CompressionServiceRequest } from "./types/compression";
+export type {
+  ChatThread,
+  ChatThreadRecord,
+  ChatThreadSummary,
+  ChatThreadTimeline,
+  ChatThreadPersistence,
+  CreateThreadOptions,
+  CloneThreadOptions,
+} from "./types/threads";

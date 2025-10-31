@@ -502,29 +502,31 @@ const ChatInputImpl = ({
     <div className={cn("flex flex-col gap-2", className)}>
       {/* Error Display */}
       {error && (
-        <Alert variant="destructive" className="mx-1">
-          <AlertDescription className="flex items-center justify-between">
-            <span className="flex-1">{error}</span>
-            <div className="flex items-center gap-1">
-              {onRetry && (
+        <div className="px-1">
+          <Alert variant="destructive">
+            <AlertDescription className="flex items-center justify-between">
+              <span className="flex-1">{error}</span>
+              <div className="flex items-center gap-1">
+                {onRetry && (
+                  <PromptInputButton
+                    onClick={onRetry}
+                    className="h-6 w-6 p-0 hover:bg-background/20"
+                    title="Retry last message"
+                  >
+                    <RotateCcwIcon className="h-3 w-3" />
+                  </PromptInputButton>
+                )}
                 <PromptInputButton
-                  onClick={onRetry}
+                  onClick={() => setError?.(null)}
                   className="h-6 w-6 p-0 hover:bg-background/20"
-                  title="Retry last message"
+                  title="Dismiss error"
                 >
-                  <RotateCcwIcon className="h-3 w-3" />
+                  <XIcon className="h-3 w-3" />
                 </PromptInputButton>
-              )}
-              <PromptInputButton
-                onClick={() => setError?.(null)}
-                className="h-6 w-6 p-0 hover:bg-background/20"
-                title="Dismiss error"
-              >
-                <XIcon className="h-3 w-3" />
-              </PromptInputButton>
-            </div>
-          </AlertDescription>
-        </Alert>
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
 
       {/* Focus Item Chips */}

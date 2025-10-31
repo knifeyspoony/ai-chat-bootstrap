@@ -68,6 +68,12 @@ const DEMO_PAGES: Array<{
     icon: MessageSquare,
   },
   {
+    href: "/vanilla",
+    title: "Vanilla Session",
+    description: "Single in-memory chat without threads or compression.",
+    icon: Compass,
+  },
+  {
     href: "/transport",
     title: "Custom Transport Hook",
     description: "Inject custom headers or data into the chat transport layer.",
@@ -78,6 +84,12 @@ const DEMO_PAGES: Array<{
     title: "Threaded Sessions",
     description: "Persist multi-conversation workspaces.",
     icon: GitBranch,
+  },
+  {
+    href: "/threads/server",
+    title: "Server Persistence",
+    description: "Demo adapter backed by a server-side data store.",
+    icon: Server,
   },
   {
     href: "/compression",

@@ -114,6 +114,7 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
 
   initializePersistent: (persistence?: ChatThreadPersistence) => {
     const nextPersistence = persistence ?? getDefaultChatThreadPersistence();
+    const hasPersistence = Boolean(nextPersistence);
     set({
       scopeKey: undefined,
       records: new Map(),
@@ -121,7 +122,7 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
       activeThreadId: undefined,
       isSummariesLoaded: false,
       persistence: nextPersistence,
-      mode: "persistent",
+      mode: hasPersistence ? "persistent" : "ephemeral",
     });
   },
 
@@ -171,17 +172,45 @@ export const useChatThreadsStore = create<ChatThreadsState>((set, get) => ({
       const summaries = await p.loadSummaries(key);
       set((state) => {
         const nextRecords = new Map(state.records);
+        const nextTimelines = new Map(state.timelines);
+        const scopeIds = new Set<string>(summaries.map((summary) => summary.id));
         for (const summary of summaries) {
           nextRecords.set(summary.id, {
             ...summary,
             metadata: ensureMetadata(summary.metadata),
           });
         }
+        // Remove records (and any cached timelines) that no longer exist in persistence for the scope
+        for (const [id, record] of state.records.entries()) {
+          const matchesScope = key ? record.scopeKey === key : true;
+          if (matchesScope && !scopeIds.has(id)) {
+            nextRecords.delete(id);
+            nextTimelines.delete(id);
+          }
+        }
+        const activeThreadId = state.activeThreadId;
+        let nextActiveThreadId = activeThreadId && nextRecords.has(activeThreadId) ? activeThreadId : undefined;
+        const fallbackSummary = summaries[0];
+        if (!nextActiveThreadId && fallbackSummary && nextRecords.has(fallbackSummary.id)) {
+          nextActiveThreadId = fallbackSummary.id;
+        }
         return {
           records: nextRecords,
+          timelines: nextTimelines,
           isSummariesLoaded: true,
+          activeThreadId: nextActiveThreadId,
         };
       });
+
+      // Refresh timeline cache for the fallback thread when needed to ensure messages load eagerly
+      const fallbackId = summaries[0]?.id;
+      if (fallbackId) {
+        const state = get();
+        const hasTimeline = state.timelines.has(fallbackId);
+        if (!hasTimeline) {
+          state.ensureTimeline(fallbackId).catch(() => {});
+        }
+      }
     } catch {
       set({ isSummariesLoaded: true });
     }

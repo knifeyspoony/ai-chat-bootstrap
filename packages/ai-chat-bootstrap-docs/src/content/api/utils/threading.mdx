@@ -226,6 +226,10 @@ export default function App() {
 }
 ```
 
+> ℹ️ If threads are enabled but no persistence adapter is available, the store will now log a warning and fall back to ephemeral mode. Always wire up an adapter (or call `initializeEphemeral`) in environments where `IndexedDB` is unavailable.
+
+> 💡 Implementing persistence in a Node/Edge context? Import helpers from the server-friendly bundle: `import { normalizeMessagesMetadata } from "ai-chat-bootstrap/server";` to avoid pulling React components into route handlers.
+
 ## Scoped Threads
 
 Use `scopeKey` to partition threads by workspace, notebook, or project:
@@ -251,11 +255,15 @@ Threads with different scope keys are isolated and won't appear in each other's 
 
 2. **Implement `loadSummaries` efficiently** - Return only the record fields needed to render thread lists. Avoid fetching full messages during summary loads.
 
-3. **Handle errors gracefully** - Wrap persistence calls in try-catch blocks to handle storage failures.
+3. **Return the full truth** - `loadSummaries` should return the complete set of threads for the scope. The store removes anything missing from the response and promotes the most recently updated thread automatically.
 
-4. **Use transactions** - When using SQL databases, wrap multiple operations in transactions for consistency.
+4. **Hydrate timelines** - `loadTimeline` should surface the latest messages. The store eagerly calls it for the active thread after `loadSummaries`, so provide canonical data.
 
-5. **Index key fields** - Add database indexes on `scopeKey`, `updatedAt`, and `id` for better query performance.
+5. **Handle errors gracefully** - Wrap persistence calls in try-catch blocks to handle storage failures.
+
+6. **Use transactions** - When using SQL databases, wrap multiple operations in transactions for consistency.
+
+7. **Index key fields** - Add database indexes on `scopeKey`, `updatedAt`, and `id` for better query performance.
 
 ## Related
 

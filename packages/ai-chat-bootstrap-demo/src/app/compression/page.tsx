@@ -193,7 +193,7 @@ export default function CompressionDemoPage() {
         }}
         header={{
           title: "AI Assistant",
-          subtitle: "GPT-4o • 2,048 token budget",
+          subtitle: "GPT-4.1 • 2,048 token budget",
         }}
         ui={{
           placeholder:

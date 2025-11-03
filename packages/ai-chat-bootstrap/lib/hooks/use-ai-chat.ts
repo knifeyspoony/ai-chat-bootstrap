@@ -155,6 +155,7 @@ export function useAIChat(options: import("./use-ai-chat-types").UseAIChatOption
     enabled: mcpEnabled,
     api: mcp?.api,
     servers: mcp?.servers,
+    toolRenderers: mcp?.toolRenderers,
     showErrorMessages,
   });
 
@@ -204,6 +205,13 @@ export function useAIChat(options: import("./use-ai-chat-types").UseAIChatOption
     messages: threadLifecycle.existingThreadMessages ?? initialMessages,
     experimental_throttle: 100,
     onToolCall: async ({ toolCall }) => {
+      console.log("[acb][use-ai-chat] onToolCall called:", {
+        toolName: toolCall.toolName,
+        isDynamic: toolCall.dynamic,
+        hasInput: !!toolCall.input,
+        toolCallId: toolCall.toolCallId,
+      });
+
       try {
         if (!toolCall.dynamic) {
           const result = await executeTool(toolCall.toolName, toolCall.input);
@@ -212,6 +220,8 @@ export function useAIChat(options: import("./use-ai-chat-types").UseAIChatOption
             toolCallId: toolCall.toolCallId,
             output: result,
           });
+        } else {
+          console.log("[acb][use-ai-chat] Dynamic tool - result should come from backend stream");
         }
       } catch (error) {
         setError("Tool execution failed");

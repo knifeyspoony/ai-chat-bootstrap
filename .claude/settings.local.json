@@ -28,7 +28,10 @@
       "Bash(node:*)",
       "Bash(echo:*)",
       "Bash(pnpm --filter ai-chat-bootstrap lint:*)",
-      "Bash(pnpm --filter ai-chat-bootstrap typecheck:*)"
+      "Bash(pnpm --filter ai-chat-bootstrap typecheck:*)",
+      "Bash(cat:*)",
+      "Bash(npm view:*)",
+      "Bash(pnpm --filter ai-chat-bootstrap test)"
     ],
     "deny": [],
     "ask": []

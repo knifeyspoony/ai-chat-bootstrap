@@ -7,11 +7,25 @@ export interface MCPToolSummary {
   description?: string;
 }
 
+export interface MCPToolRenderer {
+  serverUrl: string;
+  toolName: string;
+  render: (result: unknown) => React.ReactNode;
+}
+
 export interface MCPServerToolError {
   serverId: string;
   serverName?: string;
   url: string;
   message: string;
+}
+
+/**
+ * Creates a unique key for an MCP tool based on server URL and tool name.
+ * This prevents collisions when multiple MCP servers expose tools with the same name.
+ */
+export function createMCPToolKey(serverUrl: string, toolName: string): string {
+  return `${serverUrl}:${toolName}`;
 }
 
 export type MCPServerTransport =
@@ -53,6 +67,8 @@ interface RegisterMCPServerArgs {
 interface MCPServersStore {
   servers: Map<string, MCPServerEntry>;
   configurations: SerializedMCPServer[];
+  toolRenderers: Map<string, MCPToolRenderer>;
+  toolToServerUrl: Map<string, string>; // Maps tool name to server URL
   defaultApi?: string;
   enabled: boolean;
   registerServer: (server: RegisterMCPServerArgs) => void;
@@ -72,6 +88,19 @@ interface MCPServersStore {
   setDefaultApi: (api: string) => void;
   setEnabled: (enabled: boolean) => void;
   getServersAsStableObject: () => Record<string, MCPServerEntry>;
+  registerToolRenderer: (
+    serverUrl: string,
+    toolName: string,
+    render: (result: unknown) => React.ReactNode
+  ) => void;
+  getToolRenderer: (
+    serverUrl: string,
+    toolName: string
+  ) => ((result: unknown) => React.ReactNode) | undefined;
+  getToolRendererByToolName: (
+    toolName: string
+  ) => ((result: unknown) => React.ReactNode) | undefined;
+  clearToolRenderers: () => void;
 }
 
 export interface MCPServerToolsRequest {
@@ -87,6 +116,8 @@ export interface MCPServerToolsResponse {
 export const useAIMCPServersStore = create<MCPServersStore>((set, get) => ({
   servers: new Map<string, MCPServerEntry>(),
   configurations: [],
+  toolRenderers: new Map<string, MCPToolRenderer>(),
+  toolToServerUrl: new Map<string, string>(),
   defaultApi: "/api/mcp-discovery",
   enabled: false,
 
@@ -174,7 +205,15 @@ export const useAIMCPServersStore = create<MCPServersStore>((set, get) => ({
         isLoading: false,
         lastLoadedAt: Date.now(),
       });
-      return { servers };
+
+      // Update tool-to-server URL mapping
+      const toolToServerUrl = new Map(state.toolToServerUrl);
+      const serverUrl = current.transport.url;
+      tools.forEach((tool) => {
+        toolToServerUrl.set(tool.name, serverUrl);
+      });
+
+      return { servers, toolToServerUrl };
     });
   },
 
@@ -243,6 +282,34 @@ export const useAIMCPServersStore = create<MCPServersStore>((set, get) => ({
       result[key] = value;
     }
     return result;
+  },
+
+  registerToolRenderer: (serverUrl, toolName, render) => {
+    set((state) => {
+      const key = createMCPToolKey(serverUrl, toolName);
+      const toolRenderers = new Map(state.toolRenderers);
+      toolRenderers.set(key, { serverUrl, toolName, render });
+      return { toolRenderers };
+    });
+  },
+
+  getToolRenderer: (serverUrl, toolName) => {
+    const key = createMCPToolKey(serverUrl, toolName);
+    const renderer = get().toolRenderers.get(key);
+    return renderer?.render;
+  },
+
+  getToolRendererByToolName: (toolName) => {
+    const state = get();
+    const serverUrl = state.toolToServerUrl.get(toolName);
+    if (!serverUrl) return undefined;
+    const key = createMCPToolKey(serverUrl, toolName);
+    const renderer = state.toolRenderers.get(key);
+    return renderer?.render;
+  },
+
+  clearToolRenderers: () => {
+    set({ toolRenderers: new Map() });
   },
 }));
 

@@ -22,7 +22,7 @@ import {
   ToolInput,
   ToolOutput,
 } from "../../components/ai-elements/tool";
-import { useAIToolsStore } from "../../stores";
+import { useAIToolsStore, useAIMCPServersStore } from "../../stores";
 
 type AnyUIPart = UIMessage["parts"][number];
 
@@ -36,6 +36,9 @@ function ChatMessagePartImpl({
   responseProps?: ResponseProps;
 }) {
   const getTool = useAIToolsStore((s) => s.getTool);
+  const getMCPToolRenderer = useAIMCPServersStore(
+    (s) => s.getToolRendererByToolName
+  );
 
   switch (part.type) {
     case "text":
@@ -79,6 +82,7 @@ function ChatMessagePartImpl({
         const baseName = isDynamicTool
           ? (toolPart as DynamicToolUIPart).toolName
           : getToolName(toolPart as ToolUIPart);
+
         const displayLabel = (() => {
           if (typeof baseName === "string" && baseName.trim() !== "") {
             return baseName;
@@ -117,6 +121,24 @@ function ChatMessagePartImpl({
             customRendered = toolStoreTool.render(toolPart.output);
           } catch (err) {
             customRenderError = err;
+          }
+        }
+
+        // If no frontend tool renderer, check for MCP tool renderer
+        if (
+          !customRendered &&
+          !customRenderError &&
+          toolPart.state === "output-available" &&
+          toolPart.output
+        ) {
+          const mcpRenderer = getMCPToolRenderer(baseName);
+          if (mcpRenderer) {
+            try {
+              customRendered = mcpRenderer(toolPart.output);
+            } catch (err) {
+              console.error("[ChatMessagePart] MCP renderer error:", err);
+              customRenderError = err;
+            }
           }
         }
 

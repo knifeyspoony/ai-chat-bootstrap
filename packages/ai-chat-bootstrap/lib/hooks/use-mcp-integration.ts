@@ -8,6 +8,11 @@ export interface UseMCPIntegrationOptions {
   enabled: boolean;
   api?: string;
   servers?: SerializedMCPServer[];
+  toolRenderers?: Array<{
+    serverUrl: string;
+    toolName: string;
+    render: (result: unknown) => React.ReactNode;
+  }>;
   showErrorMessages?: boolean;
 }
 
@@ -19,6 +24,7 @@ export function useMCPIntegration({
   enabled,
   api,
   servers,
+  toolRenderers,
   showErrorMessages = false,
 }: UseMCPIntegrationOptions) {
   const setMcpEnabled = useAIMCPServersStore((state) => state.setEnabled);
@@ -32,6 +38,12 @@ export function useMCPIntegration({
   );
   const setServerError = useAIMCPServersStore((state) => state.setServerError);
   const setServerTools = useAIMCPServersStore((state) => state.setServerTools);
+  const registerToolRenderer = useAIMCPServersStore(
+    (state) => state.registerToolRenderer
+  );
+  const clearToolRenderers = useAIMCPServersStore(
+    (state) => state.clearToolRenderers
+  );
 
   // Configure MCP enabled state and server settings
   useEffect(() => {
@@ -58,6 +70,38 @@ export function useMCPIntegration({
     setMcpDefaultApi,
     setMcpEnabled,
     setMcpConfigurations,
+    showErrorMessages,
+  ]);
+
+  // Register tool renderers
+  useEffect(() => {
+    if (!enabled) {
+      clearToolRenderers();
+      return;
+    }
+
+    // Clear existing renderers first
+    clearToolRenderers();
+
+    // Register new renderers
+    if (Array.isArray(toolRenderers)) {
+      try {
+        toolRenderers.forEach(({ serverUrl, toolName, render }) => {
+          registerToolRenderer(serverUrl, toolName, render);
+        });
+      } catch (error) {
+        logDevError(
+          "[acb][useMCPIntegration] failed to register tool renderers",
+          error,
+          showErrorMessages
+        );
+      }
+    }
+  }, [
+    enabled,
+    toolRenderers,
+    registerToolRenderer,
+    clearToolRenderers,
     showErrorMessages,
   ]);
 

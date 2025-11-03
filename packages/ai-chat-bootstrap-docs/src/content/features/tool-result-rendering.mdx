@@ -222,6 +222,59 @@ render: (result) => (
 5. **Interactivity**: Users can interact with the rendered component
 6. **State Updates**: Components can trigger further tool executions
 
+## MCP Tool Rendering
+
+**Custom rendering also works with MCP (Model Context Protocol) tools!**
+
+While this page focuses on frontend tools registered with `useAIFrontendTool`, you can apply the same rendering patterns to tools provided by MCP servers. MCP tools are external services that expose tool capabilities via the Model Context Protocol.
+
+### Key Differences for MCP Tools
+
+1. **Response Format**: MCP tools return results in a standardized format with `content` array
+2. **Registration**: Use `toolRenderers` array in the `mcp` prop instead of `useAIFrontendTool`
+3. **Identification**: Match tools using `serverUrl` + `toolName` for uniqueness
+
+### Quick Example
+
+```tsx
+<ChatContainer
+  transport={{ api: "/api/chat" }}
+  mcp={{
+    enabled: true,
+    servers: [
+      {
+        id: "weather-server",
+        transport: {
+          type: "streamable-http",
+          url: "http://localhost:3030/mcp",
+        },
+      },
+    ],
+    toolRenderers: [
+      {
+        serverUrl: "http://localhost:3030/mcp",
+        toolName: "get_weather",
+        render: (result) => {
+          // Parse MCP response format
+          const data = JSON.parse(result.content[0].text);
+          return <WeatherCard {...data} />;
+        },
+      },
+    ],
+  }}
+/>
+```
+
+### Learn More
+
+For complete details on MCP tool rendering including:
+- MCP response format parsing
+- Multiple server configurations
+- Tool uniqueness guarantees
+- Debugging tips
+
+See the [MCP Servers - Custom Tool Rendering](/features/mcp-servers#custom-tool-rendering) section.
+
 ## API Reference
 
 - Hook: [useAIFrontendTool](/api/hooks/use-ai-frontend-tool)

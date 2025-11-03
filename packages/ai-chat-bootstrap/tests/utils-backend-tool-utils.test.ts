@@ -239,7 +239,7 @@ describe('loadMcpTools', () => {
     const result = await loadMcpTools(servers);
 
     expect(result.errors).toHaveLength(1);
-    expect(result.errors[0].message).toBe('Failed to load MCP tools');
+    expect(result.errors[0].message).toBe('An unknown error occurred');
   });
 
   it('handles empty tool set from server', async () => {

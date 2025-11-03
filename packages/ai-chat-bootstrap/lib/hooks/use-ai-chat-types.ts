@@ -63,6 +63,11 @@ export interface UseAIChatOptions {
     enabled?: boolean;
     api?: string;
     servers?: SerializedMCPServer[];
+    toolRenderers?: Array<{
+      serverUrl: string;
+      toolName: string;
+      render: (result: unknown) => React.ReactNode;
+    }>;
   };
   models?: {
     available?: ChatModelOption[];

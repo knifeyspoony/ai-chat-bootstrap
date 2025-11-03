@@ -317,6 +317,285 @@ function MCPServerConnection({ url }: { url: string }) {
 }
 ```
 
+## Custom Tool Rendering
+
+MCP tools support custom React rendering, allowing you to display rich, interactive UI components for tool results instead of plain text. This works similarly to [frontend tool rendering](/features/tool-result-rendering), but for tools provided by MCP servers.
+
+### Basic Usage
+
+Pass `toolRenderers` to the `mcp` prop to register custom renderers:
+
+```tsx
+"use client";
+import { ChatContainer } from "ai-chat-bootstrap";
+
+export function ChatWithMCPRendering() {
+  return (
+    <ChatContainer
+      transport={{ api: "/api/chat" }}
+      mcp={{
+        enabled: true,
+        servers: [
+          {
+            id: "weather-server",
+            transport: {
+              type: "streamable-http",
+              url: "http://localhost:3030/mcp",
+            },
+          },
+        ],
+        toolRenderers: [
+          {
+            serverUrl: "http://localhost:3030/mcp",
+            toolName: "get_weather",
+            render: (result) => {
+              // Parse MCP response format
+              const data = JSON.parse(result.content[0].text);
+
+              return (
+                <div className="p-4 bg-card rounded-lg border">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">{data.location}</h3>
+                    <span className="text-3xl font-bold">{data.temperature}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{data.conditions}</p>
+                  {data.humidity && (
+                    <div className="text-xs text-muted-foreground mt-2">
+                      Humidity: {data.humidity}%
+                    </div>
+                  )}
+                </div>
+              );
+            },
+          },
+        ],
+      }}
+    />
+  );
+}
+```
+
+### Understanding MCP Response Format
+
+MCP tools return results in a standardized format:
+
+```typescript
+{
+  content: [
+    {
+      type: "text",
+      text: '{"location":"San Francisco","temperature":"72°F","conditions":"Sunny"}'
+    }
+  ]
+}
+```
+
+Your renderer receives this entire object and should parse the JSON from `content[0].text`:
+
+```tsx
+render: (result) => {
+  // Extract and parse JSON from MCP response
+  let data: Record<string, unknown> = {};
+
+  try {
+    const mcpResult = result as { content?: Array<{ type: string; text: string }> };
+    if (mcpResult.content?.[0]?.text) {
+      data = JSON.parse(mcpResult.content[0].text);
+    }
+  } catch (error) {
+    console.error("Failed to parse MCP result:", error);
+    // Fallback to raw result
+    data = result as Record<string, unknown>;
+  }
+
+  return <YourComponent {...data} />;
+}
+```
+
+### Multiple Tool Renderers
+
+Register renderers for multiple tools from different servers:
+
+```tsx
+<ChatContainer
+  mcp={{
+    enabled: true,
+    servers: [
+      {
+        id: "weather-server",
+        transport: { type: "sse", url: "http://localhost:3030/mcp" },
+      },
+      {
+        id: "calendar-server",
+        transport: { type: "sse", url: "http://localhost:3031/mcp" },
+      },
+    ],
+    toolRenderers: [
+      {
+        serverUrl: "http://localhost:3030/mcp",
+        toolName: "get_weather",
+        render: (result) => <WeatherCard data={parseResult(result)} />,
+      },
+      {
+        serverUrl: "http://localhost:3031/mcp",
+        toolName: "list_events",
+        render: (result) => <CalendarEvents events={parseResult(result)} />,
+      },
+      {
+        serverUrl: "http://localhost:3031/mcp",
+        toolName: "create_meeting",
+        render: (result) => <MeetingConfirmation meeting={parseResult(result)} />,
+      },
+    ],
+  }}
+/>
+```
+
+### Tool Uniqueness
+
+Tool renderers are matched using a composite key of `serverUrl` + `toolName`. This guarantees uniqueness even when multiple MCP servers expose tools with the same name:
+
+```tsx
+// These are treated as different tools:
+// Server 1: http://localhost:3030/mcp -> "search"
+// Server 2: http://localhost:3031/mcp -> "search"
+
+toolRenderers: [
+  {
+    serverUrl: "http://localhost:3030/mcp",
+    toolName: "search",
+    render: (result) => <WebSearchResults {...parseResult(result)} />,
+  },
+  {
+    serverUrl: "http://localhost:3031/mcp",
+    toolName: "search",
+    render: (result) => <DatabaseSearchResults {...parseResult(result)} />,
+  },
+]
+```
+
+### Complete Example
+
+Here's a full example with error handling and multiple renderers:
+
+```tsx
+"use client";
+import React from "react";
+import { ChatContainer, useMCPServer } from "ai-chat-bootstrap";
+
+// Helper to parse MCP results
+function parseMCPResult(result: unknown): Record<string, unknown> {
+  try {
+    const mcpResult = result as { content?: Array<{ type: string; text: string }> };
+    if (mcpResult.content?.[0]?.text) {
+      return JSON.parse(mcpResult.content[0].text);
+    }
+  } catch (error) {
+    console.error("Failed to parse MCP result:", error);
+  }
+  return result as Record<string, unknown>;
+}
+
+// Weather component
+function WeatherCard({ location, temperature, conditions, humidity }: any) {
+  return (
+    <div className="space-y-2 p-4 bg-card rounded-lg border">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">{location}</h3>
+        <span className="text-3xl font-bold">{temperature}</span>
+      </div>
+      <p className="text-sm text-muted-foreground capitalize">{conditions}</p>
+      {humidity && (
+        <div className="text-xs text-muted-foreground">Humidity: {humidity}%</div>
+      )}
+    </div>
+  );
+}
+
+// Meeting component
+function MeetingAgenda({ title, date, attendees, items }: any) {
+  return (
+    <div className="space-y-3 p-4 bg-card rounded-lg border">
+      <div>
+        <h3 className="text-lg font-semibold">{title}</h3>
+        <p className="text-sm text-muted-foreground">{date}</p>
+      </div>
+      {attendees && (
+        <div className="text-sm">
+          <span className="font-medium">Attendees: </span>
+          {attendees.join(", ")}
+        </div>
+      )}
+      {items && items.length > 0 && (
+        <ol className="list-decimal list-inside space-y-1 text-sm">
+          {items.map((item: string, idx: number) => (
+            <li key={idx}>{item}</li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+export function MCPWithCustomRendering() {
+  const mcpServer = useMCPServer({
+    url: process.env.NEXT_PUBLIC_MCP_SERVER_URL!,
+    name: "Demo Tools",
+  });
+
+  return (
+    <div>
+      {mcpServer.error && (
+        <div className="mb-4 p-3 bg-destructive/10 text-destructive rounded">
+          Error: {mcpServer.error}
+        </div>
+      )}
+
+      <ChatContainer
+        transport={{ api: "/api/chat" }}
+        mcp={{
+          enabled: true,
+          toolRenderers: [
+            {
+              serverUrl: process.env.NEXT_PUBLIC_MCP_SERVER_URL!,
+              toolName: "demo_weather_forecast",
+              render: (result) => <WeatherCard {...parseMCPResult(result)} />,
+            },
+            {
+              serverUrl: process.env.NEXT_PUBLIC_MCP_SERVER_URL!,
+              toolName: "create_meeting_agenda",
+              render: (result) => <MeetingAgenda {...parseMCPResult(result)} />,
+            },
+          ],
+        }}
+        header={{ title: "MCP with Custom Rendering" }}
+        ui={{ placeholder: "Ask about weather or create a meeting agenda" }}
+      />
+    </div>
+  );
+}
+```
+
+### Best Practices for MCP Rendering
+
+1. **Always parse MCP response format** - Extract JSON from `content[0].text`
+2. **Handle parsing errors gracefully** - Provide fallback rendering
+3. **Type your data** - Create interfaces for expected tool responses
+4. **Use environment variables** - Keep server URLs configurable
+5. **Test with real servers** - Verify parsing logic with actual MCP responses
+6. **Match exact tool names** - Tool names must match exactly (case-sensitive)
+7. **Provide meaningful fallbacks** - Show useful error messages when parsing fails
+
+### Debugging Tips
+
+If your custom renderer isn't working:
+
+1. **Check tool names match exactly** - Case-sensitive matching
+2. **Verify serverUrl matches** - Must be identical to server configuration
+3. **Inspect the result object** - Log what your renderer receives
+4. **Test JSON parsing** - Ensure MCP server returns valid JSON
+5. **Check console for errors** - Parsing errors are logged
+
 ## Best Practices
 
 1. **Use environment variables** for MCP server URLs in production

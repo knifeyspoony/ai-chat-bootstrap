@@ -79,44 +79,51 @@ demoMcpServer.registerTool(
   },
   (async (args: unknown) => {
     const { city, units } = weatherToolInputSchema.parse(args);
-    const key = city.trim().toLowerCase();
-    const forecast = SAMPLE_FORECASTS[key];
+    const normalizedCity = city.toLowerCase();
+    const forecast = SAMPLE_FORECASTS[normalizedCity];
+
     if (!forecast) {
-      return {
+      const result = {
         content: [
           {
             type: "text",
-            text: `I only have sample forecasts for Seattle, San Francisco, or Denver right now. I couldn't find "${city}".`,
+            text: JSON.stringify({
+              error: `No forecast available for ${city}. Try Seattle, San Francisco, or Denver.`,
+            }),
           },
         ],
       };
+      return result;
     }
 
-    const convertTemperature = (value: number) =>
-      units === "metric" ? Math.round(((value - 32) * 5) / 9) : value;
+    // Convert temperature if metric requested
+    const temp =
+      units === "metric"
+        ? Math.round(((forecast.high - 32) * 5) / 9)
+        : forecast.high;
+    const tempUnit = units === "metric" ? "C" : "F";
 
-    const formatTemperature = (value: number) => {
-      const temperature = convertTemperature(value);
-      return `${temperature}°${units === "metric" ? "C" : "F"}`;
+    // Return structured data that matches the custom renderer expectations
+    const weatherData = {
+      location: capitalizeWords(city),
+      temperature: `${temp}°${tempUnit}`,
+      conditions: forecast.summary,
+      condition: forecast.conditions.join(", "),
+      humidity: 65, // Sample humidity value
+      high: forecast.high,
+      low: forecast.low,
     };
 
-    const { summary, high, low, conditions } = forecast;
-    const response = `Here's the latest vibe for ${capitalizeWords(
-      city
-    )}: ${summary}. Expect a high of ${formatTemperature(
-      high
-    )} and a low around ${formatTemperature(low)}. Conditions to watch: ${
-      conditions.length > 0 ? conditions.join(", ") : "clear skies"
-    }.`;
-
-    return {
+    const result = {
       content: [
         {
           type: "text",
-          text: response,
+          text: JSON.stringify(weatherData),
         },
       ],
     };
+
+    return result;
   }) as any
 );
 

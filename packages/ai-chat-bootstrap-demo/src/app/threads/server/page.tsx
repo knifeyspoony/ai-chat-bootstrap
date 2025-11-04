@@ -27,10 +27,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useShallow } from "zustand/react/shallow";
 
-const DEMO_MODELS = [
-  { id: "gpt-4o", label: "GPT-4o" },
-  { id: "gpt-4.1", label: "GPT-4.1" },
-];
+const DEMO_MODELS = [{ id: "gpt-4.1", label: "GPT-4.1" }];
 
 const SCOPE_KEY = "server-thread-demo";
 

@@ -5,8 +5,8 @@ import { ChatContainer, type UIMessage } from "ai-chat-bootstrap";
 
 const VANILLA_MODEL = [
   {
-    id: "gpt-4o",
-    label: "GPT-4o",
+    id: "gpt-4.1",
+    label: "GPT-4.1",
     description: "General purpose model",
   },
 ];
@@ -60,7 +60,8 @@ export default function VanillaChatDemoPage() {
           branching: false,
         }}
         ui={{
-          placeholder: "Try sending a message—everything stays in this session.",
+          placeholder:
+            "Try sending a message—everything stays in this session.",
         }}
         devTools={{
           enabled: true,

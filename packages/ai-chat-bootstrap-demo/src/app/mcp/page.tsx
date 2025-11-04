@@ -2,10 +2,7 @@
 
 import { ChatContainer } from "ai-chat-bootstrap";
 
-const DEMO_MODELS = [
-  { id: "gpt-4o", label: "GPT-4o" },
-  { id: "gpt-4.1", label: "GPT-4.1" },
-];
+const DEMO_MODELS = [{ id: "gpt-4.1", label: "GPT-4.1" }];
 
 const DEFAULT_MCP_SERVER_URL =
   process.env.NEXT_PUBLIC_MCP_SERVER_URL ?? "http://127.0.0.1:3031/mcp";
@@ -16,7 +13,8 @@ export default function McpTestPage() {
       <div className="border-b bg-background p-4">
         <h1 className="text-2xl font-bold">MCP Server Registration Test</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Testing automatic tool discovery via ChatContainer mcp prop with custom tool renderers
+          Testing automatic tool discovery via ChatContainer mcp prop with
+          custom tool renderers
         </p>
       </div>
 
@@ -50,12 +48,17 @@ export default function McpTestPage() {
                   // Parse the JSON from the text content
                   let data: Record<string, unknown> = {};
                   try {
-                    const mcpResult = result as { content?: Array<{ type: string; text: string }> };
+                    const mcpResult = result as {
+                      content?: Array<{ type: string; text: string }>;
+                    };
                     if (mcpResult.content?.[0]?.text) {
                       data = JSON.parse(mcpResult.content[0].text);
                     }
                   } catch (error) {
-                    console.error("[weather-renderer] Failed to parse MCP result:", error);
+                    console.error(
+                      "[weather-renderer] Failed to parse MCP result:",
+                      error
+                    );
                     data = result as Record<string, unknown>;
                   }
 
@@ -97,37 +100,45 @@ export default function McpTestPage() {
                   // Parse the JSON from the text content
                   let data: Record<string, unknown> = {};
                   try {
-                    const mcpResult = result as { content?: Array<{ type: string; text: string }> };
+                    const mcpResult = result as {
+                      content?: Array<{ type: string; text: string }>;
+                    };
                     if (mcpResult.content?.[0]?.text) {
                       data = JSON.parse(mcpResult.content[0].text);
                     }
                   } catch (error) {
-                    console.error("[meeting-renderer] Failed to parse MCP result:", error);
+                    console.error(
+                      "[meeting-renderer] Failed to parse MCP result:",
+                      error
+                    );
                     data = result as Record<string, unknown>;
                   }
 
                   return (
                     <div className="space-y-3">
                       <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
-                        Meeting Agenda: {String(data.topic || "Unknown")} ({Number(data.durationMinutes || 0)} min)
+                        Meeting Agenda: {String(data.topic || "Unknown")} (
+                        {Number(data.durationMinutes || 0)} min)
                       </h3>
                       {Array.isArray(data.results) ? (
                         <ul className="space-y-2">
-                          {data.results.map((item: Record<string, unknown>, idx: number) => (
-                            <li
-                              key={idx}
-                              className="border-l-2 border-primary/50 pl-3"
-                            >
-                              <div className="font-medium">
-                                {String(item.title || item.name || "")}
-                              </div>
-                              {item.description ? (
-                                <p className="text-sm text-muted-foreground mt-0.5">
-                                  {String(item.description)}
-                                </p>
-                              ) : null}
-                            </li>
-                          ))}
+                          {data.results.map(
+                            (item: Record<string, unknown>, idx: number) => (
+                              <li
+                                key={idx}
+                                className="border-l-2 border-primary/50 pl-3"
+                              >
+                                <div className="font-medium">
+                                  {String(item.title || item.name || "")}
+                                </div>
+                                {item.description ? (
+                                  <p className="text-sm text-muted-foreground mt-0.5">
+                                    {String(item.description)}
+                                  </p>
+                                ) : null}
+                              </li>
+                            )
+                          )}
                         </ul>
                       ) : (
                         <div className="text-sm">{JSON.stringify(data)}</div>
@@ -140,7 +151,8 @@ export default function McpTestPage() {
           }}
           header={{
             title: "MCP Test Chat",
-            subtitle: "Tools auto-fetched from mcp.servers prop with custom renderers",
+            subtitle:
+              "Tools auto-fetched from mcp.servers prop with custom renderers",
           }}
           ui={{
             placeholder:

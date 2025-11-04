@@ -1,8 +1,5 @@
 import { useChat } from "@ai-sdk/react";
-import {
-  lastAssistantMessageIsCompleteWithToolCalls,
-  UIMessage,
-} from "ai";
+import { lastAssistantMessageIsCompleteWithToolCalls, UIMessage } from "ai";
 import {
   useCallback,
   useDeferredValue,
@@ -12,11 +9,7 @@ import {
   useState,
 } from "react";
 import { useShallow } from "zustand/react/shallow";
-import {
-  useAIContextStore,
-  useAIFocusStore,
-  useAIToolsStore,
-} from "../stores";
+import { useAIContextStore, useAIFocusStore, useAIToolsStore } from "../stores";
 import { useChatStore } from "../stores/";
 import type { Suggestion } from "../types/chat";
 import {
@@ -29,29 +22,31 @@ import { normalizeMessagesMetadata } from "../utils/message-normalization";
 import { useAIChatBranching } from "./use-ai-chat-branching";
 import { useAIChatCompression } from "./use-ai-chat-compression";
 import { useChainOfThought } from "./use-chain-of-thought";
-import { useSuggestions } from "./use-suggestions";
-import { useMCPIntegration } from "./use-mcp-integration";
 import { useChatTransport } from "./use-chat-transport";
+import { useMCPIntegration } from "./use-mcp-integration";
 import { useMessageOperations } from "./use-message-operations";
 import { useModelCompressionSync } from "./use-model-compression-sync";
+import { useSuggestions } from "./use-suggestions";
 import { useThreadLifecycle } from "./use-thread-lifecycle";
 
 // Re-export types
 export type {
-  UseAIChatOptions,
   DevToolsConfig,
-  ThreadTitleOptions,
-  ThreadsOptions,
   SuggestionsOptions,
+  ThreadsOptions,
+  ThreadTitleOptions,
+  UseAIChatOptions,
 } from "./use-ai-chat-types";
+export type { ChatHelpers };
 
 type ChatHelpers = ReturnType<typeof useChat>;
-export type { ChatHelpers };
 
 /**
  * Main AI Chat hook - composed from specialized sub-hooks.
  */
-export function useAIChat(options: import("./use-ai-chat-types").UseAIChatOptions = {}) {
+export function useAIChat(
+  options: import("./use-ai-chat-types").UseAIChatOptions = {}
+) {
   const {
     transport,
     messages,
@@ -67,7 +62,8 @@ export function useAIChat(options: import("./use-ai-chat-types").UseAIChatOption
   // Extract and normalize options
   const transportOptions = transport ?? {};
   const api = transportOptions.api ?? "/api/chat";
-  const userPrepareSendMessagesRequest = transportOptions.prepareSendMessagesRequest;
+  const userPrepareSendMessagesRequest =
+    transportOptions.prepareSendMessagesRequest;
   const systemPrompt = messages?.systemPrompt;
   const initialMessages = messages?.initial;
   const threadsGroup = threads ?? {};
@@ -206,10 +202,7 @@ export function useAIChat(options: import("./use-ai-chat-types").UseAIChatOption
     experimental_throttle: 100,
     onToolCall: async ({ toolCall }) => {
       console.log("[acb][use-ai-chat] onToolCall called:", {
-        toolName: toolCall.toolName,
-        isDynamic: toolCall.dynamic,
-        hasInput: !!toolCall.input,
-        toolCallId: toolCall.toolCallId,
+        toolCall: JSON.stringify(toolCall),
       });
 
       try {
@@ -221,7 +214,9 @@ export function useAIChat(options: import("./use-ai-chat-types").UseAIChatOption
             output: result,
           });
         } else {
-          console.log("[acb][use-ai-chat] Dynamic tool - result should come from backend stream");
+          console.log(
+            "[acb][use-ai-chat] Dynamic tool - result should come from backend stream"
+          );
         }
       } catch (error) {
         setError("Tool execution failed");

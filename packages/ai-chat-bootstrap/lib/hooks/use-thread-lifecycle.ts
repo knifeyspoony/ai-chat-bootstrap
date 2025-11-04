@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { UIMessage } from "ai";
-import { useChatThreadsStore } from "../stores";
+import { useChatThreadsStore, useChatStore } from "../stores";
 import { normalizeMessagesMetadata } from "../utils/message-normalization";
 import { logDevError } from "../utils/dev-logger";
 import { getDefaultChatThreadPersistence } from "../persistence/chat-threads-indexeddb";
@@ -8,6 +8,8 @@ import { getDefaultChatThreadPersistence } from "../persistence/chat-threads-ind
 type ChatHelpers = {
   messages: UIMessage[];
   setMessages: (messages: UIMessage[]) => void;
+  stop?: () => void;
+  clearError?: () => void;
 };
 
 export interface ThreadTitleOptions {
@@ -63,6 +65,62 @@ export function useThreadLifecycle({
   const threadTitleApi =
     threadTitleEnabled && titleOptions?.api ? titleOptions.api : "";
   const threadTitleSampleCount = titleOptions?.sampleCount ?? 8;
+  const lastFreshThreadResetRef = useRef<string | undefined>(undefined);
+
+  const resetChatForFreshThread = useCallback(
+    (threadIdentifier: string) => {
+      // Clear global chat error state first so UI reflects reset even if chat hook is unavailable
+      try {
+        useChatStore.getState().setError(null);
+      } catch (error) {
+        logDevError(
+          `[acb][useThreadLifecycle] failed to reset global chat error for new thread "${threadIdentifier}"`,
+          error,
+          showErrorMessages
+        );
+      }
+
+      const latest = chatHookRef.current;
+      if (!latest) return;
+
+      try {
+        if (typeof latest.stop === "function") {
+          latest.stop();
+        }
+      } catch (error) {
+        logDevError(
+          `[acb][useThreadLifecycle] failed to cancel active completion for new thread "${threadIdentifier}"`,
+          error,
+          showErrorMessages
+        );
+      }
+
+      try {
+        if (typeof latest.clearError === "function") {
+          latest.clearError();
+        }
+      } catch (error) {
+        logDevError(
+          `[acb][useThreadLifecycle] failed to clear chat hook error for new thread "${threadIdentifier}"`,
+          error,
+          showErrorMessages
+        );
+      }
+
+      try {
+        if (Array.isArray(latest.messages) && latest.messages.length > 0) {
+          latest.setMessages([]);
+        }
+      } catch (error) {
+        logDevError(
+          `[acb][useThreadLifecycle] failed to clear messages for new thread "${threadIdentifier}"`,
+          error,
+          showErrorMessages
+        );
+      }
+    },
+    [chatHookRef, showErrorMessages]
+  );
 
   // Configure persistence mode based on threads enabled flag
   useEffect(() => {
@@ -465,6 +523,36 @@ export function useThreadLifecycle({
       return;
     }
 
+    if (
+      effectiveId &&
+      lastFreshThreadResetRef.current !== effectiveId
+    ) {
+      try {
+        const record = state.getRecord(effectiveId);
+        const timeline = state.getTimeline(effectiveId);
+        const createdAt = record?.createdAt ?? 0;
+        const updatedAt = record?.updatedAt ?? 0;
+        const hasRecord = Boolean(record);
+        const messageCount = record?.messageCount ?? 0;
+        const timelineMessages = (timeline?.messages ?? []) as UIMessage[];
+        const timelineCount = timelineMessages.length;
+        const isFreshThread =
+          (!hasRecord && timelineCount === 0) ||
+          (hasRecord && createdAt === updatedAt);
+
+        if (isFreshThread) {
+          resetChatForFreshThread(effectiveId);
+          lastFreshThreadResetRef.current = effectiveId;
+        }
+      } catch (error) {
+        logDevError(
+          `[acb][useThreadLifecycle] failed to inspect thread "${effectiveId}" freshness`,
+          error,
+          showErrorMessages
+        );
+      }
+    }
+
     if (previousHydratedId && previousHydratedId !== effectiveId) {
       try {
         state.unloadTimeline(previousHydratedId);
@@ -542,7 +630,7 @@ export function useThreadLifecycle({
       });
     // chatHookRef is intentionally not in deps - refs are stable and don't trigger re-renders
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threadId, storeActiveThreadId, threadStore, showErrorMessages]);
+  }, [threadId, storeActiveThreadId, threadStore, showErrorMessages, resetChatForFreshThread]);
 
   // Message persistence with deduplication
   function computeSignature(msgs: UIMessage[]): string {

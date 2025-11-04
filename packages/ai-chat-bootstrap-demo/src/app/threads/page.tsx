@@ -1,17 +1,14 @@
 "use client";
 
-import type { UIMessage } from "ai";
-import { ChatContainer, useChatThreadsStore } from "ai-chat-bootstrap";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Database, MessageSquare, Clock } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import type { UIMessage } from "ai";
+import { ChatContainer, useChatThreadsStore } from "ai-chat-bootstrap";
+import { Clock, Database, MessageSquare } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-const DEMO_MODELS = [
-  { id: "gpt-4o", label: "GPT-4o" },
-  { id: "gpt-4.1", label: "GPT-4.1" },
-];
+const DEMO_MODELS = [{ id: "gpt-4.1", label: "GPT-4.1" }];
 
 export default function ThreadsDemo() {
   // Scope key for this demo - all threads created here will be in this scope
@@ -48,9 +45,7 @@ export default function ThreadsDemo() {
     const list = Array.from(records.values()).filter((record) =>
       key ? record.scopeKey === key : true
     );
-    return list
-      .slice()
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+    return list.slice().sort((a, b) => b.updatedAt - a.updatedAt);
   }, [records, scopeKey, storeScopeKey]);
 
   const activeThread = useMemo(() => {
@@ -62,9 +57,9 @@ export default function ThreadsDemo() {
       ? {
           threadId: activeThreadId,
           signature: storedTimeline.state.signature,
-          messages: storedTimeline.state.order.map((id) =>
-            storedTimeline.state.byId.get(id)
-          ).filter((message): message is UIMessage => Boolean(message)),
+          messages: storedTimeline.state.order
+            .map((id) => storedTimeline.state.byId.get(id))
+            .filter((message): message is UIMessage => Boolean(message)),
           updatedAt: storedTimeline.updatedAt,
         }
       : undefined;
@@ -106,20 +101,26 @@ export default function ThreadsDemo() {
             <CardContent className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Mode:</span>
-                <Badge variant={mode === "persistent" ? "default" : "secondary"}>
+                <Badge
+                  variant={mode === "persistent" ? "default" : "secondary"}
+                >
                   {mounted ? mode : "..."}
                 </Badge>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">IndexedDB:</span>
-                <Badge variant={mounted && persistence ? "default" : "secondary"}>
+                <Badge
+                  variant={mounted && persistence ? "default" : "secondary"}
+                >
                   {mounted ? (persistence ? "Active" : "Unavailable") : "..."}
                 </Badge>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Active Thread:</span>
                 <span className="font-mono text-xs truncate max-w-[120px]">
-                  {mounted && activeThreadId ? activeThreadId.slice(0, 8) : "None"}
+                  {mounted && activeThreadId
+                    ? activeThreadId.slice(0, 8)
+                    : "None"}
                 </span>
               </div>
             </CardContent>
@@ -155,7 +156,9 @@ export default function ThreadsDemo() {
                   <Clock className="h-3 w-3" />
                   <span>
                     Updated:{" "}
-                    {new Date(activeThread.record.updatedAt).toLocaleTimeString()}
+                    {new Date(
+                      activeThread.record.updatedAt
+                    ).toLocaleTimeString()}
                   </span>
                 </div>
               </CardContent>
@@ -211,21 +214,18 @@ export default function ThreadsDemo() {
           {/* Instructions */}
           <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">How it Works</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                How it Works
+              </CardTitle>
             </CardHeader>
             <CardContent className="text-xs space-y-2 text-muted-foreground">
+              <p>• Messages auto-save to IndexedDB</p>
               <p>
-                • Messages auto-save to IndexedDB
+                • Click the threads button (top-right) to switch between
+                conversations
               </p>
-              <p>
-                • Click the threads button (top-right) to switch between conversations
-              </p>
-              <p>
-                • Reload the page - your messages persist!
-              </p>
-              <p>
-                • Threads are scoped to this demo page
-              </p>
+              <p>• Reload the page - your messages persist!</p>
+              <p>• Threads are scoped to this demo page</p>
               <p className="pt-2 text-xs font-medium text-foreground">
                 Check DevTools → Application → IndexedDB → acb_chat_threads
               </p>
@@ -265,7 +265,8 @@ export default function ThreadsDemo() {
             subtitle: "Your messages are automatically saved",
           }}
           ui={{
-            placeholder: "Try: 'Explain how thread persistence works' or start a conversation...",
+            placeholder:
+              "Try: 'Explain how thread persistence works' or start a conversation...",
           }}
           suggestions={{
             enabled: true,

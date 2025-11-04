@@ -3,11 +3,7 @@
 import { useEphemeralChatThreads } from "@/hooks/use-ephemeral-chat-threads";
 import { ChatContainer } from "ai-chat-bootstrap";
 
-const DEMO_MODELS = [
-  { id: "gpt-4o", label: "GPT-4o" },
-  { id: "gpt-4.1", label: "GPT-4.1" },
-  { id: "gpt-5", label: "GPT-5" },
-];
+const DEMO_MODELS = [{ id: "gpt-4.1", label: "GPT-4.1" }];
 
 export default function BasicChatPage() {
   useEphemeralChatThreads();
@@ -26,7 +22,7 @@ export default function BasicChatPage() {
         features={{ chainOfThought: true }}
         models={{
           available: DEMO_MODELS,
-          initial: "gpt-4o",
+          initial: "gpt-4.1",
         }}
         header={{
           title: "AI Chat Bootstrap Demo",

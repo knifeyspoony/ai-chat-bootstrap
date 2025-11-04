@@ -31,11 +31,7 @@ import {
 import Link from "next/link";
 import React, { useMemo, useState } from "react";
 
-const DEMO_MODELS = [
-  { id: "gpt-4o", label: "GPT-4o" },
-  { id: "gpt-4.1", label: "GPT-4.1" },
-  { id: "gpt-5", label: "GPT-5" },
-];
+const DEMO_MODELS = [{ id: "gpt-4.1", label: "GPT-4.1" }];
 
 const CORE_FEATURES: Array<{
   title: string;

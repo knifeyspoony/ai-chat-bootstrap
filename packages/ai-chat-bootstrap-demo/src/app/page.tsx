@@ -34,6 +34,7 @@ import {
   EyeIcon,
   Focus,
   GitBranch,
+  Hammer,
   Layers,
   MessageSquare,
   Network,
@@ -42,11 +43,7 @@ import {
   Zap,
 } from "lucide-react";
 
-const DEMO_MODELS = [
-  { id: "gpt-4o", label: "GPT-4o" },
-  { id: "gpt-4.1", label: "GPT-4.1" },
-  { id: "gpt-5", label: "GPT-5" },
-];
+const DEMO_MODELS = [{ id: "gpt-4.1", label: "GPT-4.1" }];
 
 const DEMO_PAGES: Array<{
   href: string;
@@ -102,6 +99,13 @@ const DEMO_PAGES: Array<{
     title: "MCP Integrations",
     description: "Call remote toolchains using the Model Context Protocol.",
     icon: Server,
+  },
+  {
+    href: "/server-tools",
+    title: "Server Tools",
+    description:
+      "Force backend-controlled tools (via streamText) to run every turn.",
+    icon: Hammer,
   },
 ];
 

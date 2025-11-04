@@ -1,9 +1,9 @@
-import { useEffect, useState, useCallback, useRef } from "react";
 import type { UIMessage } from "ai";
-import { useChatThreadsStore, useChatStore } from "../stores";
-import { normalizeMessagesMetadata } from "../utils/message-normalization";
-import { logDevError } from "../utils/dev-logger";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getDefaultChatThreadPersistence } from "../persistence/chat-threads-indexeddb";
+import { useChatStore, useChatThreadsStore } from "../stores";
+import { logDevError } from "../utils/dev-logger";
+import { normalizeMessagesMetadata } from "../utils/message-normalization";
 
 type ChatHelpers = {
   messages: UIMessage[];
@@ -258,7 +258,9 @@ export function useThreadLifecycle({
           }
 
           startRestoring();
-          const timeline = await threadStore.getState().ensureTimeline(activeId);
+          const timeline = await threadStore
+            .getState()
+            .ensureTimeline(activeId);
           if (timeline) {
             const storeMsgs = timeline.messages as UIMessage[];
             const currentMessages = chatHookRef.current?.messages ?? [];
@@ -311,10 +313,7 @@ export function useThreadLifecycle({
           finalState.setActiveThread(record.id);
           const currentMessages = chatHookRef.current?.messages ?? [];
           if (currentMessages.length > 0) {
-            finalState.updateThreadMessages(
-              record.id,
-              currentMessages
-            );
+            finalState.updateThreadMessages(record.id, currentMessages);
           }
         }
       } catch (error) {
@@ -338,7 +337,13 @@ export function useThreadLifecycle({
     };
     // chatHookRef is intentionally not in deps - refs are stable and don't trigger re-renders
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threadId, scopeKey, threadStore, showErrorMessages, updateIsRestoringThread]);
+  }, [
+    threadId,
+    scopeKey,
+    threadStore,
+    showErrorMessages,
+    updateIsRestoringThread,
+  ]);
 
   // Load initial thread messages synchronously if already present
   const existingThreadMessages: UIMessage[] | undefined = (() => {
@@ -458,7 +463,16 @@ export function useThreadLifecycle({
     };
     // chatHookRef is intentionally not in deps - refs are stable and don't trigger re-renders
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threadId, autoCreate, warnOnMissing, scopeKey, threadStore, showErrorMessages, updateIsRestoringThread, initialMessages]);
+  }, [
+    threadId,
+    autoCreate,
+    warnOnMissing,
+    scopeKey,
+    threadStore,
+    showErrorMessages,
+    updateIsRestoringThread,
+    initialMessages,
+  ]);
 
   // Thread switching logic
   const lastThreadIdRef = useRef<string | undefined>(undefined);
@@ -494,7 +508,9 @@ export function useThreadLifecycle({
           existing.some((m, index) => messages[index]?.id !== m.id);
         if (differs) {
           logDebug(
-            `[acb][useThreadLifecycle] Rendering ${messages.length} message(s) for thread ${effectiveId?.slice(0, 8)}`
+            `[acb][useThreadLifecycle] Rendering ${
+              messages.length
+            } message(s) for thread ${effectiveId?.slice(0, 8)}`
           );
           latest.setMessages(messages);
         }
@@ -523,17 +539,13 @@ export function useThreadLifecycle({
       return;
     }
 
-    if (
-      effectiveId &&
-      lastFreshThreadResetRef.current !== effectiveId
-    ) {
+    if (effectiveId && lastFreshThreadResetRef.current !== effectiveId) {
       try {
         const record = state.getRecord(effectiveId);
         const timeline = state.getTimeline(effectiveId);
         const createdAt = record?.createdAt ?? 0;
         const updatedAt = record?.updatedAt ?? 0;
         const hasRecord = Boolean(record);
-        const messageCount = record?.messageCount ?? 0;
         const timelineMessages = (timeline?.messages ?? []) as UIMessage[];
         const timelineCount = timelineMessages.length;
         const isFreshThread =
@@ -568,7 +580,9 @@ export function useThreadLifecycle({
     if (!effectiveId) {
       const latest = chatHookRef.current;
       if (latest && latest.messages.length > 0) {
-        logDebug("[acb][useThreadLifecycle] Clearing messages - no active thread");
+        logDebug(
+          "[acb][useThreadLifecycle] Clearing messages - no active thread"
+        );
         latest.setMessages([]);
       }
       lastThreadIdRef.current = undefined;
@@ -581,10 +595,15 @@ export function useThreadLifecycle({
 
     if (showErrorMessages) {
       logDebug(
-        `[acb][useThreadLifecycle] Thread switch: ${previousHydratedId?.slice(0, 8)} → ${effectiveId.slice(0, 8)}`
+        `[acb][useThreadLifecycle] Thread switch: ${previousHydratedId?.slice(
+          0,
+          8
+        )} → ${effectiveId.slice(0, 8)}`
       );
       logDebug(
-        `  Current chatHook.messages.length=${chatHookRef.current?.messages?.length ?? 0}`
+        `  Current chatHook.messages.length=${
+          chatHookRef.current?.messages?.length ?? 0
+        }`
       );
     }
 
@@ -608,7 +627,10 @@ export function useThreadLifecycle({
         if (threadSyncTokenRef.current !== token) return;
         if (!timeline) {
           logDebug(
-            `[acb][useThreadLifecycle] No timeline from ensureTimeline for thread ${effectiveId.slice(0, 8)}`
+            `[acb][useThreadLifecycle] No timeline from ensureTimeline for thread ${effectiveId.slice(
+              0,
+              8
+            )}`
           );
           syncMessages([], false);
           return;
@@ -630,7 +652,13 @@ export function useThreadLifecycle({
       });
     // chatHookRef is intentionally not in deps - refs are stable and don't trigger re-renders
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threadId, storeActiveThreadId, threadStore, showErrorMessages, resetChatForFreshThread]);
+  }, [
+    threadId,
+    storeActiveThreadId,
+    threadStore,
+    showErrorMessages,
+    resetChatForFreshThread,
+  ]);
 
   // Message persistence with deduplication
   function computeSignature(msgs: UIMessage[]): string {
@@ -796,10 +824,7 @@ export function useThreadLifecycle({
       try {
         const refreshedState = threadStore.getState();
         const currentRecord = refreshedState.getRecord(effectiveId);
-        const meta = (currentRecord?.metadata || {}) as Record<
-          string,
-          unknown
-        >;
+        const meta = (currentRecord?.metadata || {}) as Record<string, unknown>;
         const manual = meta.manualTitle === true;
 
         if (manual) return;
@@ -818,7 +843,9 @@ export function useThreadLifecycle({
           const storeMsgs =
             refreshedState.getTimeline(effectiveId)?.messages ?? [];
           const source =
-            storeMsgs.length > 0 ? storeMsgs : (messagesSnapshot as UIMessage[]) || [];
+            storeMsgs.length > 0
+              ? storeMsgs
+              : (messagesSnapshot as UIMessage[]) || [];
           const sample = source.slice(-threadTitleSampleCount);
           const payload: {
             messages: UIMessage[];
@@ -860,7 +887,13 @@ export function useThreadLifecycle({
         );
       }
     },
-    [threadTitleEnabled, threadTitleApi, threadTitleSampleCount, threadStore, showErrorMessages]
+    [
+      threadTitleEnabled,
+      threadTitleApi,
+      threadTitleSampleCount,
+      threadStore,
+      showErrorMessages,
+    ]
   );
 
   // onFinish callback for integration with chat hook

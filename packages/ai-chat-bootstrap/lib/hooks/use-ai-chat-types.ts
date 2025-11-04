@@ -1,5 +1,4 @@
-import type { PrepareSendMessagesRequest } from "ai";
-import type { UIMessage } from "ai";
+import type { ChatInit, PrepareSendMessagesRequest, UIMessage } from "ai";
 import type { SerializedMCPServer } from "../stores/mcp";
 import type { ChatModelOption } from "../types/chat";
 import type { CompressionConfig } from "../types/compression";
@@ -76,4 +75,5 @@ export interface UseAIChatOptions {
   compression?: CompressionConfig;
   suggestions?: SuggestionsOptions;
   devTools?: DevToolsConfig;
+  sendAutomaticallyWhen?: ChatInit<UIMessage>["sendAutomaticallyWhen"] | null;
 }

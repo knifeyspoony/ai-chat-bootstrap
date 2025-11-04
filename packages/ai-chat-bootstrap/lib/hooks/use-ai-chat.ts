@@ -57,6 +57,7 @@ export function useAIChat(
     compression: compressionOptions,
     suggestions: suggestionsOptions,
     devTools,
+    sendAutomaticallyWhen: sendAutomaticallyWhenOption,
   } = options;
 
   // Extract and normalize options
@@ -81,6 +82,11 @@ export function useAIChat(
   const suggestionsEnabled = suggestionsConfig?.enabled ?? false;
   const suggestionCount = suggestionsConfig?.count ?? 3;
   const compressionEnabled = compressionOptions?.enabled ?? false;
+  const hasSendAutomaticallyWhenOverride =
+    sendAutomaticallyWhenOption !== undefined;
+  const resolvedSendAutomaticallyWhen = hasSendAutomaticallyWhenOverride
+    ? sendAutomaticallyWhenOption ?? undefined
+    : lastAssistantMessageIsCompleteWithToolCalls;
 
   // Compute devTools flags
   const devToolsEnabled = devTools?.enabled ?? false;
@@ -197,7 +203,7 @@ export function useAIChat(
   // NOW initialize the core chat hook WITH transport
   const chatHook = useChat({
     transport: chatTransport,
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    sendAutomaticallyWhen: resolvedSendAutomaticallyWhen,
     messages: threadLifecycle.existingThreadMessages ?? initialMessages,
     experimental_throttle: 100,
     onToolCall: async ({ toolCall }) => {
